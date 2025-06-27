@@ -4,7 +4,7 @@ class Individual:
         self.fitness_function = fitness_function
         self.fitness = None
         self.data = None
-        self.evaluate()
+        self.evaluate() # não avaliar a função na criação do indivíduo
 
     def evaluate(self):
         self.fitness, self.data = self.fitness_function(self.param)
