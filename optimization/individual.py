@@ -7,7 +7,8 @@ class Individual:
         self.evaluate() # não avaliar a função na criação do indivíduo
 
     def evaluate(self):
-        self.fitness, self.data = self.fitness_function(self.param)
+        if not self.fitness:
+            self.fitness, self.data = self.fitness_function(self.param)
 
     def __str__(self):
         param_str = ", ".join(f"{p:.4f}" for p in self.param)
