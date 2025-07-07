@@ -6,7 +6,7 @@ class Particle(Individual):
     # preciso criar uma forma de registrar o histórico de posições para usar com c1
     # inicalizar a velocidade com base no tamanho do espaço de busca
     # definir proporção no update de velocidade
-    def __init__(self, param, fitness_function, velocity=None, best=None):
+    def __init__(self, param, fitness_function, velocity=None, best=None, init_vel_ratio=None):
         """
 
         :param param: lista de valores parâmetros atreladas à partícula (posição)
@@ -15,11 +15,11 @@ class Particle(Individual):
         """
         super().__init__(param, fitness_function)
         self.velocity = velocity
+        self.ratio = init_vel_ratio
         self.best = best
 
-    @staticmethod
-    def initial_velocity(parameters):
-        vel = [random.uniform(-1,1) * (parameters[i].upper_bound - parameters[i].lower_bound) for i in range(len(parameters))]
+    def initial_velocity(self, parameters):
+        vel = [random.uniform(-self.ratio,self.ratio) * parameters[i].search_space for i in range(len(parameters))]
         return vel
 
     def evaluate(self):
@@ -53,4 +53,3 @@ class Particle(Individual):
             new_vel.append(w * self.velocity[i] + cognitive + social)
 
         return Particle(new_pos, self.fitness_function, new_vel, self.best)
-
