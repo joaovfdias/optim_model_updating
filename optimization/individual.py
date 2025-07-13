@@ -5,18 +5,21 @@ class Individual:
         self.fitness = None
         self.data = None
 
+    def __str__(self):
+        param_str = ", ".join(f"{p:.4f}" for p in self.param)
+        return f"Individual(param=[{param_str}], fitness={self.fitness:.4f})"
+
     def evaluate(self):
         if not self.fitness:
-            self.fitness, self.data = self.fitness_function(self.param)
+            result = self.fitness_function(self.param)
+            self.fitness, self.data = result if isinstance(result, tuple) else (result,
+                                                                                None)  # armazenar self.data apenas se o retorno da função exigir
+            if self.data and not isinstance(self.data, list):  # revisar isso aqui
+                self.data = [self.data]
 
     @staticmethod
-    def compareIndividuals(ind1, ind2):
+    def compare_individuals(ind1, ind2):
         for i, _ in enumerate(ind1.param):
             if ind1.param[i] != ind2.param[i]:
                 return False
         return True
-
-
-    def __str__(self):
-        param_str = ", ".join(f"{p:.4f}" for p in self.param)
-        return f"Individual(param=[{param_str}], fitness={self.fitness:.4f})"

@@ -1,0 +1,125 @@
+import time
+from skopt.space import Real
+from skopt import gp_minimize
+import csv
+from datetime import datetime
+
+from ..optimizer import Optimizer
+from ..individual import Individual
+
+
+class BO(Optimizer):
+    def __init__(self, fitness_function, parameters, initial_points):
+        """
+        Otimização Bayesiana utilizando a função "gp_minimize" da biblioteca "scikit-optimize"
+        :param fitness_function: função objetivo a ser otimizada (função que recebe lista de valores dos parâmetros e retorna: fitness, [dados]
+        :param parameters: lista de objetos da classe Parameters declarados com limites inferior e superior e nome
+        :param initial_points: equivalente a "n_initial_points" na função "gp_minimize", referente ao número de avaliações executadas antes da aproximação da função com "base_estimator"
+        """
+        super().__init__(fitness_function, parameters, population_size=initial_points)
+
+        self.status = False
+        self.log = True
+
+        self.populations = []
+
+        self.initial_evaluations = initial_points
+        self.search_space = [Real(p.lower_bound, p.upper_bound, name=p.key) for p in parameters]
+
+        self.sampling_method = 'random'
+        self.sampling_methods = ['random', 'lhs']
+
+
+    def set_sampling_method(self, sampling_method):
+        if sampling_method in self.sampling_methods:
+            self.sampling_method = sampling_method
+        else:
+            print(
+                f"Método de amostragem '{sampling_method}' inválido. Tipos válidos: {list(self.sampling_methods)}")
+            return
+
+
+    def evaluate_model(self, params):
+        self.populations.append(Individual(params, self.fitness_function))
+        self.populations[-1].evaluate()
+        fitness = self.populations[-1].fitness
+
+        if self.status:
+            it = max((len(self.populations) - self.initial_evaluations), 0) # mantém IT=0 para avaliações iniciais printadas, começa a contar quando GP assume
+            best_individual = min(self.populations, key=lambda p:p.fitness)
+            if it > 0:
+                print(f"Avaliação {it}: Best = {best_individual.fitness}, Fitness = {self.populations[-1].fitness}, Parâmetros: {self.display_parameters(self.populations[-1])}")
+            else: # altera a mensagem caso esteja nos pontos iniciais ainda
+                print(f"Avaliação Inicial {len(self.populations)}: Best = {best_individual.fitness}, Fitness = {self.populations[-1].fitness}, Parâmetros: {self.display_parameters(self.populations[-1])}")
+
+        if self.log:
+            it = max((len(self.populations) - self.initial_evaluations), 0)
+            self.add_log(it, [self.populations[-1]])
+
+        return fitness
+
+
+    # Otimizar com scikit-optimize
+    def run(self, evaluations, acq_func=None, xi=None, kappa=None, status=True, log=True):
+
+        acq_func = acq_func or "EI"
+        xi = xi or 0.01 # default
+        kappa = kappa or 1.96 # default
+
+        self.status = status
+        self.log = log
+        timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
+        if acq_func in ["EI","PI"]:
+            self.logfilename = self.logfilename or f"BO_{timestamp}_acq_fun={acq_func}_xi={xi}"
+        elif acq_func=="LCB":
+            self.logfilename = self.logfilename or f"BO_{timestamp}_acq_fun={acq_func}_kappa={kappa}"
+        else:
+            self.logfilename = self.logfilename or f"BO_{timestamp}_acq_fun={acq_func}"
+
+        result = gp_minimize(self.evaluate_model, self.search_space, n_calls=evaluations, n_initial_points=self.initial_evaluations, initial_point_generator=self.sampling_method, acq_func=acq_func, acq_optimizer="sampling", xi=xi, kappa=kappa)
+
+        best_individual = self.get_best_individual(self.populations)
+
+        fim = time.time()
+        if self.log:
+            self.time_log(fim)
+            self.add_log_specs(result.specs)
+            print(f"\nRegistro salvo em: {self.log_path}")
+
+        print(f"\nMelhor solução encontrada: Fitness = {best_individual.fitness}, Parâmetros: {self.display_parameters(best_individual)}")
+
+        return result
+
+
+    def add_log_specs(self, specs_dictionary):
+        with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file, delimiter=';')
+
+            # Adiciona uma linha vazia
+            writer.writerow([])
+
+            # Adiciona o título "Specifications"
+            writer.writerow(["Specifications"])
+
+            # Adiciona as keys em uma linha
+            writer.writerow(specs_dictionary.keys())
+
+            # Adiciona os valores correspondentes em outra linha
+            writer.writerow(specs_dictionary.values())
+
+    # salvar os resultados em log [sem uso]
+    @staticmethod
+    def save_log_BO(filename, result):
+        timestamp = datetime.now().strftime("%d%m%Y_%H%M")
+        filename = filename or f"BayesianOpt_{timestamp}.csv"
+
+        header = ["Iteration", "Fitness", "x", "y", "z"]
+        with open(filename, mode="w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file, delimiter=";")
+            writer.writerow(header)
+
+            for i, (fitness, params) in enumerate(zip(result.func_vals, result.x_iters)):
+                row = [i + 1, fitness] + list(params)
+                writer.writerow(row)
+
+        print(f"Log saved as {filename}")

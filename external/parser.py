@@ -1,3 +1,126 @@
-class AnsysParser():
-    def __init__(self):
-        raise NotImplementedError
+import subprocess
+import os
+import numpy as np
+import psutil
+
+
+class Ansys:
+    """
+    ANSYS: entrar com:
+
+    ansys_exe_path: caminho do executável
+    working_dir: caminho da pasta onde serão feitas as rodadas e salvos os arquivos de saída do ANSYS (por padrão é a pasta ANSYS no diretório atual)
+    base_scripth_path: caminho do script base de comandos do ANSYS (por padrão é o arquivo "script.txt" dentro de 'working_dir')
+
+    ! usar a estrutura r'caminho' para declarar os diretórios de forma apropriada
+
+    num_nodes define a quantidade de pontos usados para descrever os deslocamentos em cada modo de vibração (será retirado, pode ser ignorado)
+    """
+    def __init__(self, ansys_exe_path, ansys_working_dir=None, input_dir=None, base_script_filename=None, base_freq_filename=None, base_modes_filename=None, output_dir=None): # estudar retirar num_modes
+        """
+
+        :param ansys_exe_path: executável do ANSYS
+        :param ansys_working_dir: pasta que o ANSYS roda e gera arquivos de saída. se vazio, será em \ANSYS dentro do caminho atual
+        :param input_dir: pasta onde os arquivos de entrada (script, dados de frequencia e modos) estão. se vazio, será em ansys_working_dir
+        :param base_script_filename: nome do script base. se vazio, "script.txt"
+        :param base_freq_filename: nome do arquivo de frequencia de referência. se vazio, "out_freq.txt"
+        :param base_modes_filename: nome do arquivo de modos de referência. se vazio, "out_modos.txt"
+        :param output_dir: diretório em que são salvos os script executáveis de cada indivíduo. se vazio, será em input_dir
+        """
+
+        self.current_dir = os.getcwd() # definindo o diretório atual para estabelecer a pasta padrão 'ANSYS'
+
+        self.ansys_exe_path = ansys_exe_path
+        self.ansys_working_dir = ansys_working_dir or os.path.join(self.current_dir, 'ANSYS')
+        os.makedirs(self.ansys_working_dir, exist_ok=True)
+
+        self.input_dir = input_dir or self.ansys_working_dir
+        self.out_dir = output_dir or self.input_dir
+        self.base_script_path = os.path.join(self.input_dir, base_script_filename or 'script.txt')
+        self.index = 0 # usado para numerar os script executáveis
+
+        self.base_freq = self.read_frequencies(os.path.join(self.input_dir, base_freq_filename or 'out_base_freq.txt')) # melhorar, dar opção de pegar o caminho
+        self.num_modes = len(self.base_freq) # define o número de modos com base no número de frequências para ajusta a matriz de dados
+        self.base_modes = self.read_modes(os.path.join(self.input_dir, base_modes_filename or 'out_base_modes.txt'))
+
+        self.out_freq_filename = "out_freq.txt" # alteráveis na chamada das funções read
+        self.out_modes_filename = "out_modes.txt"
+
+
+    def set_output_filenames(self, out_freq_filename, out_modes_filename): # pode ser passado direto nas funções read
+        self.out_freq_filename = out_freq_filename
+        self.out_modes_filename = out_modes_filename
+
+    def create_input_file(self, parameters_values, parameters_keys):
+        # recebe os valores atuais dos parâmetros (parameters_values) e seus respectivos idenfiticadores (parameters_key) para gerar o script executável (script_exe.txt)
+
+        self.remove_temp_files()
+        self.index += 1
+
+        with open(self.base_script_path, 'r') as file:
+            content = file.read()
+
+        for i, value in enumerate(parameters_values):
+            key = parameters_keys[i]
+            content = content.replace(f"%{key}%", str(value))
+
+        #content = content.replace(f"%num_nos%", str(self.num_nodes))
+        #content = content.replace(f"%num_modos%", str(self.num_modes))
+
+        new_script_path = os.path.join(self.out_dir, f'script_exe_{self.index}.txt')
+        with open(new_script_path, 'w') as file:
+            file.write(content)
+
+        return new_script_path
+
+    def remove_temp_files(self): # sem uso
+        temp_files = [
+            os.path.join(self.ansys_working_dir, "file.out"),
+            os.path.join(self.ansys_working_dir, self.out_freq_filename),
+            os.path.join(self.ansys_working_dir, self.out_modes_filename)
+        ]
+        for file in temp_files:
+            if os.path.exists(file):
+                os.remove(file)
+
+    def run_ansys(self, input_file):
+        output_file = os.path.join(self.ansys_working_dir, 'file.out')
+        command = f'"{self.ansys_exe_path}" -lch -p ansys -dis INTELMPI -np 1 -dir "{self.ansys_working_dir}" -j modeloc -i "{input_file}" -o "{output_file}" -b -s read'
+
+        result = subprocess.run(command, cwd=self.ansys_working_dir, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        # verifica manualmente se o código de saída é 8 e ignora (foram gerados avisos e não erros)
+        if result.returncode not in (0, 8):
+            print(f"Erro: ANSYS retornou código de saída {result.returncode}.")
+            print(f"STDERR: {result.stderr}")
+
+    def read_frequencies(self, path=None):
+        """
+        Por padrão, lerá as frequências armazenadas no arquivo 'out_freq.txt' dentro de 'working_dir'
+        ou entrar caminho completo/relativo para o arquivo
+        """
+        file = path or os.path.join(self.ansys_working_dir, self.out_freq_filename)
+        frequencies = np.loadtxt(file)
+        return frequencies
+
+    def read_modes(self, path=None):
+        """
+        Por padrão, lerá os modos armazenadas no arquivo 'out_modos.txt' dentro de 'working_dir'
+        ou entrar caminho completo/relativo para o arquivo
+        """
+        # é necessário entrar com o número de nós e modos para estruturar a matriz de deslocamentos exportada pelo ANSYS
+        file = path or os.path.join(self.ansys_working_dir, self.out_modes_filename)
+        data = np.loadtxt(file)
+
+        num_nodes = int(len(data) / self.num_modes) # em caso de não dar o número de nós, ele restrutura com base no num_modes
+        modes = np.reshape(data, (self.num_modes, num_nodes))
+
+        return modes
+
+
+    @staticmethod
+    def kill_ansys_process(): # sem uso, testar
+        for proc in psutil.process_iter(['pid', 'name']):
+            if 'MAPDL.exe' in proc.info['name']:  # Nome do executável do ANSYS
+                print(f"Encerrando processo ANSYS: {proc.info}")
+                proc.kill()
