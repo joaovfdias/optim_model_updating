@@ -57,13 +57,15 @@ class GAOptimizer(Optimizer):
 
             #crossover
             if random.random() < self.crossover_rate:
-                child1, child2 = self.crossover(parent1, parent2)
+                child1 = self.crossover(parent1, parent2)
+                if Individual.compareIndividuals(child1, parent1) or Individual.compareIndividuals(child1, parent2):
+                    child1 = mutate(child1, self.parameters, self.mutation_type, self.mutation_rate, mut_strength=0.5)
             else:
-                child1, child2 = mutate(parent1, self.parameters, self.mutation_type, self.mutation_rate, mut_strength=0.5), mutate(parent2, self.parameters, self.mutation_type, self.mutation_rate, mut_strength=0.5)
+                child1= mutate(parent1, self.parameters, self.mutation_type, self.mutation_rate, mut_strength=0.5)
 
-            new_population.extend([child1, child2])
-
-            return new_population[:self.population_size]
+            new_population.extend([child1])
+        self.evaluate_population(new_population)
+        return new_population[:self.population_size]
 
     def crossover(self,parent1, parent2):
         crossover_methods = {"one_point": self.one_point_crossover, "two_point": self.two_point_crossover,
@@ -74,14 +76,12 @@ class GAOptimizer(Optimizer):
     def one_point_crossover(self, parent1, parent2):
         crossover_point = random.randint(1, len(self.parameters) - 1)
         child1_param = parent1.param[:crossover_point] + parent2.param[crossover_point:]
-        child2_param = parent2.param[:crossover_point] + parent1.param[crossover_point:]
-        return Individual(child1_param, self.fitness_function), Individual(child2_param, self.fitness_function)
+        return Individual(child1_param, self.fitness_function)
 
     def two_point_crossover(self, parent1, parent2):
         point1, point2 = sorted(random.sample(range(1, len(self.parameters) - 1), 2))
         child1_param = parent1.param[:point1] + parent2.param[point1:point2] + parent1.param[point2:]
-        child2_param = parent2.param[:point1] + parent1.param[point1:point2] + parent2.param[point2:]
-        return Individual(child1_param, self.fitness_function), Individual(child2_param, self.fitness_function)
+        return Individual(child1_param, self.fitness_function)
 
     def uniform_crossover(self, parent1, parent2):
         child1_param = []
@@ -89,11 +89,9 @@ class GAOptimizer(Optimizer):
         for i in range(len(self.parameters)):
             if random.random() < 0.5:
                 child1_param.append(parent1.param[i])
-                child2_param.append(parent2.param[i])
             else:
                 child1_param.append(parent2.param[i])
-                child2_param.append(parent1.param[i])
-        return Individual(child1_param, self.fitness_function), Individual(child2_param, self.fitness_function)
+        return Individual(child1_param, self.fitness_function)
 
     def select_parent(self, population, type="roulette_wheel", truncation_rate=0.3):
         """selects two parent individuals to pass through the crossover process"""

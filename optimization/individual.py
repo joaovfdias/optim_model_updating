@@ -4,11 +4,18 @@ class Individual:
         self.fitness_function = fitness_function
         self.fitness = None
         self.data = None
-        self.evaluate() # não avaliar a função na criação do indivíduo
 
     def evaluate(self):
         if not self.fitness:
             self.fitness, self.data = self.fitness_function(self.param)
+
+    @staticmethod
+    def compareIndividuals(ind1, ind2):
+        for i, _ in enumerate(ind1.param):
+            if ind1.param[i] != ind2.param[i]:
+                return False
+        return True
+
 
     def __str__(self):
         param_str = ", ".join(f"{p:.4f}" for p in self.param)

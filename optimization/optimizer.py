@@ -30,13 +30,21 @@ class Optimizer():
                 f"Método de amostragem '{sampling_method}' inválido. Tipos válidos: {list(self.sampling_methods.keys())}")
             return
 
+    @staticmethod
+    def evaluate_population(population):
+        for individual in population:
+            individual.evaluate()
+
     def initial_population(self):
         return self.sampling_methods[self.sampling_method]()
         # chama a função do metodo indicado
 
     def random_initial_population(self):
-        return [Individual([p.random_value() for p in self.parameters], self.fitness_function) for _ in
+        pop = [Individual([p.random_value() for p in self.parameters], self.fitness_function) for _ in
                 range(self.population_size)]
+        self.evaluate_population(pop)
+        return pop
+
 
     def lhs_initial_population(self):
         n_dim = len(self.parameters)
@@ -49,7 +57,9 @@ class Optimizer():
 
         scaled_samples = lower_bounds + samples * (upper_bounds - lower_bounds)
 
-        return [
+        pop = [
             Individual([float(value) for value in scaled_samples[i]], self.fitness_function)
             for i in range(self.population_size)
         ]
+        self.evaluate_population(pop)
+        return pop
