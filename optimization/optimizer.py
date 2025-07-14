@@ -122,7 +122,7 @@ class Optimizer:
         self.logfilename = f"{filename}.csv"
         self.log_dir = self.log_dir or os.path.join(self.current_dir, "log")
         os.makedirs(self.log_dir, exist_ok=True)
-        self.log_path = os.path.join(self.log_dir, filename)
+        self.log_path = os.path.join(self.log_dir, self.logfilename)
 
         individual = individual or self.populations[0][0]
 

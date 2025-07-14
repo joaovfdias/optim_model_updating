@@ -1,5 +1,5 @@
 from optimization.parameter import Continuous
-from optimization.ga_optimizer import GA as GA
+from optimization.ga_optimizer import GA
 
 
 def fitness_function(param):
