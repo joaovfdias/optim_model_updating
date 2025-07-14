@@ -6,7 +6,7 @@ import numpy as np
 from pyDOE import lhs
 
 from .individual import Individual
-from pso_optimizer.particle import Particle
+from .pso_optimizer.particle import Particle
 
 
 class Optimizer:

@@ -1,3 +1,3 @@
-from .ga_optimizer import GAOptimizer
+from .ga_optimizer import GA
 
-__all__ = ["GAOptimizer"]
+__all__ = ["GA"]
