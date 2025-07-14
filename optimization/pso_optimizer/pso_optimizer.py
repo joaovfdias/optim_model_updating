@@ -55,7 +55,7 @@ class PSO(Optimizer):
             self.add_log(0, self.populations[-1], full=full)
 
         if status:
-            print(f"População Inicial: Melhor Fitness = {self.best_particles[-1].fitness}, Parâmetros: {self.display_parameters(self.best_particles[-1])}")
+            print(f"População Inicial: Melhor Fitness = {self.best_particles[-1].fitness:.4g}, Parâmetros: {self.display_parameters(self.best_particles[-1])}")
 
         for iteration in range(itera):
             new_pop = []
@@ -73,7 +73,7 @@ class PSO(Optimizer):
                 self.add_log(iteration+1, new_pop, full=full)
 
             if status:
-                print(f"Iteração {iteration + 1}: Melhor Fitness = {self.best_particles[-1].fitness}, Parâmetros: {self.display_parameters(self.best_particles[-1])}")
+                print(f"Iteração {iteration + 1}: Melhor Fitness = {self.best_particles[-1].fitness:.4g}, Parâmetros: {self.display_parameters(self.best_particles[-1])}")
 
                 #print(f"Iteração {iteration + 1}: Melhor Fitness = {self.best_particles[-1].fitness}, Parâmetros = {self.best_particles[-1].param}")
 
@@ -82,6 +82,6 @@ class PSO(Optimizer):
             self.time_log(fim)
             print(f"\nRegistro salvo em: {self.log_path}")
 
-        print(f"\nMelhor solução encontrada: Fitness = {self.global_best.fitness}, Parâmetros: {self.display_parameters(self.global_best)}")
+        print(f"\nMelhor solução encontrada: Fitness = {self.global_best.fitness:.4g}, Parâmetros: {self.display_parameters(self.global_best)}")
 
         return self.global_best
