@@ -1,5 +1,5 @@
-from ..optimization.parameter import *
-from ..optimization.ga_optimizer import GA
+from optimization.parameter import Continuous
+from optimization.pso_optimizer.pso_optimizer import PSO
 from ..external.parser import Ansys
 from ..external.special_functions import SpecialFun
 
@@ -50,22 +50,24 @@ def fitness_function(param):
 
     return fitness, [comp_freq, comp_modes] # retorna o valor do fitness do invíduo conforme seu conjunto de parâmetros e os dados modais associados ao modelo (se houver)
 
-# parâmetros do algoritmo
-elitism_rate = 0.10
-crossover_rate = 0.60
-mutation_strength = 0.10 # no tipo de mutação "gaussian" para variáveis contínuas, alterar essa taxa diretamente (define a faixa percentual em que os paramêtros podem variar)
+# parâmetros do algoritmo:
+w = 0.6 # inércia
+w_rate = 0.99 # taxa de decaimento de inércia
+c1 = 2.05 # governa a exploração da população
+c2 = 2.05 # governa a convergência
+init_vel_ratio = 0.2 # proporção do espaço de busca que pode ser empregado para velocidade inicial
 
-population_size = 5
-generations = 5
+population_size = 10
+iteracoes = 10
 
-# chamada
-rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength)
+# declarção do otimizador:
+rodada = PSO(fitness_function, parameters, population_size, w, w_rate, c1, c2, init_vel_ratio)
 
-# arquivo log
-log = "full"
-log_name = f"VIGA_freq+mac_semruido_ulele"
-log_dir = r"C:\Users\Thiago Artur\Documents\.Mestrado (Local)\Python\Problema Teste\log"
+# ajuste do registro:
+log = "full" # tipo de registro (True: simplificado, "full": todos os indivíduos)
+log_title = None # alterar nome do arquivo gerado, se quiser
+log_dir = None # alterar diretório do registro, por padrão \log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
+rodada.set_log(log_title, log_dir)
 
-# rodada
-#rodada.set_log(log_name, log_dir)
-best = rodada.run(generations, log=log)
+# chamada:
+best = rodada.run(iteracoes, log=log)
