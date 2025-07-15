@@ -20,7 +20,7 @@ class Ansys:
         """
 
         :param ansys_exe_path: executável do ANSYS
-        :param ansys_working_dir: pasta que o ANSYS roda e gera arquivos de saída. se vazio, será em \ANSYS dentro do caminho atual
+        :param ansys_working_dir: pasta que o ANSYS roda e gera arquivos de saída. se vazio, será em \\ANSYS dentro do caminho atual
         :param input_dir: pasta onde os arquivos de entrada (script, dados de frequencia e modos) estão. se vazio, será em ansys_working_dir
         :param base_script_filename: nome do script base. se vazio, "script.txt"
         :param base_freq_filename: nome do arquivo de frequencia de referência. se vazio, "out_freq.txt"

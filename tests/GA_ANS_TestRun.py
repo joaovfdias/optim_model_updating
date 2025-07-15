@@ -1,8 +1,14 @@
-from ..optimization.parameter import *
-from ..optimization.ga_optimizer import GA
-from ..external.parser import Ansys
-from ..external.special_functions import SpecialFun
+from optimization.parameter import *
+from optimization.ga_optimizer import GA
+from external.parser import Ansys
+from external.special_functions import SpecialFun
 
+"""
+    TEMPLATE PARA CHAMADA DO GA PARA CALIBRAÇÃO USANDO ANSYS
+    - são necessários arquivo de script do modelo genérico e arquivos de saída do modelo base
+    - diretórios precisam ser declarados usando a formatação r"{diretório}"
+    - consultar documentação das classes e métodos para entender entrada e formatos
+"""
 
 # parâmetros do modelo:
 parameters =    [
@@ -16,14 +22,16 @@ parameters =    [
 keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
 
 # parâmetros de entrada da classe Ansys:
-ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v242\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
-ansys_working_dir = r"C:\Users\Thiago Artur\Documents\.Mestrado (Local)\Python\Problema Teste\Ansys"
-input_dir = r"C:\Users\Thiago Artur\Documents\.Mestrado (Local)\Python\Problema Teste\Input"
+# entrada obrigatória:
+ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v251\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
+# entradas opcionais (caso vazias, será utilizado default: diretório \\ANSYS, arquivos "script.txt", "out_base_freq.txt" e "out_base_modes.txt"):
+ansys_working_dir = None
+input_dir = r"D:\Users\Thiago\Documents\.Mestrado (Local)\Python\OtimizadorGit\Problema Teste\Input"
 base_script_filename = "script_ulele.txt"
 base_freq_filename = "out_base_freq_ulele.txt"
 base_modes_filename = "out_base_modos_ulele.txt"
-output_dir = None #r"D:\Users\Thiago\Documents\.Mestrado (Local)\Python\OtimizadorGit\Problema Teste\Output"
-
+output_dir = r"D:\Users\Thiago\Documents\.Mestrado (Local)\Python\OtimizadorGit\Problema Teste\Output"
+# nome do arquivo de saída conforme configurado no script Ansys (precisa ser configurado usando Ansys.set_output_filenames):
 out_freq_filename = "out_freq_ulele.txt"
 out_modes_filename = "out_modes_ulele.txt"
 
@@ -48,24 +56,24 @@ def fitness_function(param):
 
     fitness = peso_freq * freq_error_sum + peso_mac * mac_error_sum
 
-    return fitness, [comp_freq, comp_modes] # retorna o valor do fitness do invíduo conforme seu conjunto de parâmetros e os dados modais associados ao modelo (se houver)
+    return fitness, [comp_freq, comp_modes] # retorna o valor do fitness do indivíduo e os dados modais associados ao modelo (se houver apenas frequências, retornar [comp_freq])
 
-# parâmetros do algoritmo
+# parâmetros do algoritmo:
 elitism_rate = 0.10
 crossover_rate = 0.60
-mutation_strength = 0.10 # no tipo de mutação "gaussian" para variáveis contínuas, alterar essa taxa diretamente (define a faixa percentual em que os paramêtros podem variar)
+mutation_strength = 0.10
 
 population_size = 5
 generations = 5
 
-# chamada
+# declaração do otimizador:
 rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength)
 
-# arquivo log
-log = "full"
-log_name = f"VIGA_freq+mac_semruido_ulele"
-log_dir = r"C:\Users\Thiago Artur\Documents\.Mestrado (Local)\Python\Problema Teste\log"
+# ajuste do registro:
+log = "full" # tipo de registro (True: simplificado, "full": todos os indivíduos)
+log_title = "teste" # alterar nome do arquivo gerado, se quiser
+log_dir = None # alterar diretório do registro, por padrão \log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
+rodada.set_log(log_title, log_dir)
 
-# rodada
-#rodada.set_log(log_name, log_dir)
+# chamada:
 best = rodada.run(generations, log=log)

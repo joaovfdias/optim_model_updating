@@ -117,8 +117,8 @@ class Optimizer:
         :param individual: indíviduo declarado da classe Individual (por padrão recebe o 1º da população inicial, só é necessário para quantificar modos e frequências)
         :param full: True caso for criar o registro completo com a função add_full_log, com Iteração e número do Indivíduo no cabeçalho; False (padrão) caso for usar "add_log" para registrar apenas o melhor indivíduo de dada iteração.
         """
-        timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
-        filename = self.logfilename or f"{self.__class__.__name__}_{timestamp}"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{self.logfilename}_{timestamp}" or f"{self.__class__.__name__}_{timestamp}"
         self.logfilename = f"{filename}.csv"
         self.log_dir = self.log_dir or os.path.join(self.current_dir, "log")
         os.makedirs(self.log_dir, exist_ok=True)
