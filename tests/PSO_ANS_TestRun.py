@@ -26,14 +26,14 @@ keys = [parameter.key for parameter in parameters]  # identificadores dos parâm
 ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v251\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 # entradas opcionais (caso vazias, será utilizado default: diretório \\ANSYS, arquivos "script.txt", "out_base_freq.txt" e "out_base_modes.txt"):
 ansys_working_dir = None
-input_dir = r"D:\Users\Thiago\Documents\.Mestrado (Local)\Python\OtimizadorGit\Problema Teste\Input"
-base_script_filename = "script_ulele.txt"
-base_freq_filename = "out_base_freq_ulele.txt"
-base_modes_filename = "out_base_modos_ulele.txt"
-output_dir = r"D:\Users\Thiago\Documents\.Mestrado (Local)\Python\OtimizadorGit\Problema Teste\Output"
+input_dir = None #r"D:\Users\Thiago\Documents\.Mestrado (Local)\Python\OtimizadorGit\Problema Teste\Input"
+base_script_filename = None #"script_ulele.txt"
+base_freq_filename = None #"out_base_freq_ulele.txt"
+base_modes_filename = None #"out_base_modos_ulele.txt"
+output_dir = None #r"D:\Users\Thiago\Documents\.Mestrado (Local)\Python\OtimizadorGit\Problema Teste\Output"
 # nome do arquivo de saída conforme configurado no script Ansys (precisa ser configurado usando Ansys.set_output_filenames):
-out_freq_filename = "out_freq_ulele.txt"
-out_modes_filename = "out_modes_ulele.txt"
+out_freq_filename = None #"out_freq_ulele.txt"
+out_modes_filename = None #"out_modes_ulele.txt"
 
 # objeto da classe Ansys declarado antes de fitness_function:
 ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename, base_freq_filename, base_modes_filename, output_dir)
@@ -65,8 +65,8 @@ c1 = 2.05 # governa a exploração da população
 c2 = 2.05 # governa a convergência
 init_vel_ratio = 0.2 # proporção do espaço de busca que pode ser empregado para velocidade inicial
 
-population_size = 10
-iteracoes = 10
+population_size = 5
+iteracoes = 5
 
 # declarção do otimizador:
 rodada = PSO(fitness_function, parameters, population_size, w, w_rate, c1, c2, init_vel_ratio)

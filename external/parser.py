@@ -48,8 +48,8 @@ class Ansys:
 
 
     def set_output_filenames(self, out_freq_filename, out_modes_filename): # pode ser passado direto nas funções read
-        self.out_freq_filename = out_freq_filename
-        self.out_modes_filename = out_modes_filename
+        self.out_freq_filename = out_freq_filename or self.out_freq_filename
+        self.out_modes_filename = out_modes_filename or self.out_modes_filename
 
     def create_input_file(self, parameters_values, parameters_keys):
         # recebe os valores atuais dos parâmetros (parameters_values) e seus respectivos idenfiticadores (parameters_key) para gerar o script executável (script_exe.txt)
