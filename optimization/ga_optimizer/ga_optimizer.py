@@ -116,7 +116,7 @@ class GA(Optimizer):
             self.add_log(0, self.populations[-1], full=full)
 
         if status:
-            print(f"População Inicial: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
+            print(f"\nPopulação Inicial: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
         for gen in range(generations):
             pop = self.populations[-1]

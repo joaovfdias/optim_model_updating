@@ -1,0 +1,116 @@
+/prep7  ! Inicia o preprocessador
+
+! PARÂMETROS DE ENTRADA:
+B = .5                ! Largura da seção da viga
+H = 1                 ! Altura da seção da viga
+comp = 10             ! Comprimento da viga
+modElast = %modulo%   ! Módulo de elasticidade (Pa) - variável a ser substituída
+poisson = %poisson%   ! Coeficiente de Poisson
+dens = %dens%         ! Densidade do material (kg/m³)
+k1 = %rigidez1%       ! Rigidez 1
+k2 = %rigidez2%       ! Rigidez 2
+NUMNODES = 100        ! Número de nós (divisão da malha da viga)
+NUMPONTOS = 10 ! Número de pontos considerados para o modo de vibração
+NUMFREQ = 10 ! Número de modos de vibração (frequências)
+
+! Propriedades da viga
+mp,ex,,modElast   ! Define o módulo de elasticidade
+mp,prxy,,poisson  ! Define o coeficiente de Poisson
+mp,dens,,dens     ! Define a densidade do material
+ET,1,188          ! Define o tipo de elemento 1 (viga)
+
+! Propriedades dos apoios
+ET,2,14           ! Define o tipo de elemento 2 (mola)
+keyopt,2,2,2      ! Configurações de elemento
+keyopt,2,3,0      ! Configurações de elemento
+
+! Definição da seção da viga
+sectype,1,beam,rect    ! Tipo de seção: ID 1, viga retangular
+secdata,B,H,3,3        ! Dados da seção: B, H, Nb (number of cells along width), Nh (number of cells along height)
+
+! Definição de constantes reais
+r,1                    ! define a constante sem valor como padrão para viga
+r,2,k1                 ! define rigidez k1
+r,3,k2                 ! define rigidez k2
+
+! Criação de nós e linhas
+k,1,0,0,0              ! Nó 1 na origem
+k,2,comp,0,0           ! Nó 2 no final da viga
+l,1,2                  ! Linha entre nó 1 e nó 2
+k,3,,1                 ! Nó 3 (referencial para orientação da viga)
+
+! Atributos de linha
+latt,1,,1,,3,,1          ! LATT, MAT, REAL, TYPE, --, KB (beginning orientation keypoints), KE (ending orientation keypoints), SECNUM
+lesize,all,,,NUMNODES    ! Define o número de divisões de linhas
+
+! Malha
+lmesh,all              ! Gera a malha para todas as linhas
+
+! Condições de contorno da viga
+nsel,s,loc,y,0         ! Seleciona nós com y = 0
+d,all,ux               ! Restringe movimento em x
+d,all,uz               ! Restringe movimento em z
+d,all,rotx             ! Restringe rotação em x
+
+! Definição de nós para rigidez
+n,,,-1                ! Cria nó auxiliar 1
+n,,comp,-1            ! Cria nó auxiliar 2
+
+! Definição dos elementos de rigidez
+type,2
+real,2
+e,node(0,-1,0),node(0,0,0)        ! Cria elemento entre nós auxiliar e principal
+
+type,2
+real,3
+e,node(comp,-1,0),node(comp,0,0)  ! Cria elemento entre nós auxiliar e principal
+
+! Condições de contorno dos pontos auxiliares dos apoios
+nsel,s,loc,y,-1       ! Seleciona nós com y = -1
+d,all,all             ! Restringe todos os graus de liberdade
+
+! Seleção total
+allsel
+
+! Solução
+/solu                 ! Inicia o solucionador
+antype,modal          ! Define o tipo de análise como modal
+modopt,lanb,NUMFREQ   ! Opções de modo: Lanczos, 50 modos
+solve                 ! Resolve a análise
+
+/post1
+
+! definindo os vetores
+*dim,Freq,array,NUMFREQ
+*dim,Modos,array,NUMPONTOS,NUMFREQ
+*dim,Nos,array,NUMPONTOS                         !criar var. para o "10" ou igualar ao NUMNODES
+
+! definir intervalos de nós em coordenada específica
+*do,g,1,10
+    Nos(g)=node(comp/(NUMPONTOS-1)*(g-1),0,0)
+*enddo
+
+*do,i,1,NUMFREQ
+	set,,i
+	*get,freq(i),ACTIVE,0,SET,FREQ
+	*do,j,1,NUMPONTOS
+		Modos(j,i)=uy(Nos(j))                  ! obtém os deslocamentos nos nós para o modo atual
+	*enddo
+*enddo
+
+*CREATE,scratch,gui
+
+*cfopen,out_freq,txt
+*VWRITE,Freq(1)
+(f12.5)
+*cfclose
+
+*MWRITE,Modos,out_modes,txt
+(f8.5)
+
+!*MWRITE,Modos,'modos','txt'
+!(10F8.5)
+
+*END
+/INPUT,scratch,gui
+

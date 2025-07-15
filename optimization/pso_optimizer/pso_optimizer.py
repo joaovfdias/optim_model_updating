@@ -55,7 +55,7 @@ class PSO(Optimizer):
             self.add_log(0, self.populations[-1], full=full)
 
         if status:
-            print(f"População Inicial: Melhor Fitness = {self.best_particles[-1].fitness:.4g}, Parâmetros: {self.display_parameters(self.best_particles[-1])}")
+            print(f"\nPopulação Inicial: Melhor Fitness = {self.best_particles[-1].fitness:.4g}, Parâmetros: {self.display_parameters(self.best_particles[-1])}")
 
         for iteration in range(itera):
             new_pop = []

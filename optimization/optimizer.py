@@ -26,7 +26,7 @@ class Optimizer:
         self.parameters_keys = [param.key for param in parameters]
         self.population_size = population_size
 
-        self.log_header=False
+        self.log_header = False
         self.logfilename = None # função set
         self.log_dir = None # função set
         self.log_path = None
@@ -105,14 +105,14 @@ class Optimizer:
         self.logfilename = log_title
         self.log_dir = log_dir
         if not log_title:
-            print(f"Arquivo de registro mantido padrão: \"{self.__class__.__name__}_ddmmaa_HHMMSS\"\n")
+            print(f"\nArquivo de registro mantido padrão: \"{self.__class__.__name__}_ddmmaa_HHMMSS\"")
         else:
-            print(f"Arquivo de registro alterado para: \"{self.logfilename}\"\n")
+            print(f"\nArquivo de registro alterado para: \"{self.logfilename}\"")
 
     def display_parameters(self, individual):
         return ', '.join(f'{k} = {v:.3g}' for k, v in zip([param.key for param in self.parameters], individual.param))
 
-    def create_log(self, individual=None, full=False):
+    def create_log(self, individual=None, full=False): # alterar dados recebidos para um dicionário, de forma a registrar as keys e values
         """
         função que cria uma planilha com cabeçalho relacionando os dados do problema.
         :param individual: indíviduo declarado da classe Individual (por padrão recebe o 1º da população inicial, só é necessário para quantificar modos e frequências)
@@ -132,30 +132,48 @@ class Optimizer:
         #best = self.__class__.__name__ == "BO"
 
         if self.__class__.__name__ == "BO":
-            header.insert(2, "Best")
+            header.insert(1, "Global Best")
 
         if full:
             header.insert(1, "Individual")
-        # alterar para criar a coluna de freqs e modos apenas se elas estiverem preenchidas em .data
-        if individual.data:
-            freq_count = len(individual.data[0])
-            header.extend([f"Freq. #{i+1}" for i in range(freq_count)])
 
-            if len(individual.data) > 1:
-                node_count = len(individual.data[1][0])
-                mode_count = len(individual.data[1])
+        # verifica se a entrada de .data é um dicionário e adapta o espaço adequado para escalar, vetor ou matriz (2d)
+        if isinstance(individual.data, dict):
 
-                for mode_id in range(mode_count):
-                        header.append(f"Mode #{mode_id+1}")
-                        header.extend([""] * (node_count - 1)) # espaçamento para alinhar os modos ao número de nós
+            idata = individual.data
+            dkeys = list(idata.keys())
+
+            i = 0
+            while i < (len(dkeys)):
+                cdata = np.asarray(idata[dkeys[i]])
+
+                try:
+                    if cdata.ndim == 0: # escalar
+                        header.append(f"{dkeys[i]}")
+
+                    elif cdata.ndim == 1: # vetor (como frequências)
+                        count = len(cdata)
+                        header.extend([f"{dkeys[i]} #{j+1}" for j in range(count)])
+
+                    elif cdata.ndim == 2: # matriz (como de modos)
+                        for cdata_id in range(cdata.shape[0]): # para a quantidade de linhas (modos)
+                            header.append(f"{dkeys[i]} #{cdata_id+1}")
+                            header.extend([""] * (cdata.shape[1] - 1)) # cria o espaçamento para a quantidade de colunas (nós)
+
+                    else:
+                        raise ValueError(f"Formato do dado '{dkeys[i]}' (posição {i+1}) não compatível com registro.") # atualmente suporta até array 2d
+                except ValueError as e:
+                    print(f"[ERRO] {e}")
+
+                i += 1
+
+        else:
+            # não registra dados caso o retorno da função não seja dict
+            print("\nDados adicionais não registrados, é necessário que a segunda saída de 'fitness_function' seja um dicionário no formato {'Identificador do dado': Valor (escalar, vetor ou matriz)}")
 
         with open(self.log_path, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file, delimiter=';')
             writer.writerow(header)
-
-        # df = pd.DataFrame(columns=header)
-        # with pd.ExcelWriter(self.log_path, engine='openpyxl', mode='w') as writer:
-        #     df.to_excel(writer, index=False, sheet_name="Data")
 
         self.log_header = True
 
@@ -172,55 +190,41 @@ class Optimizer:
             self.create_log(individual=population[0], full=full)
 
         if not full:
+            population = [min(population, key=lambda p: p.fitness)] # reduz a população apenas ao melhor
 
-            individual = min(population, key=lambda p: p.fitness) # melhor indivíduo da população atual
+        with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file, delimiter=';')
 
-            row = [iteration, individual.fitness]
+            for num, individual in enumerate(population, start=1):
+                row = [iteration]
+                if full:
+                    row.append(num) # adiciona a numeração do indivíduo para o caso log full
+                if not full and self.__class__.__name__ == "BO": # armazena o Global Best apenas no caso de amostragem Bayesiana
+                    row.append(self.best.fitness)
+                row.extend([individual.fitness] + individual.param)
 
-            if self.__class__.__name__ == "BO":
-                best_individual = min(self.populations, key=lambda p: p.fitness)
-                row.append(best_individual.fitness)
+                # verifica se a entrada de .data é um dicionário e adapta o espaço adequado para escalar, vetor ou matriz (2d)
+                if isinstance(individual.data, dict):
 
-            row.extend(individual.param)
+                    idata = individual.data
+                    dkeys = list(idata.keys())
 
-            if individual.data:
-                frequencies = individual.data[0]
-                row.extend(frequencies)
-                if len(individual.data) > 1:
-                    modes = individual.data[1]
-                    row.extend(modes.flatten())
+                    i = 0
+                    while i < (len(dkeys)):
+                        cdata = np.asarray(idata[dkeys[i]])
 
-            with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
-                writer = csv.writer(file, delimiter=';')
+                        if cdata.ndim == 0:
+                            row.append(cdata)
+
+                        if cdata.ndim == 1:
+                            row.extend(cdata)
+
+                        if cdata.ndim == 2:
+                            row.extend(cdata.flatten())
+
+                        i += 1
+
                 writer.writerow(row)
-
-            # with pd.ExcelWriter(self.log_path, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
-            #     # Carrega o conteúdo atual da aba
-            #     existing_data = pd.read_excel(self.log_path, sheet_name="Data")
-            #     # Cria um novo DataFrame com a linha
-            #     new_row = pd.DataFrame([row], columns=existing_data.columns)
-            #     # Concatena os dados
-            #     updated_data = pd.concat([existing_data, new_row], ignore_index=True)
-            #     # Salva novamente na aba específica
-            #     updated_data.to_excel(writer, index=False, sheet_name="Data")
-
-        else:
-
-            with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
-                writer = csv.writer(file, delimiter=';')
-
-                for i, individual in enumerate(population):
-
-                    row = [iteration, i+1, individual.fitness]
-                    row.extend(individual.param)
-                    if individual.data:
-                        frequencies = individual.data[0]
-                        row.extend(frequencies)
-                        if len(individual.data) > 1:
-                            modes = individual.data[1]
-                            row.extend(modes.flatten())
-
-                    writer.writerow(row)
 
     def time_log(self, fim):
         tempo = fim - self.inicio
