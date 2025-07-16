@@ -57,7 +57,7 @@ class Ansys:
         self.remove_temp_files()
         self.index += 1
 
-        with open(self.base_script_path, 'r') as file:
+        with open(self.base_script_path, 'r', encoding='utf-8') as file:
             content = file.read()
 
         for i, value in enumerate(parameters_values):
@@ -68,7 +68,7 @@ class Ansys:
         #content = content.replace(f"%num_modos%", str(self.num_modes))
 
         new_script_path = os.path.join(self.out_dir, f'script_exe_{self.index}.txt')
-        with open(new_script_path, 'w') as file:
+        with open(new_script_path, 'w', encoding='utf-8') as file:
             file.write(content)
 
         return new_script_path
