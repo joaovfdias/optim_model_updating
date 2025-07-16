@@ -10,9 +10,9 @@ class SpecialFun:
 
     @staticmethod
     def mac_error(base_modes, comp_modes):
-        num_modes = len(base_modes)
+        num_modes = base_modes.shape[0]
         # parcelas de erro do MAC
-        mac_error = [abs(1 - SpecialFun.modal_assurance_criterion(base_modes[:, i], comp_modes[:, i]))
+        mac_error = [abs(1 - SpecialFun.modal_assurance_criterion(base_modes[i, :], comp_modes[i, :]))
                       for i in range(num_modes)]
         # soma
         return sum(mac_error)
