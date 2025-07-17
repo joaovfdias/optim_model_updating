@@ -14,18 +14,15 @@ T_LAJE = .3
 DIST_1 = 1.5      ! DISTANCIA ENTRE PONTOS DED VERIFICACAO DE DESLOCAMENTO
 H_VIGA = 2
 B_VIGA = .6
-ADDED_MASS = 300 !KG/M2
-NUMFREQ = 50 ! número de frequências
 modElast = %modulo%   ! Módulo de elasticidade (Pa) - variável a ser substituída
 poisson = %poisson%   ! Coeficiente de Poisson
 dens = %dens%         ! Densidade do material (kg/m³)
 k1 = %rigidez1%       ! Rigidez 1
 k2 = %rigidez2%       ! Rigidez 2
-k3 = %rigidez3%       ! Rigidez 3
-k4 = %rigidez4%       ! Rigidez 4
-
-
-
+k3 = %rigidez3%      ! Rigidez 3
+k4 = %rigidez4%    ! Rigidez 4
+NUMFREQ = 20 ! número de frequências
+NUMPONTOS = 12   ! malha para MAC
 
 ! ELEMENT TYPE DEFINITION
 ET,1,188  ! Beam
@@ -35,7 +32,7 @@ keyopt,3,2,2  ! Defines the spring degree of freedom to 1D in UY
 keyopt,3,3,0  ! Stes the spring as a longitudinal spring-damper for 3D elements
 
 ! MATERIAL PROPRIETIES DEFINITION
-MP,EX,,modElast
+MP,EX,, modElast
 MP,PRXY,,poisson
 MP,DENS,,dens
 
@@ -56,8 +53,15 @@ WPOFFS,,,B_PONTE/2-DIST_1    !B_PONTE-2*DIST_1         (ESTAVA ASSIM ANTES E EU 
 ASBW,ALL
 WPCSYS,0
 
+! Verifica e mescla linhas duplicadas
+NUMCMP,LINE
+NUMCMP,KP
+NUMMRG,KP
+
+
+
 ! KEYPOINTS TO THE BEAM ORIENTATION
-K,20,,1,-B_PONTE/2+DIST_1
+K,20,,1, -B_PONTE/2+DIST_1
 K,21,,1,B_PONTE/2-DIST_1
 
 ! DEFINITION OF BEAM CROSS-SECTION
@@ -82,8 +86,12 @@ lsel,all
 lsel,s,loc,z,B_PONTE/2-DIST_1
 latt,1,,1,,21,,1 ! Attributes material 1, ET1, keypoint 21 and  SECTION1(rect beam)to selected line
 lmesh,all
+ALLSEL
 
-allsel
+NUMCMP,NODE
+NUMMRG,NODE     ! Tolerância bem pequena
+NUMMRG,ELEM
+NUMMRG,ELEM
 
 ! APPLY DISPLACEMENT RESTRICTIONS ON THE SLAB SUPPORTS (x, y, z translation)
 ksel,s,loc,x,0
@@ -95,9 +103,9 @@ ksel,r,loc,y,0
 cmsel,r,aux1
 nslk,s
 d,all,ux
-d,all,uy       !Applies restricttions on Y as well
 d,all,uz
 allsel
+
 
 
 ! REAL CONSTANTS FOR THE STIFFNESS VALUES OF THE MATERIALS
@@ -132,7 +140,6 @@ d,all,all
 
 ALLSEL
 
-!!! CONTINUAR DAQUI
 ! SOLUÇÃO
 
 
@@ -144,8 +151,6 @@ solve
 ! EXPORTAÇÃO DOS RESULTADOS
 /post1
 
-NUMPONTOS = 12
-NUMFREQ = 20
 
 ! DEFINIÇÃO DOS PONTOS
 *dim, Nos, array, NUMPONTOS
@@ -183,11 +188,26 @@ aux = 0
 *cfclose
 
 *MWRITE,Modos,out_modes,txt
-(f8.5)                            
+(f8.5)
 
 
 *END
 /INPUT, scratch, gui
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

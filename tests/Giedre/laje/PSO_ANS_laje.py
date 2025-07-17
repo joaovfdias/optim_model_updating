@@ -74,6 +74,8 @@ iteracoes = 5
 # declarção do otimizador:
 rodada = PSO(fitness_function, parameters, population_size, w, w_rate, c1, c2, init_vel_ratio)
 
+rodada.sync_time(ansys.anstime) # sincroniza o log label do algoritmo e a subpasta no output do ansys para facilitar controle
+
 # ajuste do registro:
 log = "full" # tipo de registro (True: simplificado, "full": todos os indivíduos)
 log_title = "laje_PSO_semruido" # alterar nome do arquivo gerado, se quiser
