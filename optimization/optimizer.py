@@ -13,6 +13,7 @@ class Optimizer:
     def __init__(self, fitness_function, parameters, population_size):
         self.inicio = time.time() # passar depois para a função run dos respectivos algoritmos
         self.current_dir = os.getcwd() # definindo o diretório atual
+        self.opttime = None
 
         self.stopping_criteria = False
         self.fitness_tolerance = 0
@@ -117,7 +118,7 @@ class Optimizer:
         :param individual: indíviduo declarado da classe Individual (por padrão recebe o 1º da população inicial, só é necessário para quantificar modos e frequências)
         :param full: True caso for criar o registro completo com a função add_full_log, com Iteração e número do Indivíduo no cabeçalho; False (padrão) caso for usar "add_log" para registrar apenas o melhor indivíduo de dada iteração.
         """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = self.opttime or datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{self.logfilename}_{timestamp}" if self.logfilename else f"{self.__class__.__name__}_{timestamp}"
         self.logfilename = f"{filename}.csv"
         self.log_dir = self.log_dir or os.path.join(self.current_dir, "log")
@@ -269,3 +270,6 @@ class Optimizer:
             self.consecutive_iterations = 0
 
         return False
+
+    def sync_time(self, time):
+        self.opttime = time

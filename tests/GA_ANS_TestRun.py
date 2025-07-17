@@ -69,6 +69,8 @@ generations = 5
 # declaração do otimizador:
 rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength)
 
+rodada.sync_time(ansys.anstime) # sincroniza o log label do algoritmo e a subpasta no output do ansys para facilitar controle
+
 # ajuste do registro:
 log = "full" # tipo de registro (True: simplificado, "full": todos os indivíduos)
 log_title = "teste" # alterar nome do arquivo gerado, se quiser

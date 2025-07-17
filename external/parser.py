@@ -2,6 +2,7 @@ import subprocess
 import os
 import numpy as np
 import psutil
+from datetime import datetime
 
 
 class Ansys:
@@ -29,13 +30,15 @@ class Ansys:
         """
 
         self.current_dir = os.getcwd() # definindo o diretório atual para estabelecer a pasta padrão 'ANSYS'
+        self.anstime = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         self.ansys_exe_path = ansys_exe_path
         self.ansys_working_dir = ansys_working_dir or os.path.join(self.current_dir, 'ANSYS')
         os.makedirs(self.ansys_working_dir, exist_ok=True)
 
         self.input_dir = input_dir or self.ansys_working_dir
-        self.out_dir = output_dir or self.input_dir
+        self.out_dir = os.path.join(output_dir or self.input_dir, self.anstime)
+        os.makedirs(self.out_dir, exist_ok=True)
         self.base_script_path = os.path.join(self.input_dir, base_script_filename or 'script.txt')
         self.index = 0 # usado para numerar os script executáveis
 
