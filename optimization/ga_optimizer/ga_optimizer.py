@@ -131,6 +131,9 @@ class GA(Optimizer):
             if status:
                 print(f"Geração {gen + 1}: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
+            if self.tolerance(self.populations[-2], self.populations[-1]): # critério de parada, determinado com a função set_tolerance
+                break
+
         fim = time.time()
         if log:
             self.time_log(fim)

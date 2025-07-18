@@ -182,12 +182,12 @@ aux = 0
 
 *CREATE, scratch, gui
 
-*cfopen, out_freq, txt
+*cfopen, out_freq_laje, txt
 *VWRITE, Freq(1)
 (f12.5)
 *cfclose
 
-*MWRITE,Modos,out_modes,txt
+*MWRITE,Modos,out_modes_laje,txt
 (f8.5)
 
 

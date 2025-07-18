@@ -26,7 +26,7 @@ keys = [parameter.key for parameter in parameters]  # identificadores dos parâm
 
 # parâmetros de entrada da classe Ansys:
 # entrada obrigatória:
-ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
+ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v251\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 # entradas opcionais (caso vazias, será utilizado default: diretório \\ANSYS, arquivos "script.txt", "out_base_freq.txt" e "out_base_modes.txt"):
 ansys_working_dir = None
 input_dir = os.path.join(os.getcwd(), 'input')
@@ -35,8 +35,8 @@ base_freq_filename = "out_base_freq_laje.txt"
 base_modes_filename = "out_base_modes_laje.txt"
 output_dir = os.path.join(os.getcwd(), 'output')
 # nome do arquivo de saída conforme configurado no script Ansys (precisa ser configurado usando Ansys.set_output_filenames):
-out_freq_filename = None
-out_modes_filename = None
+out_freq_filename = "out_freq_laje.txt"
+out_modes_filename = "out_modes_laje.txt"
 
 # objeto da classe Ansys declarado antes de fitness_function:
 ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename, base_freq_filename, base_modes_filename, output_dir)
@@ -51,8 +51,8 @@ def fitness_function(param):
     comp_freq = ansys.read_frequencies() # armazena as frequências exportadas atuais
     comp_modes = ansys.read_modes() # armazena os modos exportados atuais
 
-    freq_error_sum = SpecialFun.norm_freq_errors(ansys.base_freq, comp_freq) # parcela correspondente ao erro nas frequências
-    mac_error_sum = SpecialFun.mac_error(ansys.base_modes, comp_modes) # parcela correspondente ao erro nos modos
+    paired_comp_freq, paired_comp_modes, mac_error_sum = SpecialFun.pair_modes_mac(comp_freq, comp_modes, ansys.base_modes) # adicionada etapa de pareamento, já retorna a soma dos MAC
+    freq_error_sum = SpecialFun.norm_freq_errors(ansys.base_freq, paired_comp_freq) # parcela correspondente ao erro nas frequências
 
     peso_freq = 1 # ponderação
     peso_mac = 1
@@ -66,12 +66,12 @@ elitism_rate = 0.10
 crossover_rate = 0.60
 mutation_strength = 0.10
 
-population_size = 5
-generations = 5
+population_size = 70
+generations = 50
 
 # declaração do otimizador:
 rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength)
-
+rodada.set_tolerance(fit_tol = 1e-2, patience = 4) # critério de parada
 rodada.sync_time(ansys.anstime) # sincroniza o log label do algoritmo e a subpasta no output do ansys para facilitar controle
 
 # ajuste do registro:
