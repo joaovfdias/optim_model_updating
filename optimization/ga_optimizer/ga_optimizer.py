@@ -1,6 +1,6 @@
 import time
 
-from ..optimizer import Optimizer
+from ..optimizer import Optimizer, PopulationBased
 from ..parameter import *
 from ..individual import Individual
 from .operators.parents_selection import select_parent
@@ -8,7 +8,7 @@ from .operators.crossover import crossover_methods, crossover
 from .operators.mutation import mutate
 
 
-class GA(Optimizer):
+class GA(PopulationBased):
 
     def __init__(self, fitness_function, parameters, population_size, elitism_rate=0.1, crossover_rate=0.6, mutation_strength=0.05):
         """
@@ -31,6 +31,8 @@ class GA(Optimizer):
         self.truncation_rate = 0.3
         self.crossover_type = "uniform"
         self.mutation_type = self.generate_mutation_type()
+
+        self.iter_label = "Geração"
 
 
     def set_selection_parents(self, selection_type, truncation_rate=0.3):
@@ -98,52 +100,11 @@ class GA(Optimizer):
         # retonar a população atual garantindo o tamanho
         return new_population[:self.population_size]
 
-    # execucao
-    def run(self, generations=100, status=True, log=True):
-        """
-
-                :param generations: número de gerações a serem executadas
-                :param status: por padrão mostra o andamento das soluções a cada iteração, False para não mostrar
-                :param log: define o registro dos resultados em planilha. True (padrão): registra os melhores indivíduos de cada iteração, "full": registra todos os indivíduos de todas as iterações. False: não cria registro.
-                :return: retorna o melhor indivíduo encontrada, da qual é possível obter o fitness (.fitness), parâmetros (.param) e dados modais (.data)
-        """
-
-        self.populations = [self.initial_population()]
-
-        full = log == "full"
-        if log:
-            self.create_log(full=full)
-            self.add_log(0, self.populations[-1], full=full)
-
-        if status:
-            print(f"\nPopulação Inicial: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
-
-        for gen in range(generations):
-            pop = self.populations[-1]
-            new_pop = self.evolve_population(pop)
-
-            self.evaluate_population(new_pop)
-            self.populations.append(new_pop)
-
-            if log:
-                self.add_log(gen+1, new_pop, full=full)
-
-            if status:
-                print(f"Geração {gen + 1}: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
-
-            if self.tolerance(self.populations[-2], self.populations[-1]): # critério de parada, determinado com a função set_tolerance
-                break
-
-        fim = time.time()
-        if log:
-            self.time_log(fim)
-            print(f"\nRegistro salvo em: {self.log_path}")
-
-        best_individual = self.get_best_individual(self.populations[-1])
-
-        print(f"\nMelhor solução encontrada: Fitness = {best_individual.fitness:.4g}, Parâmetros: {self.display_parameters(best_individual)}")
-
-        return best_individual # retorna o melhor indivíduo final
+    # etapa de execução
+    def opt_step(self, iteration): # função run geral foi movida para subclasse PopulationBased herdada
+        pop = self.populations[-1]
+        new_pop = self.evolve_population(pop)
+        return new_pop
 
 
 
