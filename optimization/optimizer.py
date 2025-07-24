@@ -224,14 +224,30 @@ class Optimizer:
 
                 writer.writerow(row)
 
-    def time_log(self, fim):
+    def log_time(self, fim):
         tempo = fim - self.inicio
-        row = ["Time (s)", tempo]
+        row = ["Time (s):", tempo]
 
         with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file, delimiter=';')
             writer.writerow([])
             writer.writerow(row)
+
+    def log_specs(self):
+        with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file, delimiter=';')
+
+            writer.writerow([])
+
+            #writer.writerow([f"{self.__class__.__name__} parameters:",])
+
+            algorithm_parameters = self.specs
+            writer.writerow([f"{self.__class__.__name__} parameters:",""] + list(algorithm_parameters.keys()))
+            writer.writerow(["values:",""] + list(algorithm_parameters.values()))
+
+    @property
+    def specs(self):
+        pass
 
 
     def set_tolerance(self, fit_tol=None, param_tol=None, patience=None):
@@ -320,7 +336,8 @@ class PopulationBased(Optimizer):
 
         fim = time.time()
         if log:
-            self.time_log(fim)
+            self.log_specs()
+            self.log_time(fim)
             print(f"\nRegistro salvo em: {self.log_path}")
 
         self.global_best = self.global_best or self.get_best_individual(self.populations[-1])

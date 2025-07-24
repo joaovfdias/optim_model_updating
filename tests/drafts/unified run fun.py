@@ -45,7 +45,7 @@ class Populational(Optimizer):
 
         fim = time.time()
         if log:
-            self.time_log(fim)
+            self.log_time(fim)
             print(f"\nRegistro salvo em: {self.log_path}")
 
         self.global_best = self.global_best or self.get_best_individual(self.populations[-1])
@@ -69,7 +69,7 @@ class Populational(Optimizer):
         w = self.w * (self.w_rate ** iteration)
         for particle in self.populations[-1]:
             new_pop.append(particle.update_particle(self.parameters, self.global_best.param, w, self.c1, self.c2))
-        return new pop
+        return new_pop
 
     def initial_population(self):
         pop = super().initial_population()

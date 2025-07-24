@@ -106,6 +106,17 @@ class GA(PopulationBased):
         new_pop = self.evolve_population(pop)
         return new_pop
 
+    @property
+    def specs(self):
+        return {"sampling method": self.sampling_method,
+                "elitism rate": self.elitism_rate,
+                "selection method": self.selection_method,
+                "crossover type": self.crossover_type,
+                "crossover rate": self.crossover_rate,
+                "mutation type": self.mutation_type,
+                "mutation rate": self.mutation_rate,
+                "mutation strength": self.mutation_strength
+                }
 
 
     # as funções de 'setup' a seguir precisam ser revisadas (Giedre)

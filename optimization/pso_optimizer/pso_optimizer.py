@@ -53,3 +53,13 @@ class PSO(PopulationBased):
         for particle in self.populations[-1]:
             new_pop.append(particle.update_particle(self.parameters, self.global_best.param, w, self.c1, self.c2))
         return new_pop
+
+    @property
+    def specs(self):
+        return {"sampling method": self.sampling_method,
+                "initial velocity ratio": self.init_vel_ratio,
+                "inertia weight (w)": self.w,
+                "inertia decay rate": self.w_rate,
+                "cognitive coefficient (c1)": self.c1,
+                "social coefficient (c2)": self.c2
+                }
