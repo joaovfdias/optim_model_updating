@@ -15,10 +15,7 @@ class Optimizer:
         self.opttime = None
 
         self.stopping_criteria = False
-        self.fitness_tolerance = 0
-        self.parameters_tolerance = 0
-        self.patience = 10
-        self.consecutive_iterations = 0
+        self.tolerance_flag = [0]*3
 
         self.fitness_function = fitness_function
         self.parameters = parameters
@@ -250,18 +247,20 @@ class Optimizer:
         pass
 
 
-    def set_tolerance(self, fit_tol=None, param_tol=None, patience=None):
+    def set_tolerance(self, fit_abs=None, fit_rel=None, param_rel=None, patience=1):
         """
         Critérios de parada
-        :param fit_tol: define a tolerância na diferença do melhor fitness entre iterações consecutivas
-        :param param_tol: define a tolerância na diferença entre parâmetros nos melhores indivíduos de iterações consecutivas
+        :param fit_abs: define a tolerância do valor absoluto de fitness
+        :param fit_tol: define a tolerância da diferença relativa entre melhores fitness de iterações consecutivas
+        :param param_tol: define a tolerância da diferença entre valores dos parâmetros dos melhores indivíduos de iterações consecutivas (normalizada pelo espaço de busca)
         :param patience: define quantas vezes as tolerâncias podem ser superadas antes de interromper o algoritmo
         :return:
         """
         self.stopping_criteria = True
-        self.fitness_tolerance = fit_tol or self.fitness_tolerance
-        self.parameters_tolerance = param_tol or self.parameters_tolerance
-        self.patience = patience or self.patience
+        self.fitness_abs_tol = fit_abs
+        self.fitness_rel_tol = fit_rel
+        self.parameters_rel_tol = param_rel
+        self.patience = patience
 
     # criar uma função em otimizador que receba duas populações ou individuos e compare as diferenças, verificando se estão dentro da tolerância por uma quantidade consecutiva de iterações
     def tolerance(self, previous, current):
@@ -275,22 +274,44 @@ class Optimizer:
         previous = min(previous, key=lambda p: p.fitness)
         current = min(current, key=lambda p: p.fitness)
 
-        fitness_diff = abs(previous.fitness - current.fitness)
-        parameters_diff = max(abs(pp - cp) for pp, cp in zip(previous.param, current.param))
+        fitness_diff = abs((previous.fitness - current.fitness) / previous.fitness)
+        search_spaces = [param.search_space for param in self.parameters]
+        parameters_diff = [abs(pp - cp) / ss for pp, cp, ss in zip(previous.param, current.param, search_spaces)]
 
-        if fitness_diff < self.fitness_tolerance or parameters_diff < self.parameters_tolerance:
-            self.consecutive_iterations += 1
-            if self.consecutive_iterations >= self.patience:
-                print("\nCritério de convergência atingido: execução interrompida.")
-                return True
+        if self.fitness_abs_tol is not None:
+            if current.fitness < self.fitness_abs_tol:
+                self.tolerance_flag[0] += 1
+                if self.tolerance_flag[0] >= self.patience:
+                    print(
+                        f"\nCritério de convergência atingido: fitness menor que {self.fitness_abs_tol} por {self.patience} iterações consecutivas. \nExecução interrompida.")
+                    return True
+            else:
+                self.tolerance_flag[0] = 0
 
-        else:
-            self.consecutive_iterations = 0
+        if self.fitness_rel_tol is not None:
+            if fitness_diff < self.fitness_rel_tol:
+                self.tolerance_flag[1] += 1
+                if self.tolerance_flag[1] >= self.patience:
+                    print(
+                        f"\nCritério de convergência atingido: valores de fitness entre iterações apresentaram diferença menor que {self.fitness_rel_tol*100}% por {self.patience} vezes consecutivas. \nExecução interrompida.")
+                    return True
+            else:
+                self.tolerance_flag[1] = 0
+
+        if self.parameters_rel_tol is not None:
+            if all(diff < self.parameters_rel_tol for diff in parameters_diff):
+                self.tolerance_flag[2] += 1
+                if self.tolerance_flag[2] >= self.patience:
+                    print(
+                        f"\nCritério de convergência atingido: valores de parâmetros entre iterações apresentaram diferença menor que {self.parameters_rel_tol*100}% do intervalo de busca por {self.patience} vezes consecutivas. \nExecução interrompida.")
+                    return True
+            else:
+                self.tolerance_flag[2] = 0
 
         return False
 
-    def sync_time(self, time):
-        self.opttime = time
+    def sync_time(self, stime):
+        self.opttime = stime
 
 
 # subclasse para funções comuns a algoritmos populacionais

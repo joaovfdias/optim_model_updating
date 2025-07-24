@@ -73,7 +73,7 @@ generations = 50 # quantidade de iterações (suficientemente grande para a conv
 
 # declaração do otimizador:
 rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength) # objeto otimizador
-rodada.set_tolerance(fit_tol = 1e-4, patience = 10) # critério de parada
+rodada.set_tolerance(fit_abs = 2e-2, patience = 10) # critério de parada
 rodada.sync_time(ansys.anstime) # sincroniza timestamp de optimizer e ansys para facilitar controle dos registros
 
 # ajuste do registro:

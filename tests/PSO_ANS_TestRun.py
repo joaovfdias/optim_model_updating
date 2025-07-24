@@ -75,7 +75,7 @@ iteracoes = 50 # quantidade de iterações (suficientemente grande para a conver
 
 # declaração do otimizador:
 rodada = PSO(fitness_function, parameters, population_size, w, w_rate, c1, c2, init_vel_ratio) # objeto otimizador
-rodada.set_tolerance(fit_tol = 1e-4, patience = 10) # critério de parada
+rodada.set_tolerance(fit_abs = 2e-2, patience = 10) # critério de parada
 rodada.sync_time(ansys.anstime) # sincroniza timestamp de optimizer e ansys para facilitar controle dos registros
 
 # ajuste do registro:
