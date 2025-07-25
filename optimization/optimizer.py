@@ -1,9 +1,12 @@
 import os
 import csv
 import time
+from contextlib import contextmanager
 from datetime import datetime
 import numpy as np
 from pyDOE import lhs
+import threading
+import sys
 
 from .individual import Individual
 from .pso_optimizer.particle import Particle
@@ -80,15 +83,40 @@ class Optimizer:
         return pop
 
 
-    @staticmethod
-    def evaluate_population(population):
-        for individual in population:
-            individual.evaluate()
+    def evaluate_population(self, population):
+        for i, individual in enumerate(population, start=1):
+            with self.display_process(f"Avaliando indivíduo {i}/{self.population_size}"):
+                individual.evaluate()
 
     @staticmethod
     def get_best_individual(pop):
         return min(pop, key=lambda x: x.fitness)
 
+    @contextmanager
+    def display_process(self, message):
+        stop = False
+
+        def animate_dots():
+            dots = ["", ".", "..", "...", "..", ".", ""]
+            while not stop:
+                for d in dots:
+                    if stop:
+                        break
+                    sys.stdout.write("\033[2K\r")  # limpa conteúdo da animação
+                    sys.stdout.write(f"\r{message}{d} ")
+                    sys.stdout.flush()
+                    time.sleep(0.5)
+
+        t = threading.Thread(target=animate_dots)
+        t.start()
+
+        try:
+            yield
+        finally:
+            stop = True
+            t.join()
+            sys.stdout.write("\033[2K\r")  # limpa conteúdo da animação
+            sys.stdout.flush()
 
     def set_log(self, log_title=None, log_dir=None):
         """
