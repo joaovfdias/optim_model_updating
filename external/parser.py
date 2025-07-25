@@ -3,6 +3,9 @@ import os
 import numpy as np
 import psutil
 from datetime import datetime
+import time
+
+from external.additional_functions import Utilities
 
 
 class Ansys:
@@ -35,6 +38,7 @@ class Ansys:
         self.ansys_exe_path = ansys_exe_path
         self.ansys_working_dir = ansys_working_dir or os.path.join(self.current_dir, 'ANSYS')
         os.makedirs(self.ansys_working_dir, exist_ok=True)
+        self.max_attempts = 5
 
         self.input_dir = input_dir or self.ansys_working_dir
         self.out_dir = os.path.join(output_dir or self.input_dir, self.anstime)
@@ -57,6 +61,7 @@ class Ansys:
     def create_input_file(self, parameters_values, parameters_keys):
         # recebe os valores atuais dos parâmetros (parameters_values) e seus respectivos idenfiticadores (parameters_key) para gerar o script executável (script_exe.txt)
 
+        self.kill_ansys_process()
         self.remove_temp_files()
         self.index += 1
 
@@ -86,7 +91,7 @@ class Ansys:
             if os.path.exists(file):
                 os.remove(file)
 
-    def run_ansys(self, input_file):
+    def exe_ansys(self, input_file):
         output_file = os.path.join(self.ansys_working_dir, 'file.out')
         command = f'"{self.ansys_exe_path}" -lch -p ansys -dis INTELMPI -np 1 -dir "{self.ansys_working_dir}" -j modeloc -i "{input_file}" -o "{output_file}" -b -s read'
 
@@ -121,9 +126,51 @@ class Ansys:
         return modes
 
 
-    @staticmethod
-    def kill_ansys_process(): # sem uso, testar
+    def kill_ansys_process(self): # sem uso, testar
         for proc in psutil.process_iter(['pid', 'name']):
-            if 'MAPDL.exe' in proc.info['name']:  # Nome do executável do ANSYS
-                print(f"Encerrando processo ANSYS: {proc.info}")
-                proc.kill()
+            try:
+                if proc.info['name'] and 'ANSYS.exe' in proc.info['name']:
+                    print(f"Encerramento forçado do processo {proc.info['name']} (PID {proc.pid})")
+                    proc.kill()
+                    self.cleanup_lock_file()
+                    time.sleep(2)
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
+
+    def cleanup_lock_file(self):
+        lock_path = os.path.join(self.ansys_working_dir, "modeloc.lock")
+        if os.path.exists(lock_path):
+            try:
+                os.remove(lock_path)
+                print("Arquivo .lock removido com sucesso.")
+            except Exception as e:
+                print(f"Erro ao remover arquivo .lock: {e}")
+
+    def run_ansys(self, input_file, frequencies=True, modes=True):
+
+        def try_ansys():
+            self.exe_ansys(input_file)
+
+            freq_pass = not frequencies or os.path.exists(os.path.join(self.ansys_working_dir, self.out_freq_filename))
+            mode_pass = not modes or os.path.exists(os.path.join(self.ansys_working_dir, self.out_modes_filename))
+
+            return freq_pass and mode_pass
+
+        if try_ansys():
+            return
+
+        self.kill_ansys_process()
+        self.cleanup_lock_file()
+        time.sleep(1)
+
+        for attempt in range(2, self.max_attempts + 1): # tenta executar o Ansys novamente caso não encontre os arquivos de saída, por {max_attempts} tentativas
+            with Utilities.display_process(f"Saída ausente, tentativa {attempt} de executar ANSYS"):
+
+                if try_ansys():
+                    return
+
+            self.kill_ansys_process()
+            self.cleanup_lock_file()
+            time.sleep(1)
+
+        raise RuntimeError(f"ANSYS falhou após {self.max_attempts} tentativas.")

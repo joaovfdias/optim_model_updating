@@ -1,4 +1,4 @@
 from .parser import Ansys
-from .special_functions import SpecialFun
+from .additional_functions import SpecialFun, Utilities
 
-__all__ = ["Ansys", "SpecialFun"]
+__all__ = ["Ansys", "SpecialFun", "Utilities"]

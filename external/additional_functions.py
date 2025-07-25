@@ -1,6 +1,11 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment # usado para pareamento
 
+from contextlib import contextmanager
+import threading
+import sys
+import time
+
 class SpecialFun:
     @staticmethod
     def modal_assurance_criterion(mode1, mode2):
@@ -49,3 +54,43 @@ class SpecialFun:
         mac_paired = mac[base_index, comp_index]
 
         return [paired_comp_freq, paired_comp_modes, (1 - mac_paired).sum()]
+
+
+class Utilities:
+
+    @staticmethod
+    @contextmanager
+    def display_process(message, status=True):
+        if not status:
+            yield
+            return
+
+        stop = False
+
+        def animate_dots():
+            dots = ["", ".", "..", "...", "..", ".", ""]
+            while not stop:
+                for d in dots:
+                    if stop:
+                        break
+                    sys.stdout.write("\033[2K\r")  # limpa conteúdo da animação
+                    sys.stdout.write(f"\r{message}{d} ")  # limpa conteúdo da animação
+                    sys.stdout.flush()
+                    time.sleep(0.5)
+
+        t = threading.Thread(target=animate_dots)
+        t.start()
+
+        try:
+            yield
+        except Exception as e:
+            stop = True
+            t.join()
+            sys.stdout.write("\033[2K\r")  # limpa conteúdo da animação
+            sys.stdout.flush()
+            return e
+        finally:
+            stop = True
+            t.join()
+            sys.stdout.write("\033[2K\r")  # limpa conteúdo da animação
+            sys.stdout.flush()

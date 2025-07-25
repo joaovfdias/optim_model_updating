@@ -1,7 +1,7 @@
 from optimization.parameter import *
 from optimization.pso_optimizer.pso_optimizer import PSO
 from external.parser import Ansys
-from external.special_functions import SpecialFun
+from external.additional_functions import SpecialFun
 
 import os
 
@@ -42,12 +42,13 @@ out_modes_filename = "out_modes_laje.txt"
 # objeto da classe Ansys declarado antes de fitness_function:
 ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename, base_freq_filename, base_modes_filename, output_dir)
 ansys.set_output_filenames(out_freq_filename, out_modes_filename) # ajusta o nome dos arquivos de saída de freq. e modos do Ansys, que serão gerados em ansys_working_dir
+ansys.max_attempts = 6 # define quantas tentativas de rodada o Ansys executa em caso de erro
 
 # função objetivo com pareamento (usa 'Ansys' para rodar e obter os parâmetros modais necessários e 'SpecialFun' para fazer os cálculos de erro e MAC):
 def fitness_function(param):
 
     input_file = ansys.create_input_file(param, keys) # gera o arquivo de input para o ansys com base na lista de parâmetros (valores) e keys (nomes)
-    ansys.run_ansys(input_file) # executa esse arquivo
+    ansys.run_ansys(input_file, True, True) # executa esse arquivo (sinalizar quais dados ele espera que o Ansys retorne)
 
     comp_freq = ansys.read_frequencies() # armazena as frequências exportadas atuais
     comp_modes = ansys.read_modes() # armazena os modos exportados atuais
@@ -70,8 +71,8 @@ c1 = 2.05 # influencia a exploração individual
 c2 = 2.05 # influencia a convergência para o mínimo do grupo
 init_vel_ratio = 0.2 # proporção do espaço de busca que pode ser empregado para velocidade inicial
 
-population_size = 70 # indivíduos avaliados por geração (recomendado ao menos 10x o número de variáveis)
-iteracoes = 50 # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
+population_size = 2 # indivíduos avaliados por geração (recomendado ao menos 10x o número de variáveis)
+iteracoes = 5 # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
 
 # declaração do otimizador:
 rodada = PSO(fitness_function, parameters, population_size, w, w_rate, c1, c2, init_vel_ratio) # objeto otimizador

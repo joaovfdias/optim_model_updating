@@ -1,15 +1,13 @@
 import os
 import csv
 import time
-from contextlib import contextmanager
 from datetime import datetime
 import numpy as np
 from pyDOE import lhs
-import threading
-import sys
 
 from .individual import Individual
 from .pso_optimizer.particle import Particle
+from external.additional_functions import Utilities
 
 
 class Optimizer:
@@ -29,6 +27,7 @@ class Optimizer:
         self.logfilename = None # função set
         self.log_dir = None # função set
         self.log_path = None
+        self.status = True
 
         self.sampling_method = "lhs"
         self.sampling_methods = {"random": self.random_initial_population, "lhs": self.LHS_initial_population}
@@ -85,38 +84,13 @@ class Optimizer:
 
     def evaluate_population(self, population):
         for i, individual in enumerate(population, start=1):
-            with self.display_process(f"Avaliando indivíduo {i}/{self.population_size}"):
+            with Utilities.display_process(f"Avaliando indivíduo {i}/{self.population_size}", self.status):
                 individual.evaluate()
 
     @staticmethod
     def get_best_individual(pop):
         return min(pop, key=lambda x: x.fitness)
 
-    @contextmanager
-    def display_process(self, message):
-        stop = False
-
-        def animate_dots():
-            dots = ["", ".", "..", "...", "..", ".", ""]
-            while not stop:
-                for d in dots:
-                    if stop:
-                        break
-                    sys.stdout.write("\033[2K\r")  # limpa conteúdo da animação
-                    sys.stdout.write(f"\r{message}{d} ")
-                    sys.stdout.flush()
-                    time.sleep(0.5)
-
-        t = threading.Thread(target=animate_dots)
-        t.start()
-
-        try:
-            yield
-        finally:
-            stop = True
-            t.join()
-            sys.stdout.write("\033[2K\r")  # limpa conteúdo da animação
-            sys.stdout.flush()
 
     def set_log(self, log_title=None, log_dir=None):
         """
@@ -357,6 +331,7 @@ class PopulationBased(Optimizer):
         :return: retorna a melhor partícula encontrada, da qual é possível obter o fitness (.fitness), parâmetros (.param) e dados modais (.data)
         """
         self.inicio = time.time()
+        self.status = status
         self.populations = [self.initial_population()]
 
         full = log == "full"
@@ -364,7 +339,7 @@ class PopulationBased(Optimizer):
             self.create_log(full=full)
             self.add_log(0, self.populations[-1], full=full)
 
-        if status:
+        if self.status:
             print(f"\nPopulação Inicial: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
         for iteration in range(iterations):
@@ -377,7 +352,7 @@ class PopulationBased(Optimizer):
             if log:
                 self.add_log(iteration+1, new_pop, full=full)
 
-            if status:
+            if self.status:
                 print(f"{self.iter_label} {iteration + 1}: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
             if self.tolerance(self.populations[-2], self.populations[-1]): # critério de parada, determinado com a função set_tolerance
