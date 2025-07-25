@@ -12,10 +12,7 @@ class Individual:
     def evaluate(self):
         if not self.fitness:
             result = self.fitness_function(self.param)
-            self.fitness, self.data = result if isinstance(result, tuple) else (result,
-                                                                                None)  # armazenar self.data apenas se o retorno da função exigir
-            if self.data and not isinstance(self.data, list):  # revisar isso aqui
-                self.data = [self.data]
+            self.fitness, self.data = result if isinstance(result, tuple) else (result, None)  # armazenar self.data apenas se o retorno da função exigir
 
     @staticmethod
     def compare_individuals(ind1, ind2):

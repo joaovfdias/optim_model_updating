@@ -1,12 +1,12 @@
-import time
-from skopt.space import Real
-from skopt import gp_minimize
-import csv
-from datetime import datetime
-
 from ..optimizer import Optimizer
 from ..individual import Individual
 
+from skopt.space import Real
+from skopt import gp_minimize
+
+import csv
+import time
+from datetime import datetime
 
 class BO(Optimizer):
     def __init__(self, fitness_function, parameters, initial_points):
@@ -43,14 +43,14 @@ class BO(Optimizer):
         self.populations.append(Individual(params, self.fitness_function))
         self.populations[-1].evaluate()
         fitness = self.populations[-1].fitness
+        self.best = min(self.populations, key=lambda p:p.fitness)
 
         if self.status:
             it = max((len(self.populations) - self.initial_evaluations), 0) # mantém IT=0 para avaliações iniciais printadas, começa a contar quando GP assume
-            best_individual = min(self.populations, key=lambda p:p.fitness)
             if it > 0:
-                print(f"Avaliação {it}: Best = {best_individual.fitness}, Fitness = {self.populations[-1].fitness}, Parâmetros: {self.display_parameters(self.populations[-1])}")
+                print(f"Avaliação {it}: Global Best = {self.best.fitness}, Fitness = {self.populations[-1].fitness}, Parâmetros: {self.display_parameters(self.populations[-1])}")
             else: # altera a mensagem caso esteja nos pontos iniciais ainda
-                print(f"Avaliação Inicial {len(self.populations)}: Best = {best_individual.fitness}, Fitness = {self.populations[-1].fitness}, Parâmetros: {self.display_parameters(self.populations[-1])}")
+                print(f"Avaliação Inicial {len(self.populations)}: Global Best = {self.best.fitness}, Fitness = {self.populations[-1].fitness}, Parâmetros: {self.display_parameters(self.populations[-1])}")
 
         if self.log:
             it = max((len(self.populations) - self.initial_evaluations), 0)
