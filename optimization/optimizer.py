@@ -26,6 +26,7 @@ class Optimizer:
         self.logfilename = None # função set
         self.log_dir = None # função set
         self.log_path = None
+        self.status = True
 
         self.sampling_method = "lhs"
         self.sampling_methods = {"random": self.random_initial_population, "lhs": self.LHS_initial_population}
@@ -329,6 +330,7 @@ class PopulationBased(Optimizer):
         :return: retorna a melhor partícula encontrada, da qual é possível obter o fitness (.fitness), parâmetros (.param) e dados modais (.data)
         """
         self.inicio = time.time()
+        self.status = status
         self.populations = [self.initial_population()]
 
         full = log == "full"
@@ -336,7 +338,7 @@ class PopulationBased(Optimizer):
             self.create_log(full=full)
             self.add_log(0, self.populations[-1], full=full)
 
-        if status:
+        if self.status:
             print(f"\nPopulação Inicial: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
         for iteration in range(iterations):
@@ -349,7 +351,7 @@ class PopulationBased(Optimizer):
             if log:
                 self.add_log(iteration+1, new_pop, full=full)
 
-            if status:
+            if self.status:
                 print(f"{self.iter_label} {iteration + 1}: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
             if self.tolerance(self.populations[-2], self.populations[-1]): # critério de parada, determinado com a função set_tolerance
