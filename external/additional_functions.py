@@ -49,3 +49,7 @@ class SpecialFun:
         mac_paired = mac[base_index, comp_index]
 
         return [paired_comp_freq, paired_comp_modes, (1 - mac_paired).sum()]
+
+
+class StopOptimization(Exception): # aux na parada controlada
+    pass

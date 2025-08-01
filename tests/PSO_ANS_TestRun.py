@@ -1,7 +1,7 @@
 from optimization.parameter import *
 from optimization.pso_optimizer.pso_optimizer import PSO
 from external.parser import Ansys
-from external.special_functions import SpecialFun
+from external.additional_functions import SpecialFun
 
 import os
 
@@ -27,7 +27,7 @@ keys = [parameter.key for parameter in parameters]  # identificadores dos parâm
 
 # parâmetros de entrada da classe Ansys:
 # entrada obrigatória:
-ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v251\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
+ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 # entradas opcionais (caso vazias, será utilizado default: {diretório atual}\ANSYS, arquivos "script.txt", "out_base_freq.txt" e "out_base_modes.txt"):
 ansys_working_dir = None
 input_dir = os.path.join(os.getcwd(), 'input') # {diretório atual}\input (localização do script e dados de referência)
@@ -71,8 +71,8 @@ c1 = 2.05 # influencia a exploração individual
 c2 = 2.05 # influencia a convergência para o mínimo do grupo
 init_vel_ratio = 0.2 # proporção do espaço de busca que pode ser empregado para velocidade inicial
 
-population_size = 70 # indivíduos avaliados por geração (recomendado ao menos 10x o número de variáveis)
-iteracoes = 50 # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
+population_size = 2 # indivíduos avaliados por geração (recomendado ao menos 10x o número de variáveis)
+iteracoes = 5 # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
 
 # declaração do otimizador:
 rodada = PSO(fitness_function, parameters, population_size, w, w_rate, c1, c2, init_vel_ratio) # objeto otimizador

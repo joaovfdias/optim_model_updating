@@ -1,12 +1,15 @@
 import os
 import csv
+import sys
 import time
 from datetime import datetime
 import numpy as np
 from pyDOE import lhs
+import signal
 
 from .individual import Individual
 from .pso_optimizer.particle import Particle
+from external.additional_functions import StopOptimization
 
 
 class Optimizer:
@@ -33,6 +36,10 @@ class Optimizer:
         self.algorithms = {"GA": Individual, "PSO": Particle} # auxiliar do inicializador de população
 
         self.populations = []
+
+        self.stop_requested = False
+        signal.signal(signal.SIGINT, self.handle_stop_signal)
+        signal.signal(signal.SIGTERM, self.handle_stop_signal)
 
 
     # funções 'set' que permitem ao usuário modificar valores padrão
@@ -315,6 +322,19 @@ class Optimizer:
         self.opttime = stime
 
 
+    def handle_stop_signal(self, signum, frame):
+        print("\nStopping signal received")
+        self.stopping_criteria = True
+        sys.settrace(self.global_trace)
+
+    def global_trace(self, frame, event, arg):
+        if self.stop_requested:
+            sys.settrace(None)
+            raise StopOptimization()
+        return self.global_trace
+
+
+
 # subclasse para funções comuns a algoritmos populacionais
 class PopulationBased(Optimizer):
     def __init__(self, fitness_function, parameters, population_size):
@@ -341,21 +361,27 @@ class PopulationBased(Optimizer):
         if self.status:
             print(f"\nPopulação Inicial: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
-        for iteration in range(iterations):
+        try:
+            for iteration in range(iterations):
 
-            new_pop = self.opt_step(iteration)
+                new_pop = self.opt_step(iteration)
 
-            self.evaluate_population(new_pop)
-            self.populations.append(new_pop)
+                self.evaluate_population(new_pop)
+                self.populations.append(new_pop)
 
-            if log:
-                self.add_log(iteration+1, new_pop, full=full)
+                if log:
+                    self.add_log(iteration+1, new_pop, full=full)
 
-            if self.status:
-                print(f"{self.iter_label} {iteration + 1}: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
+                if self.status:
+                    print(f"{self.iter_label} {iteration + 1}: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
-            if self.tolerance(self.populations[-2], self.populations[-1]): # critério de parada, determinado com a função set_tolerance
-                break
+                if self.tolerance(self.populations[-2], self.populations[-1]): # critério de parada, determinado com a função set_tolerance
+                    break
+
+        except StopOptimization:
+            print("Executada parada controlada")
+        except Exception as e:
+            print(f"Erro inesperado: {e}")
 
         fim = time.time()
         if log:

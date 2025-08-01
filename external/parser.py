@@ -89,7 +89,7 @@ class Ansys:
             if os.path.exists(file):
                 os.remove(file)
 
-    def exe_ansys(self, input_file):
+    def exe_ansys(self, input_file): # preciso adaptar para que seja possível interromper o subprocess caso o pycharm pare
         output_file = os.path.join(self.ansys_working_dir, 'file.out')
         command = f'"{self.ansys_exe_path}" -lch -p ansys -dis INTELMPI -np 1 -dir "{self.ansys_working_dir}" -j modeloc -i "{input_file}" -o "{output_file}" -b -s read'
 
