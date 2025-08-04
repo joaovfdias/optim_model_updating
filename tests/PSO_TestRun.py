@@ -27,10 +27,12 @@ c2 = 2.05 # governa a convergência
 init_vel_ratio = 0.2 # proporção do espaço de busca que pode ser empregado para velocidade inicial
 
 population_size = 50
-iteracoes = 100
+iteracoes = 300
 
 # declarção do otimizador:
 rodada = PSO(ackley, parameters, population_size, w, w_rate, c1, c2, init_vel_ratio)
+# critério de parada:
+rodada.set_tolerance(fit_abs=2e-1, fit_rel=0.01, param_rel=0.01, patience=5)
 
 # ajuste do registro:
 log = "full" # tipo de registro (True: simplificado, "full": todos os indivíduos)

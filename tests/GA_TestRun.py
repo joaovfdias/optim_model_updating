@@ -24,11 +24,13 @@ elitism_rate = 0.10
 crossover_rate = 0.40
 mutation_strength = 0.30
 
-population_size = 100
-generations = 200
+population_size = 50
+generations = 300
 
 # declaração do otimizador:
 rodada = GA(ackley, parameters, population_size, elitism_rate, crossover_rate, mutation_strength)
+# critério de parada:
+rodada.set_tolerance(fit_abs=2e-1, fit_rel=0.01, param_rel=0.01, patience=5)
 
 # ajuste do registro:
 log = "full" # tipo de registro (True: simplificado, "full": todos os indivíduos)

@@ -42,12 +42,13 @@ out_modes_filename = "out_modes_laje.txt"
 # objeto da classe Ansys declarado antes de fitness_function:
 ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename, base_freq_filename, base_modes_filename, output_dir)
 ansys.set_output_filenames(out_freq_filename, out_modes_filename) # ajusta o nome dos arquivos de saída de freq. e modos do Ansys, que serão gerados em ansys_working_dir
+ansys.max_attempts = 6 # define quantas tentativas de rodada o Ansys executa em caso de erro
 
 # função objetivo com pareamento (usa 'Ansys' para rodar e obter os parâmetros modais necessários e 'SpecialFun' para fazer os cálculos de erro e MAC):
 def fitness_function(param):
 
     input_file = ansys.create_input_file(param, keys) # gera o arquivo de input para o ansys com base na lista de parâmetros (valores) e keys (nomes)
-    ansys.run_ansys(input_file) # executa esse arquivo
+    ansys.run_ansys(input_file, True, True) # executa esse arquivo (sinalizar quais dados ele espera que o Ansys retorne)
 
     comp_freq = ansys.read_frequencies() # armazena as frequências exportadas atuais
     comp_modes = ansys.read_modes() # armazena os modos exportados atuais
@@ -73,7 +74,7 @@ generations = 50 # quantidade de iterações (suficientemente grande para a conv
 
 # declaração do otimizador:
 rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength) # objeto otimizador
-rodada.set_tolerance(fit_tol = 1e-4, patience = 10) # critério de parada
+rodada.set_tolerance(fit_abs = 2e-2, patience = 10) # critério de parada
 rodada.sync_time(ansys.anstime) # sincroniza timestamp de optimizer e ansys para facilitar controle dos registros
 
 rodada.sync_time(ansys.anstime) # sincroniza o log label do algoritmo e a subpasta no output do ansys para facilitar controle

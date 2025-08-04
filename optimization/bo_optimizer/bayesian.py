@@ -66,6 +66,7 @@ class BO(Optimizer):
         xi = xi or 0.01 # default
         kappa = kappa or 1.96 # default
 
+        self.inicio = time.time()
         self.status = status
         self.log = log
         timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
@@ -82,7 +83,7 @@ class BO(Optimizer):
 
         fim = time.time()
         if self.log:
-            self.time_log(fim)
+            self.log_time(fim)
             self.add_log_specs(result.specs)
             print(f"\nRegistro salvo em: {self.log_path}")
 

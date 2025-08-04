@@ -11,15 +11,11 @@ from .pso_optimizer.particle import Particle
 
 class Optimizer:
     def __init__(self, fitness_function, parameters, population_size):
-        self.inicio = time.time() # passar depois para a função run dos respectivos algoritmos
         self.current_dir = os.getcwd() # definindo o diretório atual
         self.opttime = None
 
         self.stopping_criteria = False
-        self.fitness_tolerance = 0
-        self.parameters_tolerance = 0
-        self.patience = 10
-        self.consecutive_iterations = 0
+        self.tolerance_flag = [0]*3
 
         self.fitness_function = fitness_function
         self.parameters = parameters
@@ -30,6 +26,7 @@ class Optimizer:
         self.logfilename = None # função set
         self.log_dir = None # função set
         self.log_path = None
+        self.status = True
 
         self.sampling_method = "lhs"
         self.sampling_methods = {"random": self.random_initial_population, "lhs": self.LHS_initial_population}
@@ -53,7 +50,6 @@ class Optimizer:
         self.populations = [self.initial_population()]
 
     def initial_population(self):
-        self.inicio = time.time()
 
         pop = self.sampling_methods[self.sampling_method]() # chama a função do metodo indicado
         self.evaluate_population(pop)
@@ -226,28 +222,46 @@ class Optimizer:
 
                 writer.writerow(row)
 
-    def time_log(self, fim):
+    def log_time(self, fim):
         tempo = fim - self.inicio
-        row = ["Time (s)", tempo]
+        row = ["Time (s):", tempo]
 
         with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file, delimiter=';')
             writer.writerow([])
             writer.writerow(row)
 
+    def log_specs(self):
+        with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file, delimiter=';')
 
-    def set_tolerance(self, fit_tol=None, param_tol=None, patience=None):
+            writer.writerow([])
+
+            #writer.writerow([f"{self.__class__.__name__} parameters:",])
+
+            algorithm_parameters = self.specs
+            writer.writerow([f"{self.__class__.__name__} parameters:",""] + list(algorithm_parameters.keys()))
+            writer.writerow(["values:",""] + list(algorithm_parameters.values()))
+
+    @property
+    def specs(self):
+        pass
+
+
+    def set_tolerance(self, fit_abs=None, fit_rel=None, param_rel=None, patience=1):
         """
         Critérios de parada
-        :param fit_tol: define a tolerância na diferença do melhor fitness entre iterações consecutivas
-        :param param_tol: define a tolerância na diferença entre parâmetros nos melhores indivíduos de iterações consecutivas
+        :param fit_abs: define a tolerância do valor absoluto de fitness
+        :param fit_tol: define a tolerância da diferença relativa entre melhores fitness de iterações consecutivas
+        :param param_tol: define a tolerância da diferença entre valores dos parâmetros dos melhores indivíduos de iterações consecutivas (normalizada pelo espaço de busca)
         :param patience: define quantas vezes as tolerâncias podem ser superadas antes de interromper o algoritmo
         :return:
         """
         self.stopping_criteria = True
-        self.fitness_tolerance = fit_tol or self.fitness_tolerance
-        self.parameters_tolerance = param_tol or self.parameters_tolerance
-        self.patience = patience or self.patience
+        self.fitness_abs_tol = fit_abs
+        self.fitness_rel_tol = fit_rel
+        self.parameters_rel_tol = param_rel
+        self.patience = patience
 
     # criar uma função em otimizador que receba duas populações ou individuos e compare as diferenças, verificando se estão dentro da tolerância por uma quantidade consecutiva de iterações
     def tolerance(self, previous, current):
@@ -261,19 +275,99 @@ class Optimizer:
         previous = min(previous, key=lambda p: p.fitness)
         current = min(current, key=lambda p: p.fitness)
 
-        fitness_diff = abs(previous.fitness - current.fitness)
-        parameters_diff = max(abs(pp - cp) for pp, cp in zip(previous.param, current.param))
+        fitness_diff = abs((previous.fitness - current.fitness) / previous.fitness)
+        search_spaces = [param.search_space for param in self.parameters]
+        parameters_diff = [abs(pp - cp) / ss for pp, cp, ss in zip(previous.param, current.param, search_spaces)]
 
-        if fitness_diff < self.fitness_tolerance or parameters_diff < self.parameters_tolerance:
-            self.consecutive_iterations += 1
-            if self.consecutive_iterations >= self.patience:
-                print("\nCritério de convergência atingido: execução interrompida.")
-                return True
+        if self.fitness_abs_tol is not None:
+            if current.fitness < self.fitness_abs_tol:
+                self.tolerance_flag[0] += 1
+                if self.tolerance_flag[0] >= self.patience:
+                    print(
+                        f"\nCritério de convergência atingido: fitness menor que {self.fitness_abs_tol} por {self.patience} iterações consecutivas. \nExecução interrompida.")
+                    return True
+            else:
+                self.tolerance_flag[0] = 0
 
-        else:
-            self.consecutive_iterations = 0
+        if self.fitness_rel_tol is not None:
+            if fitness_diff < self.fitness_rel_tol:
+                self.tolerance_flag[1] += 1
+                if self.tolerance_flag[1] >= self.patience:
+                    print(
+                        f"\nCritério de convergência atingido: valores de fitness entre iterações apresentaram diferença menor que {self.fitness_rel_tol*100}% por {self.patience} vezes consecutivas. \nExecução interrompida.")
+                    return True
+            else:
+                self.tolerance_flag[1] = 0
+
+        if self.parameters_rel_tol is not None:
+            if all(diff < self.parameters_rel_tol for diff in parameters_diff):
+                self.tolerance_flag[2] += 1
+                if self.tolerance_flag[2] >= self.patience:
+                    print(
+                        f"\nCritério de convergência atingido: valores de parâmetros entre iterações apresentaram diferença menor que {self.parameters_rel_tol*100}% do intervalo de busca por {self.patience} vezes consecutivas. \nExecução interrompida.")
+                    return True
+            else:
+                self.tolerance_flag[2] = 0
 
         return False
 
-    def sync_time(self, time):
-        self.opttime = time
+    def sync_time(self, stime):
+        self.opttime = stime
+
+
+# subclasse para funções comuns a algoritmos populacionais
+class PopulationBased(Optimizer):
+    def __init__(self, fitness_function, parameters, population_size):
+        self.iter_label = "Iteração"
+        self.global_best = None
+        super().__init__(fitness_function, parameters, population_size)
+
+    def run(self, iterations=100, status=True, log=True):
+        """
+        :param itera: número de iterações a serem executadas
+        :param status: por padrão mostra o andamento das soluções a cada iteração, False para não mostrar
+        :param log: define o registro dos resultados em planilha. True (padrão): registra os melhores indivíduos de cada iteração, "full": registra todos os indivíduos de todas as iterações. False: não cria registro.
+        :return: retorna a melhor partícula encontrada, da qual é possível obter o fitness (.fitness), parâmetros (.param) e dados modais (.data)
+        """
+        self.inicio = time.time()
+        self.status = status
+        self.populations = [self.initial_population()]
+
+        full = log == "full"
+        if log:
+            self.create_log(full=full)
+            self.add_log(0, self.populations[-1], full=full)
+
+        if self.status:
+            print(f"\nPopulação Inicial: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
+
+        for iteration in range(iterations):
+
+            new_pop = self.opt_step(iteration)
+
+            self.evaluate_population(new_pop)
+            self.populations.append(new_pop)
+
+            if log:
+                self.add_log(iteration+1, new_pop, full=full)
+
+            if self.status:
+                print(f"{self.iter_label} {iteration + 1}: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
+
+            if self.tolerance(self.populations[-2], self.populations[-1]): # critério de parada, determinado com a função set_tolerance
+                break
+
+        fim = time.time()
+        if log:
+            self.log_specs()
+            self.log_time(fim)
+            print(f"\nRegistro salvo em: {self.log_path}")
+
+        self.global_best = self.global_best or self.get_best_individual(self.populations[-1])
+
+        print(f"\nMelhor solução encontrada: Fitness = {self.global_best.fitness:.4g}, Parâmetros: {self.display_parameters(self.global_best)}")
+
+        return self.global_best # retorna o melhor indivíduo final
+
+    def opt_step(self, iteration): # definida nos algoritmos específicos
+        pass
