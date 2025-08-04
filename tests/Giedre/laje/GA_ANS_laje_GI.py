@@ -60,7 +60,10 @@ def run_trial(pop, gen, noise, MAC=None):
 
         fitness = peso_freq * freq_error_sum + peso_mac * mac_error_sum if MAC else peso_freq * freq_error_sum
 
-        return fitness, [paired_comp_freq, paired_comp_modes] # retorna o valor do fitness do indivíduo e os dados modais associados ao modelo (se houver apenas frequências, retornar [comp_freq])
+        return fitness, {"freq error": freq_error_sum,
+                         "mac error": mac_error_sum,
+                         "Freq.": paired_comp_freq,
+                         "Mode": paired_comp_modes}  # caso haja dados adicionais para registrar, o 2º retorno da função deve ser um dicionário com {"Identificador": Valor (escalar, vetor, matriz)}. Caso não haja, retornar apenas fitness.
 
     # parâmetros do algoritmo:
     elitism_rate = 0.10
