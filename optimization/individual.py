@@ -7,7 +7,7 @@ class Individual:
         self.fitness_function = fitness_function
         self.fitness = None
         self.data = None
-        self.etime = None
+        self.etime = time.time()
 
     def __str__(self):
         param_str = ", ".join(f"{p:.4f}" for p in self.param)

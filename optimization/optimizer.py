@@ -4,6 +4,8 @@ import time
 from datetime import datetime
 import numpy as np
 from pyDOE import lhs
+import pandas as pd
+import io
 
 from .individual import Individual
 from .pso_optimizer.particle import Particle
@@ -29,6 +31,11 @@ class Optimizer:
         self.log_path = None
         self.status = True
 
+        self.log_history = None
+        self.logged_time = 0
+        self.logged_iteration = 0
+
+        self.iter_label = "Iteração"
         self.sampling_method = "lhs"
         self.sampling_methods = {"random": self.random_initial_population, "lhs": self.LHS_initial_population}
         self.algorithms = {"GA": Individual, "PSO": Particle} # auxiliar do inicializador de população
@@ -47,8 +54,6 @@ class Optimizer:
             print(
                 f"Método de amostragem '{sampling_method}' inválido. Tipos válidos: {list(self.sampling_methods.keys())}")
             return
-
-        self.populations = [self.initial_population()]
 
     def initial_population(self):
 
@@ -81,6 +86,102 @@ class Optimizer:
                 ]
         return pop
 
+    def resume_from_log(self, csv_path):
+        """
+        Retoma rodada de otimização com base em log no caminho indicado
+        {Não funciona no Bayesiano até implementação própria}
+        """
+        self.log_history = csv_path
+
+    def resume_initial_population(self):
+        """
+        Lê o log CSV e reconstrói todas as populações válidas
+        """
+        valid_lines = []
+        with open(self.log_history, mode='r', newline='', encoding='utf-8') as f:
+            for line in f:
+                values = line.strip().split(';')
+                if not values[0]:  # interrompe se a primeira coluna (Iteration) estiver vazia
+                    break
+                valid_lines.append(line)
+
+        # Criar DataFrame com as colunas desejadas
+        df = pd.read_csv(io.StringIO("".join(valid_lines)), sep=';')
+
+        expect_col = ['Iteration', 'Individual', 'Fitness'] + [param.key for param in self.parameters] + ['Time (s)']
+        missing = [col for col in expect_col if col not in df.columns]
+        if missing:
+            if missing == ['Time (s)']:
+                print(f"\nColuna 'Time' ausente no histórico, tempo total não será registrado")
+            else:
+                raise ValueError(f"Coluna(s) ausente(s) no CSV: {missing}")
+
+        # Agrupar por geração com base na coluna "Iteration"
+        curr_pop = []
+        curr_iteration = 0
+
+        for _, row in df.iterrows():
+            iteration = int(row["Iteration"])
+
+            # Quando mudar de geração
+            if iteration != curr_iteration:
+                if curr_pop:
+                    self.populations.append(curr_pop)
+                    if len(curr_pop) != self.population_size:
+                        raise ValueError(f"Tamanho de população definido pelo usuário ({self.population_size}) incompatível com população #{curr_iteration} registrada ({len(curr_pop)})")
+                curr_pop = []
+                curr_iteration = iteration
+
+            # Adiciona indivíduo atual
+            individuo = self.algorithms[self.__class__.__name__]([row[param.key] for param in self.parameters], self.fitness_function)
+            individuo.fitness = float(row["Fitness"])
+
+            curr_pop.append(individuo)
+
+        # Adiciona a última população, se completa
+        if len(curr_pop) == self.population_size:
+            self.populations.append(curr_pop)
+        else:
+            print(f"\nDescartada última população incompleta registrada")
+            curr_pop -= 1
+
+        if self.__class__.__name__ == "PSO": # para o PSO, é necessário reconstruir o histórico da última instância da partícula (Particle.best)
+            for i in range(self.population_size): # para cada partícula da população
+                particle_history = [population[i] for population in self.populations] # armazena a partícula na posição i ao longo das iterações
+                particle_best = self.get_best_individual(particle_history)
+                self.populations[-1][i].best = [particle_best.param, particle_best.fitness] # atualiza o histórico para a última população registrada para dar continuidade ao algoritmo
+            self.best_particles.extend([self.get_best_individual(population) for population in self.populations])
+            self.global_best = self.get_best_individual(self.best_particles)
+
+        print(f"\nHistórico de [{len(self.populations)} populações de {len(self.populations[0])} indivíduos] reconstruído a partir do arquivo log: {self.log_history}"
+              f"\nOtimização retomada a patir da {self.iter_label.lower()} {curr_iteration + 1}")
+
+        self.create_log_path()
+        header = valid_lines[0].strip().split(';')
+        index_last_line = (len(self.populations) * len(self.populations[0])) # total de linhas válidas
+
+        if 'Time (s)' in header: # Salvar o tempo acumulado anterior, se houver
+            self.logged_time = float(df.iloc[index_last_line - 1]["Time (s)"]) # desconta o cabeçalho do index pois não é linha no dataframe
+
+        else: # Adiciona a coluna Time (s), caso não exista, para compatibilizar com log atual
+            insert_index = len(expect_col) - 1
+            header.insert(insert_index, 'Time (s)')
+            new_valid_lines = [';'.join(header) + '\n']
+
+            for line in valid_lines[1:index_last_line + 1]:
+                values = line.strip().split(';')
+                values.insert(insert_index, "")
+                new_valid_lines.append(';'.join(values) + '\n')
+
+            valid_lines = new_valid_lines
+
+        # Armazenar o conteúdo completo das linhas válidas (copia no novo log)
+        with open(self.log_path, mode='w', newline='', encoding='utf-8') as new_log:
+            new_log.writelines(valid_lines[:index_last_line + 1])
+        self.log_header = True
+
+        self.logged_iteration = curr_iteration # usada para retomar as rodadas
+
 
     @staticmethod
     def evaluate_population(population):
@@ -109,18 +210,21 @@ class Optimizer:
     def display_parameters(self, individual):
         return ', '.join(f'{k} = {v:.3g}' for k, v in zip([param.key for param in self.parameters], individual.param))
 
-    def create_log(self, individual=None, full=False): # alterar dados recebidos para um dicionário, de forma a registrar as keys e values
-        """
-        função que cria uma planilha com cabeçalho relacionando os dados do problema.
-        :param individual: indíviduo declarado da classe Individual (por padrão recebe o 1º da população inicial, só é necessário para quantificar modos e frequências)
-        :param full: True caso for criar o registro completo com a função add_full_log, com Iteração e número do Indivíduo no cabeçalho; False (padrão) caso for usar "add_log" para registrar apenas o melhor indivíduo de dada iteração.
-        """
+    def create_log_path(self):
         timestamp = self.opttime or datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{self.logfilename}_{timestamp}" if self.logfilename else f"{self.__class__.__name__}_{timestamp}"
         self.logfilename = f"{filename}.csv"
         self.log_dir = self.log_dir or os.path.join(self.current_dir, "log")
         os.makedirs(self.log_dir, exist_ok=True)
         self.log_path = os.path.join(self.log_dir, self.logfilename)
+
+    def create_log(self, individual=None, full=False): # alterar dados recebidos para um dicionário, de forma a registrar as keys e values
+        """
+        função que cria uma planilha com cabeçalho relacionando os dados do problema.
+        :param individual: indíviduo declarado da classe Individual (por padrão recebe o 1º da população inicial, só é necessário para quantificar modos e frequências)
+        :param full: True caso for criar o registro completo com a função add_full_log, com Iteração e número do Indivíduo no cabeçalho; False (padrão) caso for usar "add_log" para registrar apenas o melhor indivíduo de dada iteração.
+        """
+        self.create_log_path()
 
         individual = individual or self.populations[0][0]
 
@@ -198,7 +302,8 @@ class Optimizer:
                     row.append(num) # adiciona a numeração do indivíduo para o caso log full
                 if not full and self.__class__.__name__ == "BO": # armazena o Global Best apenas no caso de amostragem Bayesiana
                     row.append(self.best.fitness)
-                row.extend([individual.fitness] + individual.param + [individual.etime - self.inicio])
+                elapsed_time = self.logged_time + (individual.etime - self.inicio) # registra o tempo passado até imediatamente após a avaliação desse indivíduo, considerando o tempo acumulado do log
+                row.extend([individual.fitness] + individual.param + [elapsed_time])
 
                 # verifica se a entrada de .data é um dicionário e adapta o espaço adequado para escalar, vetor ou matriz (2d)
                 if isinstance(individual.data, dict):
@@ -225,7 +330,15 @@ class Optimizer:
 
     def log_time(self, fim):
         tempo = fim - self.inicio
-        row = ["Time (s):", tempo]
+
+        if not self.log_history:
+            row = ["Time (s):", tempo]
+        else: # caso o histórico tenha sido reconstruído de um log, indica separadamente o tempo da rodada anterior, atual e somatória
+            row = [
+                "Logged Time (s):", self.logged_time,
+                "Current Run Time (s):", tempo,
+                "Total Accumulated Time (s):", self.logged_time + tempo
+            ]
 
         with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file, delimiter=';')
@@ -319,7 +432,6 @@ class Optimizer:
 # subclasse para funções comuns a algoritmos populacionais
 class PopulationBased(Optimizer):
     def __init__(self, fitness_function, parameters, population_size):
-        self.iter_label = "Iteração"
         self.global_best = None
         super().__init__(fitness_function, parameters, population_size)
 
@@ -332,17 +444,20 @@ class PopulationBased(Optimizer):
         """
         self.inicio = time.time()
         self.status = status
-        self.populations = [self.initial_population()]
 
-        full = log == "full"
-        if log:
-            self.create_log(full=full)
-            self.add_log(0, self.populations[-1], full=full)
+        if not self.log_history: # caso não tenha sido indicada reconstrução a partir de log anterior, gera e registra a população inicial normalmente
+            self.populations.append(self.initial_population())
+            full = log == "full"
+            if log:
+                self.add_log(0, self.populations[-1], full=full)
+            if self.status:
+                print(f"\nPopulação Inicial: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
-        if self.status:
-            print(f"\nPopulação Inicial: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
+        else:
+            self.resume_initial_population() # reconstroi as populações iniciais com base em log anterior
+            full = True # demanda registro completo
 
-        for iteration in range(iterations):
+        for iteration in range(self.logged_iteration, iterations):
 
             new_pop = self.opt_step(iteration)
 

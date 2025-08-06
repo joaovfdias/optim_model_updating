@@ -27,7 +27,7 @@ keys = [parameter.key for parameter in parameters]  # identificadores dos parâm
 
 # parâmetros de entrada da classe Ansys:
 # entrada obrigatória:
-ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v251\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
+ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 # entradas opcionais (caso vazias, será utilizado default: {diretório atual}\ANSYS, arquivos "script.txt", "out_base_freq.txt" e "out_base_modes.txt"):
 ansys_working_dir = None
 input_dir = os.path.join(os.getcwd(), 'input') # {diretório atual}\input (localização do script e dados de referência)
@@ -79,9 +79,12 @@ rodada.sync_time(ansys.anstime) # sincroniza timestamp de optimizer e ansys para
 
 # ajuste do registro:
 log = "full" # tipo de registro (True: simplificado - melhor de cada iteração, "full": todos os indivíduos)
-log_title = "teste_GA_laje" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
+log_title = "teste_GA_log" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
 log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
 rodada.set_log(log_title, log_dir)
+
+# caso queira retomar a rodada de algum log cvs:
+rodada.resume_from_log(r"C:\Users\Thiago Artur\Documents\.Mestrado (Local)\PyGit\tests\test log recovery\teste_GA_log_completo.csv")
 
 # chamada:
 best = rodada.run(generations, log=log)
