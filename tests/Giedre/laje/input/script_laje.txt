@@ -21,7 +21,7 @@ k1 = %rigidez1%       ! Rigidez 1
 k2 = %rigidez2%       ! Rigidez 2
 k3 = %rigidez3%      ! Rigidez 3
 k4 = %rigidez4%    ! Rigidez 4
-NUMFREQ = 12 ! número de frequências
+NUMFREQ = 20 ! número de frequências
 NUMPONTOS = 12   ! malha para MAC
 
 ! ELEMENT TYPE DEFINITION

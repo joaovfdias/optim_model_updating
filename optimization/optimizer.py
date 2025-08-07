@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 import numpy as np
 from pyDOE import lhs
+import pandas as pd
 
 from .individual import Individual
 from .pso_optimizer.particle import Particle
@@ -21,6 +22,7 @@ class Optimizer:
         self.parameters = parameters
         self.parameters_keys = [param.key for param in parameters]
         self.population_size = population_size
+        self.initial_iteration = 0
 
         self.log_header = False
         self.logfilename = None # função set
@@ -29,7 +31,7 @@ class Optimizer:
         self.status = True
 
         self.sampling_method = "lhs"
-        self.sampling_methods = {"random": self.random_initial_population, "lhs": self.LHS_initial_population}
+        self.sampling_methods = {"random": self.random_initial_population, "lhs": self.LHS_initial_population, "user": self.user_initial_population}
         self.algorithms = {"GA": Individual, "PSO": Particle} # auxiliar do inicializador de população
 
         self.populations = []
@@ -79,6 +81,32 @@ class Optimizer:
                 for i in range(self.population_size)
                 ]
         return pop
+
+    def set_user_initial_population(self, log_file):
+        'User the given initial population, by sending the file'
+        self.log_population = log_file
+
+    def user_initial_population(self):
+        path = self.log_population
+        df = pd.read_csv(path, sep=';', low_memory=False)
+
+        self.initial_iteration = df['Iteration'].iloc[-1]
+
+        selected_columns = [col for col in ['Fitness'] + self.parameters_keys if col in df.columns]
+        columns = df[selected_columns]
+        last_gen = columns.tail(self.population_size)
+        ind_data = last_gen.values
+
+        pop = [
+            # alteração para criar "Individual" no caso do GA e "Partcile" no caso do PSO, evitando repetição da função nas classes
+            self.algorithms[self.__class__.__name__](ind_data[i, 1:], self.fitness_function) for i in range(self.population_size)
+            ]
+
+        for i, individual in enumerate(pop):
+            individual.fitness = ind_data[i, 0]
+
+        return pop
+
 
 
     @staticmethod
@@ -341,7 +369,7 @@ class PopulationBased(Optimizer):
         if self.status:
             print(f"\nPopulação Inicial: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
-        for iteration in range(iterations):
+        for iteration in range(iterations - self.initial_iteration):
 
             new_pop = self.opt_step(iteration)
 
@@ -349,10 +377,10 @@ class PopulationBased(Optimizer):
             self.populations.append(new_pop)
 
             if log:
-                self.add_log(iteration+1, new_pop, full=full)
+                self.add_log(self.initial_iteration + iteration+1, new_pop, full=full)
 
             if self.status:
-                print(f"{self.iter_label} {iteration + 1}: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
+                print(f"{self.iter_label} {self.initial_iteration + iteration + 1}: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
             if self.tolerance(self.populations[-2], self.populations[-1]): # critério de parada, determinado com a função set_tolerance
                 break
