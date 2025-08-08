@@ -1,4 +1,5 @@
 import time
+import uuid
 
 
 class Individual:
@@ -8,6 +9,7 @@ class Individual:
         self.fitness = None
         self.data = None
         self.etime = time.time()
+        self.id = str(uuid.uuid4())
 
     def __str__(self):
         param_str = ", ".join(f"{p:.4f}" for p in self.param)
@@ -25,3 +27,7 @@ class Individual:
             if ind1.param[i] != ind2.param[i]:
                 return False
         return True
+
+    @staticmethod
+    def save_individual_as_file():
+        raise NotImplementedError
