@@ -7,6 +7,7 @@ from skopt import gp_minimize
 import csv
 import time
 from datetime import datetime
+import numpy as np
 
 class BO(Optimizer):
     def __init__(self, fitness_function, parameters, initial_points):
@@ -81,10 +82,32 @@ class BO(Optimizer):
 
         best_individual = self.get_best_individual(self.populations)
 
+        gp_final = result.models[-1]
+        kernel = gp_final.kernel_
+
+        # Função para encontrar o componente com length_scale
+        def extract_length_scales(kernel):
+            if hasattr(kernel, "length_scale"):
+                return kernel.length_scale
+
+            for attr in ("k1", "k2"):
+                if hasattr(kernel, attr):
+                    try:
+                        ls = extract_length_scales(getattr(kernel, attr))
+                        if ls is not None:
+                            return ls
+                    except Exception as e:
+                        print(f"Erro ao extrair length scales de {attr}: {e}")
+
+            return None
+
+        length_scales = extract_length_scales(kernel)
+        print("Length-scales:", length_scales)
+
         fim = time.time()
         if self.log:
             self.log_time(fim)
-            self.add_log_specs(result.specs)
+            self.add_log_specs(result.specs, length_scales)
             print(f"\nRegistro salvo em: {self.log_path}")
 
         print(f"\nMelhor solução encontrada: Fitness = {best_individual.fitness}, Parâmetros: {self.display_parameters(best_individual)}")
@@ -92,7 +115,7 @@ class BO(Optimizer):
         return result
 
 
-    def add_log_specs(self, specs_dictionary):
+    def add_log_specs(self, specs_dictionary, length_scales):
         with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file, delimiter=';')
 
@@ -107,6 +130,16 @@ class BO(Optimizer):
 
             # Adiciona os valores correspondentes em outra linha
             writer.writerow(specs_dictionary.values())
+
+            # comprimentos de escala e sensibilidade
+            writer.writerow([])
+            writer.writerow(["Length scales:"] + [length_scales])
+
+            sensitivities = 1 / np.array(length_scales)
+            relative_sensitivities = sensitivities / np.sum(sensitivities)
+
+            writer.writerow(["Relative sensitivities:"] + [relative_sensitivities])
+
 
     # salvar os resultados em log [sem uso]
     @staticmethod
