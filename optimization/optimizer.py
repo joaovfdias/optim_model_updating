@@ -14,6 +14,7 @@ class Optimizer:
     def __init__(self, fitness_function, parameters, population_size):
         self.current_dir = os.getcwd() # definindo o diretório atual
         self.opttime = None
+        self.inicio = time.time()
 
         self.stopping_criteria = False
         self.tolerance_flag = [0]*3
@@ -151,7 +152,7 @@ class Optimizer:
 
         individual = individual or self.populations[0][0]
 
-        header = ["Iteration", "Fitness"] + self.parameters_keys
+        header = ["Iteration", "Fitness"] + self.parameters_keys + ["Time (s)"]
 
         #best = self.__class__.__name__ == "BO"
 
@@ -225,7 +226,7 @@ class Optimizer:
                     row.append(num) # adiciona a numeração do indivíduo para o caso log full
                 if not full and self.__class__.__name__ == "BO": # armazena o Global Best apenas no caso de amostragem Bayesiana
                     row.append(self.best.fitness)
-                row.extend([individual.fitness] + individual.param)
+                row.extend([individual.fitness] + individual.param + [individual.etime - self.inicio])
 
                 # verifica se a entrada de .data é um dicionário e adapta o espaço adequado para escalar, vetor ou matriz (2d)
                 if isinstance(individual.data, dict):
