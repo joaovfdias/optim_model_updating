@@ -89,9 +89,7 @@ class Plotter:
         self.plot_style[self.graph_style]()
 
 
-
-
-# Gera os grupos de comparacao
+# Gera os grupos de arquivos
 main_folder_path = r"C:\Users\giedr\PycharmProjects\GitGeral\tests\Giedre\Mean_Values\TestFolder"
 
 modes = Group(main_folder_path, 'model').group()
@@ -100,7 +98,7 @@ analysis = [(Group(main_folder_path, 'mac', m).group()) for m in modes]
 
 noise = [(Group(main_folder_path, 'noise', m).group()) for m in modes]
 
-#Gera os graficos para cada grupo
+#Gera os graficos para cada arquivo
 styles = ['line', 'boxplot', 'scatter', 'scatter_last_gen']
 for style in styles:
     for m in modes:

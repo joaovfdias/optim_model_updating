@@ -18,9 +18,9 @@ class Group:
         N5 = []
         N0 = []
         for file in self.sub_group:
-            if '15' in file.name:
+            if 'n15' in file.name.lower() or 'n0.15' in file.name.lower():
                 N15.append(file)
-            elif '5' in file.name:
+            elif 'n5' in file.name.lower() or 'n0.05' in file.name.lower():
                 N5.append(file)
             else:
                 N0.append(file)
@@ -37,7 +37,10 @@ class Group:
         laje = []
         viga = []
         for file in self.sub_group:
-            laje.append(file) if 'laje' in file.name.lower() else viga.append(file)
+            if 'laje' in file.name.lower() or 'bridge' in file.name.lower() or 'slab' in file.name.lower():
+                laje.append(file)
+            else:
+                viga.append(file)
         return laje, viga
 
     def group(self):
