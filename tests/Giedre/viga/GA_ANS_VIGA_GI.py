@@ -73,9 +73,13 @@ def run_viga(pop, gen, noise, MAC=None):
     generations = gen
 
     # declaração do otimizador:
+    # declaração do otimizador:
     rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength)
+    rodada.set_user_initial_population( r'C:\Users\giedr\OneDrive\Documents\Ufes\TCC\ANSYS FILES\ANSYS_RESULTS\teste8_31-07\viga\Erro_viga_GA_freq_MAC_N0.0_20250731_114552.csv')
+    rodada.set_sampling_method('user')
     # rodada.set_tolerance(fit_tol = 1e-2, patience = 4) # critério de parada
-    rodada.sync_time(ansys.anstime) # sincroniza o log label do algoritmo e a subpasta no output do ansys para facilitar controle
+    rodada.sync_time(
+        ansys.anstime)  # sincroniza o log label do algoritmo e a subpasta no output do ansys para facilitar controle
 
     # ajuste do registro:
     log = "full"  # tipo de registro (True: simplificado, "full": todos os indivíduos)

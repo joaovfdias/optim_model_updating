@@ -17,7 +17,7 @@ class Individual:
         if not self.fitness:
             result = self.fitness_function(self.param)
             self.fitness, self.data = result if isinstance(result, tuple) else (result, None)  # armazenar self.data apenas se o retorno da função exigir
-            self.etime = time.time()
+#            self.etime = time.time()
 
     @staticmethod
     def compare_individuals(ind1, ind2):

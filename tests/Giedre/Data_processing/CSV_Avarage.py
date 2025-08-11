@@ -99,7 +99,7 @@ class CSVProcessor:
 
 # Exemplo de uso
 if __name__ == "__main__":
-    entrada = Path(r"C:\Users\giedr\Documents\TCC\ANSYS\ANSYS_RESULTS\try")
-    saida = Path(r'/tests/Giedre/Mean_Values/TestFolder')
+    entrada = Path(r'C:\Users\giedr\PycharmProjects\GitGeral\tests\Giedre\Data_processing\All_data')
+    saida = Path(r'C:\Users\giedr\PycharmProjects\GitGeral\tests\Giedre\Data_processing\Average_Values')
     processor = CSVProcessor(entrada, saida)
     processor.compute_and_save_averages()

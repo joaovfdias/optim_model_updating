@@ -103,8 +103,8 @@ class Optimizer:
             self.algorithms[self.__class__.__name__](ind_data[i, 1:], self.fitness_function) for i in range(self.population_size)
             ]
 
-        for i, individual in enumerate(pop):
-            individual.fitness = ind_data[i, 0]
+        # for i, individual in enumerate(pop):
+        #     individual.fitness = ind_data[i, 0]
 
         return pop
 
@@ -226,7 +226,7 @@ class Optimizer:
                     row.append(num) # adiciona a numeração do indivíduo para o caso log full
                 if not full and self.__class__.__name__ == "BO": # armazena o Global Best apenas no caso de amostragem Bayesiana
                     row.append(self.best.fitness)
-                row.extend([individual.fitness] + individual.param + [individual.etime - self.inicio])
+                row.extend([individual.fitness] + individual.param) #+ inetimedividual.
 
                 # verifica se a entrada de .data é um dicionário e adapta o espaço adequado para escalar, vetor ou matriz (2d)
                 if isinstance(individual.data, dict):

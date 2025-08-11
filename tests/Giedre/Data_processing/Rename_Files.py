@@ -47,5 +47,5 @@ class RenameFiles:
 
 
 # Chamada
-renomear = RenameFiles(r'C:\Users\giedr\PycharmProjects\GitGeral\tests\Giedre\Data_processing\All_data\Avarage')
+renomear = RenameFiles(r'C:\Users\giedr\PycharmProjects\GitGeral\tests\Giedre\Mean_Values\TestFolder')
 renomear.rename_all()

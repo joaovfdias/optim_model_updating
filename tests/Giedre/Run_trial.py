@@ -22,8 +22,8 @@ def run_viga(pop, gen, noise=0, MAC=0):
 # run_viga(50,30,0.05)
 # # VIGA FREQ N15
 # run_viga(50,30,0.15)
-# #VIGA FREQ MAC N0
-# run_viga(50,30,0, 1)
+#VIGA FREQ MAC N0
+run_viga(50,30,0, 1)
 # #VIGA FREQ MAC N5
 # run_viga(50,30,0.05,1)
 # #VIGA FREQ MAC N15
@@ -34,10 +34,10 @@ def run_viga(pop, gen, noise=0, MAC=0):
 # run_test(70,30,0,0)
 # # PONTE FREQ NOISE = 5%
 # run_test(70,30,0.05,0)#run ponte freq N5
-# #PONTE FREQ NOISE = 15%
+# PONTE FREQ NOISE = 15%
 # run_test(70,30,0.15,0) #run ponte freq N15
 # PONTE FREQ MAC NOISE = 0%
-run_test(70,30,0, 1)
+#run_test(70,30,0, 1)
 #PONTE FREQ MAC NOISE = 5%
 # run_test(70,30,0.05, 1)
 # # PONTE FREQ MAC NOISE = 15%
