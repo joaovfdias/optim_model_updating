@@ -1,4 +1,4 @@
-﻿Trial;Model;Analysis;Noise;Fitness;Young's Modulus;Poisson's Ration;Density;Stiffness1;Stiffness2;Stiffness3;Stiffness4;E Error;n Error;r Error;k1 Error;k2 Error;k3 Error;k4 Error
+﻿Trial;Model;Analysis;Noise;Fitness;Young's Modulus;Poisson's Ration;Density;Stiffness1;Stiffness2;Stiffness3;Stiffness4;E Error;Poisson Ratio Error;Density Error;k1 Error;k2 Error;k3 Error;k4 Error
 1;Beam;Freq;0;0.035;23056609428;0.27633796;2453.974478;9659163.134;14895102.02;;;1.002461279;1.3816898;0.981589791;0.965916313;0.993006801;;
 2;Beam;Freq;0;0.012311072;23413474968;0.18642115;2554.50674;9938867.629;15566950.09;;;1.017977173;0.93210575;1.021802696;0.993886763;1.037796673;;
 3;Beam;Freq;0;0.013214285;23683767541;0.18571804;2587.83146;10181160.68;15791860.36;;;1.029729024;0.9285902;1.035132584;1.018116068;1.052790691;;

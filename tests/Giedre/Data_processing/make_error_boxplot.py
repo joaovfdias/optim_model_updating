@@ -99,7 +99,7 @@ def plot_model_error(df_model: pd.DataFrame, err_col: str, out_path: Path, show:
     plt.rcParams['font.size'] = 12
     plt.rcParams['figure.subplot.left'] = 0.1
     plt.rcParams['figure.subplot.right'] = 0.8
-    plt.rcParams['figure.subplot.top'] = 0.9
+    plt.rcParams['figure.subplot.top'] = 0.98
     plt.rcParams['figure.subplot.bottom'] = 0.1
 
     df_m, use_noise_num, noise_levels, xticklabels, analyses = prepare_levels(df_model)
@@ -154,13 +154,16 @@ def plot_model_error(df_model: pd.DataFrame, err_col: str, out_path: Path, show:
     # Título e eixos
     title_model = str(df_model["Model"].iloc[0]) if "Model" in df_model.columns and not df_model.empty else ""
     title = f"{title_model} — {err_col}"
-    ax.set_title(title)
+    # ax.set_title(title)
     ax.set_xlabel("Noise")
-    ax.set_ylabel(f"{err_col} = value / reference value")
+    ax.set_ylabel(f"optimal value / reference value")
     ax.set_xticks(base_positions)
     ax.set_xticklabels(xticklabels)
     # Fixando os ranges
-    plt.ylim(0, 3.5)  # Limites no eixo Y
+    if 'beam' in title_model.lower():
+        plt.ylim(0, 2.5)  # Limites no eixo Y
+    if 'bridge' in title_model.lower():
+        plt.ylim(0, 3.5)  # Limites no eixo Y
     ax.grid(True, axis="y", linestyle="--", alpha=0.4)
 
     # Legenda no centro à direita, fora do gráfico
