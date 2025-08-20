@@ -85,5 +85,8 @@ log_title = "teste_PSO_laje" # alterar nome do arquivo gerado, se quiser (todos 
 log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
 rodada.set_log(log_title, log_dir)
 
+# caso queira retomar a rodada de algum log cvs:
+# rodada.resume_from_log(r"D:\Users\Thiago\Documents\.Mestrado (Local)\Python\GitGeral\tests\log\teste_PSO_rec_laje_20250820_114950 - Copia (2).csv")
+
 # chamada:
 best = rodada.run(iteracoes, log=log)

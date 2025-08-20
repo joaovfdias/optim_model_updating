@@ -83,5 +83,8 @@ log_title = "teste_GA_laje" # alterar nome do arquivo gerado, se quiser (todos r
 log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
 rodada.set_log(log_title, log_dir)
 
+# caso queira retomar a rodada de algum log cvs:
+# rodada.resume_from_log(r"C:\Users\Thiago Artur\Documents\.Mestrado (Local)\PyGit\tests\test log recovery\teste_GA_log_completo.csv")
+
 # chamada:
 best = rodada.run(generations, log=log)
