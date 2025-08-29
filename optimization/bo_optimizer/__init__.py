@@ -1,3 +1,3 @@
-from .bayesian import BO
+from .BO import *
 
-__all__ = ["BO"]
+__all__ = ["BO", "BOConfig"]
