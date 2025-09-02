@@ -14,7 +14,7 @@ class Individual:
         return f"Individual(param=[{param_str}], fitness={self.fitness:.4f})"
 
     def evaluate(self):
-        if not self.fitness:
+        if self.fitness is None:
             result = self.fitness_function(self.param)
             self.fitness, self.data = result if isinstance(result, tuple) else (result, None)  # armazenar self.data apenas se o retorno da função exigir
             self.etime = time.time()

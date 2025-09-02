@@ -14,7 +14,7 @@ def ackley(params):
     sum_cos = np.sum(np.cos(c * params))
     term1 = -a * np.exp(-b * np.sqrt(sum_sq / n))
     term2 = -np.exp(sum_cos / n)
-    return term1 + term2 + a + np.exp(1)
+    return term1 + term2 + a + np.exp(1), {"Term1": term1, "Term2": term2}
 
 # parâmetros do modelo:
 parameters = [Continuous(-32.768,32.768,f"v{i}") for i in range(5)]
@@ -32,7 +32,7 @@ iteracoes = 300
 # declarção do otimizador:
 rodada = PSO(ackley, parameters, population_size, w, w_rate, c1, c2, init_vel_ratio)
 # critério de parada:
-rodada.set_tolerance(fit_abs=2e-1, fit_rel=0.01, param_rel=0.01, patience=5)
+rodada.set_tolerance(fit_abs=2e-2, patience=10)
 
 # ajuste do registro:
 log = "full" # tipo de registro (True: simplificado, "full": todos os indivíduos)

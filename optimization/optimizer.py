@@ -10,6 +10,9 @@ import io
 from .individual import Individual
 from .pso_optimizer.particle import Particle
 
+from data.storage import dumps_json, loads_json, param_to_dict, param_from_dict, indiv_to_dict, indiv_from_dict, load_fitness_from_spec
+import random
+
 
 class Optimizer:
     def __init__(self, fitness_function, parameters, population_size):
@@ -441,6 +444,217 @@ class Optimizer:
 
     def sync_time(self, stime):
         self.opttime = stime
+
+    # --------- métodos para armazenamento de dados ---------
+
+    def _algo_name(self):
+        return self.__class__.__name__  # "GA" | "PSO" | "BO"
+
+    def _common_state(self):
+        return {
+            "sampling_method": getattr(self, "sampling_method", None),
+            "tolerance": {
+                "fit_abs": getattr(self, "fitness_abs_tol", None),
+                "fit_rel": getattr(self, "fitness_rel_tol", None),
+                "param_rel": getattr(self, "parameters_rel_tol", None),
+                "patience": getattr(self, "patience", None),
+            },
+            "logged_iteration": getattr(self, "logged_iteration", 0),
+            "logged_time": getattr(self, "logged_time", 0.0),
+        }
+
+    def _algo_state(self):
+        algo = self._algo_name()
+        if algo == "GA":
+            return {"GA": getattr(self, "specs", {})}
+        if algo == "PSO":
+            # coletar os hiperparâmetros e instantâneos úteis
+            s = getattr(self, "specs", {})
+            s_ps = {"PSO": dict(s)}
+            s_ps["PSO"]["global_best"] = None if self.global_best is None else {
+                "param": self.global_best.param, "fitness": self.global_best.fitness
+            }
+            return s_ps
+        if algo == "BO":
+            bo = {"BO": {}}
+            cfg = getattr(self, "config", None)
+            if cfg:
+                from dataclasses import asdict
+                bo["BO"]["config"] = asdict(cfg)
+            bo["BO"]["bounds"] = getattr(self, "bounds", None).tolist() if getattr(self, "bounds", None) is not None else None
+            bo["BO"]["history_X"] = [x.tolist() for x in getattr(self, "history_X", [])]
+            bo["BO"]["history_y"] = list(getattr(self, "history_y", []))
+            # snapshot facultativo do kernel treinado
+            gp = getattr(self, "gp", None)
+            if gp and getattr(gp, "kernel_", None) is not None:
+                bo["BO"]["gp_snapshot"] = {
+                    "kernel_str": str(gp.kernel_),
+                    "theta": gp.kernel_.theta.tolist(),
+                    "params": gp.kernel_.get_params()
+                }
+            return bo
+        return {}
+
+    def save_state(self, filename: str | None = None, fitness_spec: dict | None = None, include_rng_state: bool = True):
+        now = time.time()
+        algo = self._algo_name()
+
+        if filename is None:
+            filename = f"{algo}_state_{time.strftime('%Y-%m-%d_%H-%M-%SZ', time.gmtime(now))}.json.gz"
+
+        outdir = "log"
+        os.makedirs(outdir, exist_ok=True)
+        filepath = os.path.join(outdir, filename)
+
+        # RNG simples (sementes) para reproduzir amostragem
+        rng = {
+            "py_random_seed": getattr(self, "_py_random_seed", None),
+            "numpy_seed": getattr(self, "_np_random_seed", None),
+            "py_random_state": None,
+            "numpy_state": None
+        }
+        if include_rng_state:
+            try:
+                rng["py_random_state"] = list(random.getstate())
+            except Exception:
+                pass
+            try:
+                rng_state = np.random.get_state()
+                rng["numpy_state"] = [rng_state[0], rng_state[1].tolist(), *rng_state[2:]]
+            except Exception:
+                pass
+
+        # populações
+        pops = []
+        for it_idx, pop in enumerate(self.populations):
+            pops.append({
+                "iteration": it_idx,
+                "individuals": [indiv_to_dict(ind) for ind in pop]
+            })
+
+        run = {
+            "version": 1,
+            "algorithm": algo,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
+            "host_cwd": getattr(self, "current_dir", None),
+            "iter_label": getattr(self, "iter_label", "Iteração"),
+            "population_size": self.population_size,
+            "rng": rng,
+            "parameters": [param_to_dict(p) for p in self.parameters],
+            "fitness_spec": fitness_spec or None,
+            "optimizer": {
+                "common": self._common_state(),
+                **self._algo_state()
+            },
+            "timeline": {
+                "start_time": float(getattr(self, "inicio", now)),
+                "now_time": float(now)
+            },
+            "populations": pops,
+            "notes": None
+        }
+
+        # Mensagens de status
+        total_iters = len(self.populations)
+        total_inds = sum(len(pop) for pop in self.populations)
+        print(f"[save_state] Salvando estado ({algo}) em: {filepath}")
+        print(
+            f"[save_state] Iterações: {total_iters} | Indivíduos totais: {total_inds} | RNG state incluso: {bool(rng.get('py_random_state') or rng.get('numpy_state'))}")
+
+        dumps_json(run, filepath)
+        print(f"[save_state] OK ✔ Arquivo gravado.")
+        return filepath  # <-- retorna caminho completo
+
+    @classmethod
+    def load_state(cls, filename: str, fitness_function=None):  # recriação do estado de otimização
+        print(f"[load_state] Carregando estado de: {filename}")
+        d = loads_json(filename)
+        algo = d["algorithm"]
+        print(f"[load_state] Algoritmo detectado: {algo}")
+
+        # 1) parâmetros
+        params = [param_from_dict(p) for p in d["parameters"]]
+        print(f"[load_state] Parâmetros: {len(params)}")
+
+        # 2) fitness
+        if fitness_function is None:
+            fitness_function = load_fitness_from_spec(d.get("fitness_spec"))
+        if fitness_function is None:
+            # fallback: função dummy que impede evaluate() até ser substituída
+            def _stub(_):
+                raise RuntimeError("Defina 'fitness_function' ao carregar o estado.")
+
+            fitness_function = _stub
+            print("[load_state] Aviso: fitness_function não fornecida; usando stub que força erro ao avaliar.")
+
+        # 3) instanciar otimizador correto
+        if algo == "GA":
+            from .ga_optimizer import GA
+            opt = GA(fitness_function, params, d["population_size"], **{})
+        elif algo == "PSO":
+            from .pso_optimizer.pso_optimizer import PSO
+            pso_cfg = d["optimizer"]["PSO"]
+            opt = PSO(fitness_function, params, d["population_size"],
+                      w=pso_cfg.get("inertia weight (w)") or pso_cfg.get("w") or 0.6,
+                      w_rate=pso_cfg.get("inertia decay rate") or pso_cfg.get("w_rate") or 0.99,
+                      c1=pso_cfg.get("cognitive coefficient (c1)") or pso_cfg.get("c1") or 2.0,
+                      c2=pso_cfg.get("social coefficient (c2)") or pso_cfg.get("c2") or 2.0,
+                      init_vel_ratio=pso_cfg.get("initial velocity ratio") or pso_cfg.get("init_vel_ratio") or 0.2)
+        elif algo == "BO":
+            from .bo_optimizer.BO import BO, BOConfig
+            bo_cfg = d["optimizer"]["BO"].get("config", {})
+            cfg = BOConfig(**bo_cfg)
+            opt = BO(fitness_function, params, population_size=1, config=cfg)
+            # restaurar BO: bounds, history, gp
+            if d["optimizer"]["BO"].get("bounds"):
+                opt.bounds = np.array(d["optimizer"]["BO"]["bounds"], dtype=float)
+            opt.history_X = [np.asarray(x, dtype=float) for x in d["optimizer"]["BO"].get("history_X", [])]
+            opt.history_y = [float(y) for y in d["optimizer"]["BO"].get("history_y", [])]
+            print(f"[load_state] BO: history_X={len(opt.history_X)} pontos | history_y={len(opt.history_y)}")
+        else:
+            raise ValueError(f"Unsupported algorithm '{algo}' in archive")
+
+        # 4) campos comuns
+        opt.iter_label = d.get("iter_label", opt.iter_label)
+        opt.population_size = d.get("population_size", opt.population_size)
+        opt.sampling_method = d["optimizer"]["common"].get("sampling_method", opt.sampling_method)
+        tol = d["optimizer"]["common"].get("tolerance", {})
+        if any(v is not None for v in tol.values()):
+            opt.set_tolerance(fit_abs=tol.get("fit_abs"), fit_rel=tol.get("fit_rel"),
+                              param_rel=tol.get("param_rel"), patience=tol.get("patience") or 1)
+        opt.logged_iteration = d["optimizer"]["common"].get("logged_iteration", 0)
+        opt.logged_time = d["optimizer"]["common"].get("logged_time", 0.0)
+
+        # 5) reconstruir populações
+        opt.populations = []
+        for entry in d["populations"]:
+            inds = [indiv_from_dict(i, fitness_function) for i in entry["individuals"]]
+            opt.populations.append(inds)
+        print(
+            f"[load_state] Populações carregadas: {len(opt.populations)} (tam última: {len(opt.populations[-1]) if opt.populations else 0})")
+
+        # 6) reconstruções específicas
+        if algo == "PSO":
+            # recomputar histórico de best por partícula
+            best_particles = []
+            for pop in opt.populations:
+                best_particles.append(min(pop, key=lambda x: x.fitness))
+            opt.best_particles = best_particles
+            opt.global_best = min(best_particles, key=lambda x: x.fitness)
+            gb = opt.global_best
+            print(f"[load_state] PSO: global_best fitness={getattr(gb, 'fitness', None)}")
+
+        if algo == "BO":
+            # reconstruir GP (opcional): refit com history, respeitando config.random_state
+            if len(opt.history_X) > 0:
+                try:
+                    opt._fit_gp()
+                    print("[load_state] BO: GP refit concluído.")
+                except Exception as e:
+                    print(f"[load_state] BO: falha ao refazer fit do GP: {e}")
+
+        print("[load_state] OK ✔ Estado reconstituído.")
+        return opt
 
 
 # subclasse para funções comuns a algoritmos populacionais

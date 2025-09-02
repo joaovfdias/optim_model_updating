@@ -20,7 +20,7 @@ class Particle(Individual):
 
     def evaluate(self):
         # avalia a função caso ainda não tenha sido
-        if not self.fitness:
+        if self.fitness is None:
             super().evaluate() # executa o mesmo procedimento de Individual
             # preenche e registra a melhor posição com base no fitness (histórico da partícula necessária ao PSO)
             self.best = self.best or [self.param, self.fitness]
