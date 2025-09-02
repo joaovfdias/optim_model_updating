@@ -656,6 +656,11 @@ class Optimizer:
         print("[load_state] OK ✔ Estado reconstituído.")
         return opt
 
+    def analyze_sensitivity(self, **kwargs):
+        from .sensitivity import SensitivityAnalyzer
+        sa = SensitivityAnalyzer.from_optimizer(self)
+        return sa.run(**kwargs), sa
+
 
 # subclasse para funções comuns a algoritmos populacionais
 class PopulationBased(Optimizer):
