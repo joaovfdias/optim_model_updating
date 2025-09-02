@@ -4,6 +4,7 @@ import numpy as np
 import psutil
 from datetime import datetime
 import time
+from ansys.mapdl.core import launch_mapdl
 
 
 class Ansys:
@@ -18,7 +19,7 @@ class Ansys:
 
     num_nodes define a quantidade de pontos usados para descrever os deslocamentos em cada modo de vibração (será retirado, pode ser ignorado)
     """
-    def __init__(self, ansys_exe_path, ansys_working_dir=None, input_dir=None, base_script_filename=None, base_freq_filename=None, base_modes_filename=None, output_dir=None): # estudar retirar num_modes
+    def __init__(self, ansys_exe_path, ansys_working_dir=None, input_dir=None, base_script_filename=None, base_freq_filename=None, base_modes_filename=None, output_dir=None, legacy=False):
         """
 
         :param ansys_exe_path: executável do ANSYS
@@ -51,6 +52,11 @@ class Ansys:
         self.out_freq_filename = "out_freq.txt" # alteráveis na chamada das funções read
         self.out_modes_filename = "out_modes.txt"
 
+        self.legacy = legacy
+        if not self.legacy:
+            self.kill_ansys_process()
+            self.mapdl = launch_mapdl(run_location=self.ansys_working_dir, override=True)
+
 
     def set_output_filenames(self, out_freq_filename, out_modes_filename): # pode ser passado direto nas funções read
         self.out_freq_filename = out_freq_filename or self.out_freq_filename
@@ -59,8 +65,6 @@ class Ansys:
     def create_input_file(self, parameters_values, parameters_keys):
         # recebe os valores atuais dos parâmetros (parameters_values) e seus respectivos idenfiticadores (parameters_key) para gerar o script executável (script_exe.txt)
 
-        self.kill_ansys_process()
-        self.remove_temp_files()
         self.index += 1
 
         with open(self.base_script_path, 'r', encoding='utf-8') as file:
@@ -77,9 +81,16 @@ class Ansys:
         with open(new_script_path, 'w', encoding='utf-8') as file:
             file.write(content)
 
-        return new_script_path
+        if self.legacy: # interface antiga, com base em subprocess
+            self.kill_ansys_process()
+            self.remove_temp_files()
+            new_input = new_script_path
+        else: # nova interface com base no PyAnsys
+            new_input = content
 
-    def remove_temp_files(self): # sem uso
+        return new_input
+
+    def remove_temp_files(self): # legacy
         temp_files = [
             os.path.join(self.ansys_working_dir, "file.out"),
             os.path.join(self.ansys_working_dir, self.out_freq_filename),
@@ -89,7 +100,7 @@ class Ansys:
             if os.path.exists(file):
                 os.remove(file)
 
-    def exe_ansys(self, input_file):
+    def exe_ansys(self, input_file): # legacy
         output_file = os.path.join(self.ansys_working_dir, 'file.out')
         command = f'"{self.ansys_exe_path}" -lch -p ansys -dis INTELMPI -np 1 -dir "{self.ansys_working_dir}" -j modeloc -i "{input_file}" -o "{output_file}" -b -s read'
 
@@ -135,7 +146,7 @@ class Ansys:
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
 
-    def cleanup_lock_file(self):
+    def cleanup_lock_file(self): # legacy
         lock_path = os.path.join(self.ansys_working_dir, "modeloc.lock")
         if os.path.exists(lock_path):
             try:
@@ -146,23 +157,15 @@ class Ansys:
 
     def run_ansys(self, input_file, frequencies=True, modes=True):
 
-        def try_ansys():
-            self.exe_ansys(input_file)
+        if self.legacy:
 
-            freq_pass = not frequencies or os.path.exists(os.path.join(self.ansys_working_dir, self.out_freq_filename))
-            mode_pass = not modes or os.path.exists(os.path.join(self.ansys_working_dir, self.out_modes_filename))
+            def try_ansys():
+                self.exe_ansys(input_file)
 
-            return freq_pass and mode_pass
+                freq_pass = not frequencies or os.path.exists(os.path.join(self.ansys_working_dir, self.out_freq_filename))
+                mode_pass = not modes or os.path.exists(os.path.join(self.ansys_working_dir, self.out_modes_filename))
 
-        if try_ansys():
-            return
-
-        self.kill_ansys_process()
-        self.cleanup_lock_file()
-        time.sleep(1)
-
-        for attempt in range(2, self.max_attempts + 1): # tenta executar o Ansys novamente caso não encontre os arquivos de saída, por {max_attempts} tentativas
-            print(f"Saída ausente, tentativa {attempt} de executar ANSYS")
+                return freq_pass and mode_pass
 
             if try_ansys():
                 return
@@ -171,4 +174,18 @@ class Ansys:
             self.cleanup_lock_file()
             time.sleep(1)
 
-        raise RuntimeError(f"ANSYS falhou após {self.max_attempts} tentativas.")
+            for attempt in range(2, self.max_attempts + 1): # tenta executar o Ansys novamente caso não encontre os arquivos de saída, por {max_attempts} tentativas
+                print(f"Saída ausente, tentativa {attempt} de executar ANSYS")
+
+                if try_ansys():
+                    return
+
+                self.kill_ansys_process()
+                self.cleanup_lock_file()
+                time.sleep(1)
+
+            raise RuntimeError(f"ANSYS falhou após {self.max_attempts} tentativas.")
+
+        else:
+            self.mapdl.clear()
+            self.mapdl.input_strings(input_file) # implementar maneira de verificar se outputs foram gerados corretamente, como no legacy
