@@ -601,7 +601,7 @@ class Optimizer:
                       c2=pso_cfg.get("social coefficient (c2)") or pso_cfg.get("c2") or 2.0,
                       init_vel_ratio=pso_cfg.get("initial velocity ratio") or pso_cfg.get("init_vel_ratio") or 0.2)
         elif algo == "BO":
-            from .bo_optimizer.BO import BO, BOConfig
+            from .bo_optimizer.bayesian import BO, BOConfig
             bo_cfg = d["optimizer"]["BO"].get("config", {})
             cfg = BOConfig(**bo_cfg)
             opt = BO(fitness_function, params, population_size=1, config=cfg)

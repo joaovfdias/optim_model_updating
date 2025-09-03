@@ -21,7 +21,6 @@ class Ansys:
     """
     def __init__(self, ansys_exe_path, ansys_working_dir=None, input_dir=None, base_script_filename=None, base_freq_filename=None, base_modes_filename=None, output_dir=None, legacy=False):
         """
-
         :param ansys_exe_path: executável do ANSYS
         :param ansys_working_dir: pasta que o ANSYS roda e gera arquivos de saída. se vazio, será em \\ANSYS dentro do caminho atual
         :param input_dir: pasta onde os arquivos de entrada (script, dados de frequencia e modos) estão. se vazio, será em ansys_working_dir
@@ -29,6 +28,7 @@ class Ansys:
         :param base_freq_filename: nome do arquivo de frequencia de referência. se vazio, "out_freq.txt"
         :param base_modes_filename: nome do arquivo de modos de referência. se vazio, "out_modos.txt"
         :param output_dir: diretório em que são salvos os script executáveis de cada indivíduo. se vazio, será em input_dir
+        :param legacy: por padrão, usa a biblioteca PyAnsys para gerenciar as rodadas. em caso de incompatibilidade, use False para aplicar processo tradicional. para instalar PyAnsys: python -m pip install pyansys[mapdl-all]
         """
 
         self.current_dir = os.getcwd() # definindo o diretório atual para estabelecer a pasta padrão 'ANSYS'
