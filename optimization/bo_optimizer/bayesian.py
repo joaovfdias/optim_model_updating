@@ -174,13 +174,19 @@ class BO(Optimizer):
         self.bounds = np.array([[getattr(p, "lower_bound"), getattr(p, "upper_bound")] for p in self.parameters], dtype=float)
         self.population: List[Individual] = []
 
+    def _default_kernel(self, y):
+        span = (self.bounds[:, 1] - self.bounds[:, 0])
+        # chute inicial ~20% da faixa por dimensão
+        ls0 = np.maximum(1e-12, 0.2 * span)
+        # bounds por dimensão (3 ordens abaixo/acima da escala)
+        ls_bounds = [(max(1e-12, 1e-3 * s), 1e3 * s) for s in span]
 
-    def _default_kernel(self):
-        n_dims = max(1, self.n_dims)
-        base = Matern(length_scale=np.ones(n_dims), length_scale_bounds=(1e-3, 1e3), nu=2.5)
-        kernel = C(1.0, (1e-3, 1e3)) * base + WhiteKernel(noise_level=1e-6, noise_level_bounds=(1e-9, 1e-3))
+        var_y = float(np.var(y)) if y.size > 1 else 1.0
+        nl_bounds = (max(1e-12, 1e-9 * var_y), max(1e-9, 1e2 * var_y))
+
+        base = Matern(length_scale=ls0, length_scale_bounds=ls_bounds, nu=2.5)
+        kernel = C(1.0, (1e-6, 1e6)) * base + WhiteKernel(noise_level=1e-6, noise_level_bounds=nl_bounds)
         return kernel
-
 
     def _vec_to_param_list(self, x: np.ndarray) -> List[float]:
         return [float(v) for v in x]
@@ -242,17 +248,27 @@ class BO(Optimizer):
     def _fit_gp(self):
         X = np.vstack(self.history_X)
         y = np.asarray(self.history_y, dtype=float)
-        kernel = self.config.kernel or self._default_kernel()
+
+        # kernel inicial: usa kernel_ otimizado anterior se existir
+        if self.gp is not None and hasattr(self.gp, "kernel_"):
+            kernel0 = self.gp.kernel_
+        else:
+            kernel0 = self.config.kernel or self._default_kernel(y)
+
         self.gp = GaussianProcessRegressor(
-            kernel=kernel,
+            kernel=kernel0,
             alpha=self.config.alpha,
             normalize_y=self.config.normalize_y,
-            n_restarts_optimizer=self.config.n_restarts_optimizer,
+            n_restarts_optimizer=max(1, self.config.n_restarts_optimizer),  # garantir >0
+            optimizer="fmin_l_bfgs_b",
             random_state=self.rng,
         )
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=ConvergenceWarning)
             self.gp.fit(X, y)
+
+        # print("LML:", getattr(self.gp, "log_marginal_likelihood_value_", None))
+        # print("Kernel_:", getattr(self.gp, "kernel_", None))
 
     def _extract_length_scales(self, kernel):
         # busca recursiva pelo componente que possui length_scale
