@@ -81,24 +81,31 @@ class Ansys:
         with open(new_script_path, 'w', encoding='utf-8') as file:
             file.write(content)
 
-        if self.legacy: # interface antiga, com base em subprocess
-            self.kill_ansys_process()
-            self.remove_temp_files()
-            new_input = new_script_path
-        else: # nova interface com base no PyAnsys
-            new_input = content
+        new_input = new_script_path if self.legacy else content
+
+        # if self.legacy: # interface antiga, com base em subprocess
+        #     self.kill_ansys_process()
+        #     # self.remove_temp_files()
+        #     new_input = new_script_path
+        # else: # nova interface com base no PyAnsys
+        #     new_input = content
 
         return new_input
 
     def remove_temp_files(self): # legacy
         temp_files = [
-            os.path.join(self.ansys_working_dir, "file.out"),
+            # os.path.join(self.ansys_working_dir, "file.out"),
             os.path.join(self.ansys_working_dir, self.out_freq_filename),
             os.path.join(self.ansys_working_dir, self.out_modes_filename)
         ]
         for file in temp_files:
-            if os.path.exists(file):
+            try:
                 os.remove(file)
+            except FileNotFoundError:
+                print(f"Arquivo {file} já não existia na pasta")
+                # pass  # já não existe, segue em frente
+            except PermissionError:
+                print(f"Arquivo em uso, não foi possível remover: {file}")
 
     def exe_ansys(self, input_file): # legacy
         output_file = os.path.join(self.ansys_working_dir, 'file.out')
@@ -142,7 +149,7 @@ class Ansys:
                 if proc.info['name'] and 'ANSYS.exe' in proc.info['name']:
                     print(f"Encerramento forçado do processo {proc.info['name']} (PID {proc.pid})")
                     proc.kill()
-                    time.sleep(2)
+                    time.sleep(0.2)
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
 
@@ -157,35 +164,37 @@ class Ansys:
 
     def run_ansys(self, input_file, frequencies=True, modes=True):
 
+        def try_ansys():
+            self.remove_temp_files()
+
+            self.exe_ansys(input_file) if self.legacy else (self.mapdl.clear(), self.mapdl.input_strings(input_file))  # self.mapdl.input_strings(["\CLEAR" + input_file])
+
+            freq_pass = not frequencies or os.path.exists(os.path.join(self.ansys_working_dir, self.out_freq_filename))
+            mode_pass = not modes or os.path.exists(os.path.join(self.ansys_working_dir, self.out_modes_filename))
+
+            return freq_pass and mode_pass
+
+        if try_ansys():
+            return
+
         if self.legacy:
+            self.kill_ansys_process()
+            self.cleanup_lock_file()
+        time.sleep(0.02)
 
-            def try_ansys():
-                self.exe_ansys(input_file)
-
-                freq_pass = not frequencies or os.path.exists(os.path.join(self.ansys_working_dir, self.out_freq_filename))
-                mode_pass = not modes or os.path.exists(os.path.join(self.ansys_working_dir, self.out_modes_filename))
-
-                return freq_pass and mode_pass
+        for attempt in range(2, self.max_attempts + 1): # tenta executar o Ansys novamente caso não encontre os arquivos de saída, por {max_attempts} tentativas
+            print(f"Saída ausente, tentativa {attempt} de executar ANSYS")
 
             if try_ansys():
                 return
 
-            self.kill_ansys_process()
-            self.cleanup_lock_file()
-            time.sleep(1)
-
-            for attempt in range(2, self.max_attempts + 1): # tenta executar o Ansys novamente caso não encontre os arquivos de saída, por {max_attempts} tentativas
-                print(f"Saída ausente, tentativa {attempt} de executar ANSYS")
-
-                if try_ansys():
-                    return
-
+            if self.legacy:
                 self.kill_ansys_process()
                 self.cleanup_lock_file()
-                time.sleep(1)
+            time.sleep(0.02)
 
-            raise RuntimeError(f"ANSYS falhou após {self.max_attempts} tentativas.")
+        raise RuntimeError(f"ANSYS falhou após {self.max_attempts} tentativas.")
 
-        else:
-            self.mapdl.clear()
-            self.mapdl.input_strings(input_file) # implementar maneira de verificar se outputs foram gerados corretamente, como no legacy
+        # else:
+        #     self.mapdl.clear()
+        #     self.mapdl.input_strings(input_file) # implementar maneira de verificar se outputs foram gerados corretamente, como no legacy
