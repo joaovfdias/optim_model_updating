@@ -50,10 +50,10 @@ def fitness_function(param):
     return fitness, {"Freq.": paired_comp_freq, "Mode": paired_comp_modes}
 
 # default: já calcula init_points = max(8, ceil(3 * n_dims))
-cfg = BOConfig()
-cfg.acquisition = "EI"
+cfg = BOConfig.from_preset("low")
+cfg.acquisition = "POI"
 
-iterations = 100
+iterations = 250
 
 rodada = BO(fitness_function, parameters, config=cfg)
 

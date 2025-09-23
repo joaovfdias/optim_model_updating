@@ -387,32 +387,72 @@ class BO(Optimizer):
         """
         # 1) pré-amostra seeds em [0,1]^d
         npts = int(max(self.config.acq_n_points, q * 100))
-        Xu = self.rng.rand(npts, self.n_dims)                  # seeds no espaço normalizado
-        X0 = self._from_unit(Xu)                               # escala original para avaliar aquisição
-        vals = self._acquisition(X0, best_y)                   # maior é melhor
+        Xu = self.rng.rand(npts, self.n_dims)  # seeds no espaço normalizado [0,1]
+        Xu = np.clip(Xu, 0.0, 1.0)  # clip defensivo
+
+        X0 = self._from_unit(Xu)  # escala original
+        # filtro de finitude antes da aquisição
+        # ok = np.isfinite(X0).all(axis=1)
+        # Xu, X0 = Xu[ok], X0[ok]
+        # if X0.size == 0:
+        #     # fallback extremo: centro do domínio
+        #     return self._from_unit(np.full((q, self.n_dims), 0.5))
+
+        vals = self._acquisition(X0, best_y)  # maior é melhor
+        vals = np.asarray(vals, dtype=float)
+        # substitui NaN/inf da aquisição por -inf para não virar seed
+        # vals[~np.isfinite(vals)] = -np.inf
 
         # 2) selecione multi-starts
         k = int(max(self.config.acq_n_restarts, q))
-        starts = Xu[np.argsort(-vals)[:k]]
+        # garante que há pelo menos k seeds válidas
+        order = np.argsort(-vals)[:min(k, len(vals))]
+        starts = Xu[order]
 
         bounds_unit = [(0.0, 1.0)] * self.n_dims
 
         def obj(z_unit: np.ndarray) -> Tuple[float, np.ndarray]:
+            # clip defensivo no espaço unitário
+            z_unit = np.clip(z_unit, 0.0, 1.0)
             X_real = self._from_unit(z_unit.reshape(1, -1))
-            val = self._acquisition(X_real, best_y)[0]
-            return -float(val), None  # L-BFGS minimiza; grad numérico implícito
 
-        chosen = []
-        tried = []
+            # penalizações se algo sair não-finito
+            # if not np.isfinite(X_real).all():
+            #     return 1e9, None
+
+            val = self._acquisition(X_real, best_y)
+            # if not np.isfinite(val).all():
+            #     return 1e9, None
+
+            # L-BFGS minimiza → usamos negativo (queremos maximizar aquisição)
+            return -float(val[0]), None
+
+        chosen: list[np.ndarray] = []
+        tried: list[tuple[np.ndarray, float]] = []
 
         # 3) roda L-BFGS a partir de cada seed
         for x0 in starts:
-            xopt, f, _ = fmin_l_bfgs_b(func=obj, x0=x0, bounds=bounds_unit, maxiter=self.config.acq_maxiter)
-            tried.append((xopt.copy(), -f))
+            x0 = np.clip(x0, 0.0, 1.0)  # seed clip
+            try:
+                xopt, f, _ = fmin_l_bfgs_b(func=obj, x0=x0, bounds=bounds_unit,
+                                           maxiter=self.config.acq_maxiter)
+                score = -f
+                if not np.isfinite(score):
+                    continue
+                tried.append((xopt.copy(), float(score)))
+            except Exception:
+                # se o solver falhar nesse start, apenas pula
+                continue
+
+        if not tried:
+            # fallback: devolve pontos aleatórios (robustez)
+            Xu_fallback = np.clip(self.rng.rand(q, self.n_dims), 0.0, 1.0)
+            return self._from_unit(Xu_fallback)
 
         # 4) ordena por valor de aquisição e aplica diversidade simples
         tried.sort(key=lambda t: t[1], reverse=True)
         hard_radius = 1e-3  # em [0,1]^d
+
         for xopt, _score in tried:
             if len(chosen) >= q:
                 break
@@ -423,7 +463,11 @@ class BO(Optimizer):
                 if d > hard_radius:
                     chosen.append(xopt)
 
-        Xu_best = np.array(chosen[:q])
+        # se ainda faltou preencher q, completa com aleatório robusto
+        while len(chosen) < q:
+            chosen.append(np.clip(self.rng.rand(self.n_dims), 0.0, 1.0))
+
+        Xu_best = np.vstack(chosen[:q])
         return self._from_unit(Xu_best)
 
     # ----------------
@@ -540,7 +584,7 @@ class BO(Optimizer):
                 ind.data.update(diag)
 
             self.population.extend(new_pop)
-            self.best = min(self.populations, key=lambda p: p.fitness)
+            self.best = min(self.population, key=lambda p: p.fitness)
 
             # status desta iteração
             best_new = self.get_best_individual(new_pop)
