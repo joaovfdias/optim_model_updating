@@ -1,9 +1,11 @@
+from optimization.sensitivity import SensitivityAnalyzer, ParamSpec, Sampler
+import pandas as pd
+import numpy as np
 from optimization.parameter import *
 from external.parser import Ansys
 from external.special_functions import SpecialFun
-import os
 
-from optimization.bo_optimizer import *
+import os
 
 parameters = [
     Continuous(20e9, 30e9, 'modulo'),
@@ -31,7 +33,9 @@ ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename
 ansys.set_output_filenames(out_freq_filename, out_modes_filename)
 ansys.max_attempts = 6
 
-def fitness_function(param):
+def evaluate(row):
+    param = row
+
     input_file = ansys.create_input_file(param, keys)
     ansys.run_ansys(input_file, True, True)
 
@@ -47,16 +51,25 @@ def fitness_function(param):
     peso_mac  = 1
     fitness = peso_freq * freq_error_sum + peso_mac * mac_error_sum
 
-    return fitness, {"Freq.": paired_comp_freq, "Mode": paired_comp_modes}
+    ddata = {}
+    for i, f in enumerate(paired_comp_freq, start=1):
+        ddata[f"freq #{i}"] = f
+    for i, m in enumerate(paired_comp_modes, start=1):
+        mac = SpecialFun.modal_assurance_criterion(comp_modes[i-1], m)
+        ddata[f"MAC #{i}"] = mac
 
-# default: já calcula init_points = max(8, ceil(3 * n_dims))
-cfg = BOConfig()
-cfg.acquisition = "EI"
+    return ddata
 
-iterations = 100
+# Gera DoE sem precisar do Optimizer
+rng = np.random.default_rng(42)
+specs = [ParamSpec(p.key, p.lower_bound, p.upper_bound) for p in parameters]
 
-rodada = BO(fitness_function, parameters, config=cfg)
+X = Sampler.lhs(200, specs, rng)
+Y = X.apply(evaluate, axis=1, result_type="expand")
 
-best = rodada.run(iterations)
+df_eval = pd.concat([X, Y], axis=1)
 
-ansys.mapdl.exit()
+# Rodar análise de sensibilidade
+sa = SensitivityAnalyzer(minimize=True)
+selected = sa.workflow(df_eval, fitness_col="Fitness", interactive=True)
+print("Parâmetros escolhidos:", selected)

@@ -4,7 +4,6 @@ import numpy as np
 import psutil
 from datetime import datetime
 import time
-from ansys.mapdl.core import launch_mapdl
 
 
 class Ansys:
@@ -54,6 +53,7 @@ class Ansys:
 
         self.legacy = legacy
         if not self.legacy:
+            from ansys.mapdl.core import launch_mapdl
             self.kill_ansys_process()
             self.mapdl = launch_mapdl(run_location=self.ansys_working_dir, override=True)
 

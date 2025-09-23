@@ -41,7 +41,7 @@ class Optimizer:
         self.iter_label = "Iteração"
         self.sampling_method = "lhs"
         self.sampling_methods = {"random": self.random_initial_population, "lhs": self.LHS_initial_population}
-        self.algorithms = {"GA": Individual, "PSO": Particle} # auxiliar do inicializador de população
+        self.ind_type = Particle if self.__class__.__name__ == "PSO" else Individual # auxiliar do inicializador de população
 
         self.populations = []
 
@@ -67,7 +67,7 @@ class Optimizer:
 
     def random_initial_population(self):
         pop =   [ # alteração para criar "Individual" no caso do GA e "Partcile" no caso do PSO, evitando repetição da função nas classes
-                self.algorithms[self.__class__.__name__]([p.random_value() for p in self.parameters], self.fitness_function)
+                self.ind_type([p.random_value() for p in self.parameters], self.fitness_function)
                 for _ in range(self.population_size)
                 ]
         return pop
@@ -84,7 +84,7 @@ class Optimizer:
         scaled_samples = lower_bounds + samples * (upper_bounds - lower_bounds)
 
         pop =   [ # alteração para criar "Individual" no caso do GA e "Partcile" no caso do PSO, evitando repetição da função nas classes
-                self.algorithms[self.__class__.__name__]([float(value) for value in scaled_samples[i]], self.fitness_function)
+                self.ind_type([float(value) for value in scaled_samples[i]], self.fitness_function)
                 for i in range(self.population_size)
                 ]
         return pop
@@ -140,7 +140,7 @@ class Optimizer:
                 curr_iteration = iteration
 
             # Adiciona indivíduo atual
-            individuo = self.algorithms[self.__class__.__name__]([row[param.key] for param in self.parameters], self.fitness_function)
+            individuo = self.ind_type([row[param.key] for param in self.parameters], self.fitness_function)
             individuo.fitness = float(row["Fitness"])
             if self.__class__.__name__ == 'PSO':
                 part_vel = [row[v] for v in vel]
@@ -484,7 +484,11 @@ class Optimizer:
             bo["BO"]["bounds"] = getattr(self, "bounds", None).tolist() if getattr(self, "bounds", None) is not None else None
             bo["BO"]["history_X"] = [x.tolist() for x in getattr(self, "history_X", [])]
             bo["BO"]["history_y"] = list(getattr(self, "history_y", []))
-            # snapshot facultativo do kernel treinado
+            bo["BO"]["best"] = indiv_to_dict(self.best) if self.best else None
+            # RGN local
+            if hasattr(self, "_get_local_rng_state"):
+                bo["BO"]["rng_state"] = self._get_local_rng_state()
+            # snapshot opcional do kernel treinado
             gp = getattr(self, "gp", None)
             if gp and getattr(gp, "kernel_", None) is not None:
                 bo["BO"]["gp_snapshot"] = {
@@ -562,11 +566,11 @@ class Optimizer:
             f"[save_state] Iterações: {total_iters} | Indivíduos totais: {total_inds} | RNG state incluso: {bool(rng.get('py_random_state') or rng.get('numpy_state'))}")
 
         dumps_json(run, filepath)
-        print(f"[save_state] OK ✔ Arquivo gravado.")
-        return filepath  # <-- retorna caminho completo
+        print(f"[save_state] Arquivo gravado.")
+        return filepath  # retorna caminho completo
 
     @classmethod
-    def load_state(cls, filename: str, fitness_function=None):  # recriação do estado de otimização
+    def load_state(cls, filename: str, fitness_function=None, snapshot=False):  # recriação do estado de otimização
         print(f"[load_state] Carregando estado de: {filename}")
         d = loads_json(filename)
         algo = d["algorithm"]
@@ -602,21 +606,36 @@ class Optimizer:
                       init_vel_ratio=pso_cfg.get("initial velocity ratio") or pso_cfg.get("init_vel_ratio") or 0.2)
         elif algo == "BO":
             from .bo_optimizer.bayesian import BO, BOConfig
-            bo_cfg = d["optimizer"]["BO"].get("config", {})
+            bo_block = d["optimizer"]["BO"]
+            bo_cfg = bo_block.get("config", {})
             cfg = BOConfig(**bo_cfg)
-            opt = BO(fitness_function, params, population_size=1, config=cfg)
-            # restaurar BO: bounds, history, gp
-            if d["optimizer"]["BO"].get("bounds"):
-                opt.bounds = np.array(d["optimizer"]["BO"]["bounds"], dtype=float)
-            opt.history_X = [np.asarray(x, dtype=float) for x in d["optimizer"]["BO"].get("history_X", [])]
-            opt.history_y = [float(y) for y in d["optimizer"]["BO"].get("history_y", [])]
+
+            init_pts = d.get("population_size") \
+                       or bo_cfg.get("init_points") \
+                       or cfg.init_points \
+                       or cfg.computed_init_points(len(params))  # fallback seguro
+
+            opt = BO(fitness_function, params, initial_points=init_pts, config=cfg)
+
+            # bounds, history
+            if bo_block.get("bounds"):
+                opt.bounds = np.array(bo_block["bounds"], dtype=float)
+                opt._fit_scaler()  # garantir scaler consistente com bounds carregado
+            opt.history_X = [np.asarray(x, dtype=float) for x in bo_block.get("history_X", [])]
+            opt.history_y = [float(y) for y in bo_block.get("history_y", [])]
+
+            # RGN local
+            if bo_block.get("rng_state") is not None and hasattr(opt, "_set_local_rng_state"):
+                opt._set_local_rng_state(bo_block["rng_state"])
+
             print(f"[load_state] BO: history_X={len(opt.history_X)} pontos | history_y={len(opt.history_y)}")
+
         else:
             raise ValueError(f"Unsupported algorithm '{algo}' in archive")
 
         # 4) campos comuns
         opt.iter_label = d.get("iter_label", opt.iter_label)
-        opt.population_size = d.get("population_size", opt.population_size)
+        if algo != "BO": opt.population_size = d.get("population_size", opt.population_size)
         opt.sampling_method = d["optimizer"]["common"].get("sampling_method", opt.sampling_method)
         tol = d["optimizer"]["common"].get("tolerance", {})
         if any(v is not None for v in tol.values()):
@@ -645,21 +664,57 @@ class Optimizer:
             print(f"[load_state] PSO: global_best fitness={getattr(gb, 'fitness', None)}")
 
         if algo == "BO":
+            best_dict = bo_block.get("best")
+            if best_dict is not None:
+                opt.best = indiv_from_dict(best_dict, fitness_function)
+
             # reconstruir GP (opcional): refit com history, respeitando config.random_state
-            if len(opt.history_X) > 0:
-                try:
-                    opt._fit_gp()
-                    print("[load_state] BO: GP refit concluído.")
-                except Exception as e:
-                    print(f"[load_state] BO: falha ao refazer fit do GP: {e}")
+            try:
+                snap = bo_block.get("gp_snapshot") if snapshot else None
+                if snap and "params" in snap:
+                    from sklearn.gaussian_process import GaussianProcessRegressor
+                    k0 = opt.config.kernel or opt._default_kernel(np.asarray(opt.history_y, dtype=float))
+                    k0.set_params(**snap["params"])
+                    # Reconstrói o GP com os parâmetros salvos
+                    opt.gp = GaussianProcessRegressor(
+                        kernel=k0,
+                        alpha=opt.config.alpha,
+                        normalize_y=opt.config.normalize_y,
+                        optimizer=None,  # congela hiperparâmetros na inicialização
+                        n_restarts_optimizer=0,
+                        random_state=opt.rng,
+                    )
+                    opt.gp.fit(np.vstack(opt.history_X), np.array(opt.history_y))
+                else:
+                    # fallback: refit normal
+                    if opt.history_X:
+                        opt._fit_gp()
+                print("[load_state] BO: GP refit concluído.")
+
+            except Exception as e:
+                print(f"[load_state] BO: falha ao refazer fit do GP: {e}")
+                pass
 
         print("[load_state] OK ✔ Estado reconstituído.")
         return opt
 
-    def analyze_sensitivity(self, **kwargs):
+    def analyze_sensitivity(self, df=None, **kwargs):
+        # df: DataFrame opcional com histórico/log; se None, você pode passar df externamente
         from .sensitivity import SensitivityAnalyzer
-        sa = SensitivityAnalyzer.from_optimizer(self)
-        return sa.run(**kwargs), sa
+        sa = SensitivityAnalyzer(minimize=True)
+        if df is None:
+            raise ValueError("Passe um DataFrame 'df' com parâmetros + métricas (+ Fitness opcional).")
+        selected = sa.workflow(
+            df,
+            fitness_col=kwargs.get("fitness_col", "Fitness"),
+            param_keys_hint=[p.key for p in self.parameters],
+            strategy=kwargs.get("strategy", "max_abs"),
+            tau=kwargs.get("tau", None),
+            topk=kwargs.get("topk", None),
+            show_plot=kwargs.get("show_plot", True),
+            interactive=kwargs.get("interactive", True),
+        )
+        return selected, sa
 
 
 # subclasse para funções comuns a algoritmos populacionais
