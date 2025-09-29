@@ -41,6 +41,7 @@ class BOConfig:
 
     # otimização da aquisição
     acq_optimizer: str = "lbfgs"  # "sampling" (tradicional) | "lbfgs"
+    acq_hyper_tuning = True
     # lbfgs:
     acq_n_points: int = 10000        # pontos para pré-seleção
     acq_n_restarts: int = 5          # multi-starts
@@ -166,6 +167,9 @@ class BO(Optimizer):
 
         # scaler (normalização interna do GP)
         self._fit_scaler()
+
+        if self.config.acq_hyper_tuning:
+            self.set_tolerance(fit_rel=1e-2, patience=10)
 
     # -----------------
     # Normalização (GP)
@@ -582,6 +586,11 @@ class BO(Optimizer):
             for ind in new_pop:
                 ind.data = ind.data or {}
                 ind.data.update(diag)
+
+            if self.tolerance([self.best], new_pop): # critério de parada, determinado com a função set_tolerance
+                self.config.xi = self.config.xi / 10
+                self.config.kappa = self.config.kappa * 0.60
+                print(f"Hyperparameter {'kappa' if self.config.acquisition.upper() == 'UCB' else 'xi'} reduced to {self.config.kappa if self.config.acquisition == 'UCB' else self.config.xi} due to fitness stagnation [set config.acq_hyper_tuning=False to keep hyperparameters fixed]")
 
             self.population.extend(new_pop)
             self.best = min(self.population, key=lambda p: p.fitness)

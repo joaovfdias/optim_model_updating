@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Any
+
 import os
 import csv
 import time
@@ -395,7 +398,7 @@ class Optimizer:
         self.patience = patience
 
     # criar uma função em otimizador que receba duas populações ou individuos e compare as diferenças, verificando se estão dentro da tolerância por uma quantidade consecutiva de iterações
-    def tolerance(self, previous, current):
+    def tolerance(self, previous: List[Individual], current: List[Individual]) -> bool:
         # estrutura de chamada externa:
             #if self.tolerance(previous, current):
                 #break
