@@ -1,229 +1,369 @@
-
 from __future__ import annotations
-from dataclasses import dataclass, asdict
-from typing import List, Dict, Tuple, Optional, Sequence, Any
-import json, os
+
+import math
+import re
+from dataclasses import dataclass
+from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
+
 import numpy as np
-
+import pandas as pd
+import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
+import os
+from datetime import datetime
 
 
-# def _rankdata(a: np.ndarray) -> np.ndarray:
-#     a = np.asarray(a, dtype=float)
-#     n = a.size
-#     order = a.argsort(kind="mergesort")
-#     ranks = np.empty(n, dtype=float)
-#     ranks[order] = np.arange(1, n + 1, dtype=float)
-#     # corrigir empates: média das posições
-#     # detecta blocos de valores iguais no array ordenado
-#     vals = a[order]
-#     i = 0
-#     while i < n - 1:
-#         j = i
-#         while j + 1 < n and vals[j + 1] == vals[i]:
-#             j += 1
-#         if j > i:
-#             mean_rank = (ranks[order][i:j+1].mean())
-#             ranks[order][i:j+1] = mean_rank
-#         i = j + 1
-#     return ranks
-
-def _spearmanr_1d(x: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
-    """
-    Spearman via SciPy.
-    """
-    rho, p = spearmanr(x, y, nan_policy="omit")
-    if rho is None or np.isnan(rho) or np.isnan(p):
-        return 0.0, 1.0
-    return float(rho), float(p)
-
-    # import math
-    # x = np.asarray(x, dtype=float)
-    # y = np.asarray(y, dtype=float)
-    # n = x.size
-    # if n != y.size or n < 3:
-    #     return np.nan, np.nan
-    # if np.all(x == x[0]) or np.all(y == y[0]):
-    #     return 0.0, 1.0
-    # rx = _rankdata(x)
-    # ry = _rankdata(y)
-    # rx = (rx - rx.mean()) / (rx.std() or 1.0)
-    # ry = (ry - ry.mean()) / (ry.std() or 1.0)
-    # rho = float(np.clip((rx @ ry) / (n - 1), -1.0, 1.0))
-    # t = rho * np.sqrt((n - 2) / (1.0 - rho * rho + 1e-12))
-    # z = abs(t)
-    # Phi = 0.5 * (1 + math.erf(z / math.sqrt(2)))
-    # p = 2 * (1 - Phi)
-    # return rho, float(p)
-
-
-def _ensure_dir(path: str):
-    d = os.path.dirname(path)
-    if d and not os.path.exists(d):
-        os.makedirs(d, exist_ok=True)
-
+# ParamSpec + Amostragem (DoE)
 
 @dataclass
-class SensitivityResult:
-    names: List[str]
-    rho: List[float]
-    pval: List[float]
-    selected_idx: List[int]
+class ParamSpec:
+    name: str
+    lower: float
+    upper: float
+    kind: Literal["continuous", "integer"] = "continuous"
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {"names": self.names, "rho": self.rho, "pval": self.pval, "selected_idx": self.selected_idx}
+
+class Sampler:
+    @staticmethod
+    def random(n: int, specs: Sequence[ParamSpec], rng: np.random.Generator) -> pd.DataFrame:
+        rows: List[Dict[str, float]] = []
+        for _ in range(n):
+            row = {}
+            for p in specs:
+                u = rng.random()
+                v = p.lower + u * (p.upper - p.lower)
+                row[p.name] = int(round(v)) if p.kind == "integer" else float(v)
+            rows.append(row)
+        return pd.DataFrame(rows)
+
+    @staticmethod
+    def lhs(n: int, specs: Sequence[ParamSpec], rng: np.random.Generator) -> pd.DataFrame:
+        if n <= 0:
+            raise ValueError("n deve ser positivo")
+        cols: Dict[str, np.ndarray] = {}
+        for p in specs:
+            cut = np.linspace(0.0, 1.0, n + 1)
+            u = rng.random(n)
+            pts = cut[:-1] + u * (1.0 / n)
+            rng.shuffle(pts)
+            vals = p.lower + pts * (p.upper - p.lower)
+            vals = np.rint(vals).astype(int) if p.kind == "integer" else vals.astype(float)
+            cols[p.name] = vals
+        return pd.DataFrame(cols)
+
+
+# Detecção de métricas do LOG
+
+_SERVICE_COLS = {"Iteration", "Individual", "Fitness", "Global Best", "Time (s)"}
+
+def _is_service_col(c: str) -> bool:
+    return c in _SERVICE_COLS or c.startswith("pso.v")  # velocidades no PSO
+
+
+def _default_metric_detector(c: str) -> bool:
+    """
+    Compatível com cabeçalhos gerados pelo teu Optimizer:
+    - vetores: "freq #1", "MAC #1", etc.
+    - permite variações "freq_1", "MAC_1", "metric_*"
+    """
+    if _is_service_col(c):
+        return False
+    c0 = c.strip()
+    return bool(
+        re.match(r'^(freq|Freq|mac|MAC|metric_)\b', c0) or
+        re.search(r'\s#\d+$', c0)  # ex.: "freq #1", "MAC #2", "modos #3"
+    )
+
+
+# Cálculo de correlações
+
+def compute_spearman_multi(
+    df: pd.DataFrame,
+    *,
+    param_cols: Optional[List[str]] = None,
+    metric_cols: Optional[List[str]] = None,
+    fitness_col: Optional[str] = None,
+    minimize: bool = True,
+    is_metric_fn: Callable[[str], bool] = _default_metric_detector,
+    param_keys_hint: Optional[List[str]] = None,  # ex.: [p.key for p in optimizer.parameters]
+    drop_extra_cols: Iterable[str] = (),
+) -> Tuple[pd.DataFrame, Optional[pd.Series]]:
+    """
+    Retorna:
+      - corr_df: DataFrame (index=parâmetros, columns=métricas) com ρ (com sinal)
+      - overall: Series  (index=parâmetros) com ρ vs fitness (se fitness_col fornecida)
+    """
+    df = df.copy()
+
+    # Param cols
+    if param_cols is None:
+        if param_keys_hint:
+            param_cols = [c for c in param_keys_hint if c in df.columns]
+        else:
+            blacklist = set(drop_extra_cols) | _SERVICE_COLS
+            if fitness_col:
+                blacklist.add(fitness_col)
+            # métricas detectadas automaticamente
+            metrics_auto = [c for c in df.columns if is_metric_fn(c)]
+            blacklist.update(metrics_auto)
+            # tudo que sobrar (numérico) vira candidato a parâmetro
+            param_cols = [c for c in df.columns if c not in blacklist]
+
+    # Metric cols
+    if metric_cols is None:
+        metric_cols = [c for c in df.columns if is_metric_fn(c)]
+        if not metric_cols:
+            raise ValueError("Nenhuma coluna de métrica detectada; passe metric_cols explicitamente.")
+
+    # sanity
+    miss_p = [c for c in param_cols if c not in df.columns]
+    miss_m = [c for c in metric_cols if c not in df.columns]
+    if miss_p or miss_m:
+        raise ValueError(f"Colunas ausentes. params={miss_p}, metrics={miss_m}")
+
+    # Spearman por métrica
+    rows = []
+    for p in param_cols:
+        x = pd.to_numeric(df[p], errors="coerce")
+        row: Dict[str, float] = {}
+        for m in metric_cols:
+            y = pd.to_numeric(df[m], errors="coerce")
+            mask = ~(x.isna() | y.isna())
+            if mask.sum() < 3:
+                rho = np.nan
+            else:
+                rho, _ = spearmanr(x[mask], y[mask])
+            row[m] = float(rho) if rho is not None else np.nan
+        rows.append(pd.Series(row, name=p))
+    corr_df = pd.DataFrame(rows)
+
+    # Spearman com fitness geral (opcional)
+    overall = None
+    if fitness_col and fitness_col in df.columns:
+        f = pd.to_numeric(df[fitness_col], errors="coerce")
+        f_eff = -f if minimize else f
+        vals: Dict[str, float] = {}
+        for p in param_cols:
+            x = pd.to_numeric(df[p], errors="coerce")
+            mask = ~(x.isna() | f_eff.isna())
+            if mask.sum() < 3:
+                rho = np.nan
+            else:
+                rho, _ = spearmanr(x[mask], f_eff[mask])
+            vals[p] = float(rho) if rho is not None else np.nan
+        overall = pd.Series(vals, name="rho_fitness").sort_values(ascending=False)
+
+    return corr_df, overall
+
+
+def plot_heatmap_corr(corr_df: pd.DataFrame, title: str = "Spearman (parâmetros × métricas)", auto_save: bool = True):
+    if corr_df.empty:
+        raise ValueError("corr_df vazio")
+    fig_w = max(6, 0.7 * corr_df.shape[1])
+    fig_h = max(4, 0.45 * corr_df.shape[0])
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    im = ax.imshow(corr_df.values, aspect="auto", vmin=-1.0, vmax=1.0)
+    ax.set_xticks(range(corr_df.shape[1]))
+    ax.set_xticklabels(corr_df.columns, rotation=45, ha="right")
+    ax.set_yticks(range(corr_df.shape[0]))
+    ax.set_yticklabels(corr_df.index)
+    cbar = fig.colorbar(im, ax=ax)
+    cbar.set_label("ρ (Spearman)")
+    ax.set_title(title)
+    ax.set_xlabel("Métricas")
+    ax.set_ylabel("Parâmetros")
+    # anota valores se não for gigante
+    if corr_df.shape[0] * corr_df.shape[1] <= 200:
+        for i in range(corr_df.shape[0]):
+            for j in range(corr_df.shape[1]):
+                v = corr_df.iat[i, j]
+                if not (isinstance(v, float) and math.isnan(v)):
+                    ax.text(j, i, f"{v:+.2f}", ha="center", va="center", fontsize=8)
+    plt.tight_layout()
+
+    if auto_save:
+        out_dir = os.path.join(os.getcwd(), "plot")
+        os.makedirs(out_dir, exist_ok=True)
+
+        # gera nome do arquivo com timestamp
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        fname = f"heatmap_sensitivity_{ts}.png"
+        fpath = os.path.join(out_dir, fname)
+
+        plt.savefig(fpath, dpi=300)
+        print(f"[OK] Heatmap salvo em {fpath}")
+
+    plt.show()
+
+
+def recommend_cut(
+    corr_df: pd.DataFrame,
+    *,
+    strategy: Literal["max_abs", "mean_abs"] = "max_abs",
+    tau: Optional[float] = None,
+    topk: Optional[int] = None,
+) -> Tuple[List[str], pd.DataFrame]:
+    if corr_df.empty:
+        return [], pd.DataFrame(columns=["score"])
+    abs_df = corr_df.abs()
+    score = abs_df.max(axis=1) if strategy == "max_abs" else abs_df.mean(axis=1)
+    if topk is not None:
+        keep = list(score.nlargest(topk).index)
+    else:
+        if tau is None:
+            with np.errstate(invalid="ignore"):
+                tau = float(np.nanquantile(score.values, 0.7))  # heurística ~top 30%
+        keep = list(score[score >= float(tau)].index)
+    ranking = pd.DataFrame({"score": score}).sort_values("score", ascending=False)
+    return keep, ranking
+
+
+# Orquestrador
 
 class SensitivityAnalyzer:
-    """
-    Análise de sensibilidade baseada em Spearman |rho| entre parâmetros e fitness.
-    """
+    def __init__(self, *, minimize: bool = True, is_metric_fn: Callable[[str], bool] = _default_metric_detector):
+        self.minimize = minimize
+        self.is_metric_fn = is_metric_fn
 
-    def __init__(self, param_names: List[str], X: np.ndarray, y: np.ndarray):
-        """
-        X: shape (N, D) amostras de parâmetros
-        y: shape (N,) fitness correspondente
-        """
-        self.param_names = list(param_names)
-        self.X = np.asarray(X, dtype=float)
-        self.y = np.asarray(y, dtype=float)
+    # (1) Histórico / DoE já avaliados
+    def from_history(
+        self,
+        df: pd.DataFrame,
+        *,
+        param_cols: Optional[List[str]] = None,
+        metric_cols: Optional[List[str]] = None,
+        fitness_col: Optional[str] = None,
+        param_keys_hint: Optional[List[str]] = None,
+    ) -> Tuple[pd.DataFrame, Optional[pd.Series]]:
+        return compute_spearman_multi(
+            df,
+            param_cols=param_cols,
+            metric_cols=metric_cols,
+            fitness_col=fitness_col,
+            minimize=self.minimize,
+            is_metric_fn=self.is_metric_fn,
+            param_keys_hint=param_keys_hint,
+        )
 
-        ok = np.isfinite(self.X).all(axis=1) & np.isfinite(self.y)
-        self.X = self.X[ok]
-        self.y = self.y[ok]
+    # (2) Gera DoE a partir do teu Optimizer.parameters
+    def from_optimizer_doe(
+        self,
+        optimizer,
+        evaluate_fn: Callable[[pd.Series], Union[float, Dict[str, float]]],
+        *,
+        n: Optional[int] = None,
+        sampler: Literal["lhs", "random"] = "lhs",
+        seed: Optional[int] = None,
+        fitness_col: str = "Fitness",
+        metric_cols: Optional[List[str]] = None,
+    ) -> Tuple[pd.DataFrame, Optional[pd.Series], pd.DataFrame]:
+        specs: List[ParamSpec] = []
+        for p in optimizer.parameters:
+            # compatível com .key, .lower_bound, .upper_bound do teu código
+            name = p.key
+            lb = float(p.lower_bound)
+            ub = float(p.upper_bound)
+            kind = getattr(p, "kind", "continuous")
+            specs.append(ParamSpec(name, lb, ub, kind))
+        n = n or 10 * max(1, len(specs))
 
-    @classmethod
-    def from_optimizer(cls, opt) -> "SensitivityAnalyzer":
-        """
-        Coleta (X, y) do otimizador:
-        - BO: usa history_X, history_y
-        - GA/PSO: concatena todas as populações avaliadas (fitness não-None)
-        """
-        # nomes dos parâmetros
-        names = [getattr(p, "key", f"p{i}") for i, p in enumerate(opt.parameters)]
+        rng = np.random.default_rng(seed)
+        X = Sampler.lhs(n, specs, rng) if sampler == "lhs" else Sampler.random(n, specs, rng)
 
-        # BO
-        if opt.__class__.__name__ == "BO" or hasattr(opt, "history_X"):
-            HX = getattr(opt, "history_X", [])
-            Hy = getattr(opt, "history_y", [])
-            X = np.array(HX, dtype=float)
-            y = np.array(Hy, dtype=float)
-            return cls(names, X, y)
-
-        # GA/PSO
-        rows = []
-        ys = []
-        for pop in getattr(opt, "populations", []):
-            for ind in pop:
-                if ind.fitness is None:  # pular não avaliados
-                    continue
-                rows.append(np.array(ind.param, dtype=float))
-                ys.append(float(ind.fitness))
-        if not rows:
-            raise ValueError("Nenhum indivíduo avaliado encontrado em opt.populations.")
-        X = np.vstack(rows)
-        y = np.array(ys, dtype=float)
-        return cls(names, X, y)
-
-    def compute(self, absolute: bool = True) -> Tuple[List[float], List[float]]:
-        """Retorna (rho, pval) por parâmetro. Se absolute=True usa |rho| para ranking."""
-        D = self.X.shape[1]
-        rho, pval = [], []
-        for j in range(D):
-            r, p = _spearmanr_1d(self.X[:, j], self.y)
-            rho.append(abs(r) if absolute else r)
-            pval.append(p)
-        return rho, pval
-
-    def select(self,
-               rho: List[float],
-               pval: List[float],
-               mode: str = "threshold",
-               threshold: float = 0.3,
-               top_k: Optional[int] = None,
-               max_pval: Optional[float] = None) -> List[int]:
-        """
-        Critério de seleção:
-          - mode='threshold': escolhe índices com |rho| >= threshold e (opcional) pval <= max_pval
-          - mode='topk': escolhe os 'top_k' maiores |rho| (aplica max_pval se dado)
-        """
-        idx = list(range(len(rho)))
-        if mode == "threshold":
-            sel = [i for i in idx if rho[i] >= threshold and (max_pval is None or pval[i] <= max_pval)]
-            return sel
-        elif mode == "topk":
-            if top_k is None or top_k <= 0:
-                raise ValueError("top_k deve ser > 0 para mode='topk'.")
-            order = sorted(idx, key=lambda i: rho[i], reverse=True)
-            ordered = [i for i in order if (max_pval is None or pval[i] <= max_pval)]
-            return ordered[:top_k]
-        else:
-            raise ValueError("mode deve ser 'threshold' ou 'topk'.")
-
-    def run(self,
-            mode: str = "threshold",
-            threshold: float = 0.3,
-            top_k: Optional[int] = None,
-            max_pval: Optional[float] = 0.05,
-            absolute: bool = True,
-            verbose: bool = True) -> SensitivityResult:
-        rho, pval = self.compute(absolute=absolute)
-        sel = self.select(rho, pval, mode=mode, threshold=threshold, top_k=top_k, max_pval=max_pval)
-
-        if verbose:
-            print("[sensitivity] Spearman |rho| por parâmetro:")
-            for name, r, p in zip(self.param_names, rho, pval):
-                star = " *" if (name in [self.param_names[i] for i in sel]) else ""
-                sig = f"(p={p:.3g})"
-                print(f"  - {name:>15s}: {r:.4f} {sig}{star}")
-            if mode == "threshold":
-                print(f"[sensitivity] Seleção: |rho| >= {threshold} e p <= {max_pval}")
+        results: List[Dict[str, float]] = []
+        for _, r in X.iterrows():
+            out = evaluate_fn(r)
+            if isinstance(out, dict):
+                results.append(out)
             else:
-                print(f"[sensitivity] Seleção: top_k = {top_k} (p <= {max_pval} se fornecido)")
-            print(f"[sensitivity] Escolhidos: {[self.param_names[i] for i in sel]}")
+                results.append({fitness_col: float(out)})
+        Y = pd.DataFrame(results)
 
-        return SensitivityResult(self.param_names, rho, pval, sel)
+        df_eval = pd.concat([X.reset_index(drop=True), Y.reset_index(drop=True)], axis=1)
 
+        corr_df, overall = compute_spearman_multi(
+            df_eval,
+            param_cols=[s.name for s in specs],
+            metric_cols=metric_cols,  # se None, detecta automaticamente
+            fitness_col=fitness_col if fitness_col in df_eval.columns else None,
+            minimize=self.minimize,
+            is_metric_fn=self.is_metric_fn,
+        )
+        return corr_df, overall, df_eval
 
-    def export_scores_csv(self, res: SensitivityResult, filename: str):
-        _ensure_dir(filename)
-        import csv
-        with open(filename, "w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f)
-            w.writerow(["param", "spearman_abs_rho", "p_value", "selected"])
-            for i, name in enumerate(res.names):
-                w.writerow([name, f"{res.rho[i]:.6g}", f"{res.pval[i]:.6g}", int(i in res.selected_idx)])
-        print(f"[sensitivity] CSV salvo em: {filename}")
+    # (3) Workflow completo com prompt opcional
+    def workflow(
+        self,
+        df: pd.DataFrame,
+        *,
+        fitness_col: Optional[str] = None,
+        param_cols: Optional[List[str]] = None,
+        metric_cols: Optional[List[str]] = None,
+        param_keys_hint: Optional[List[str]] = None,
+        strategy: Literal["max_abs", "mean_abs"] = "max_abs",
+        tau: Optional[float] = None,
+        topk: Optional[int] = None,
+        show_plot: bool = True,
+        interactive: bool = True,
+        input_fn: Callable[[str], str] = input,
+    ) -> List[str]:
+        corr_df, overall = self.from_history(
+            df,
+            param_cols=param_cols,
+            metric_cols=metric_cols,
+            fitness_col=fitness_col,
+            param_keys_hint=param_keys_hint,
+        )
 
-    def export_selection_json(self,
-                              res: SensitivityResult,
-                              all_parameters: Sequence[Any],
-                              filename: str):
-        """
-        Gera um JSON com:
-          - lista completa de scores
-          - e um bloco 'selected_parameters' com os Parameters (kind, key, bounds) para recriar depois.
-        """
-        _ensure_dir(filename)
+        print("\n=== Correlação por métrica (ρ de Spearman) ===")
+        print(corr_df.round(3).to_string())
 
-        def param_to_dict(p):
-            d = {"kind": p.__class__.__name__, "key": getattr(p, "key", None)}
-            if hasattr(p, "lower_bound"): d["lower"] = float(p.lower_bound)
-            if hasattr(p, "upper_bound"): d["upper"] = float(p.upper_bound)
-            return d
+        if show_plot:
+            try:
+                plot_heatmap_corr(corr_df, title="Spearman por métrica (parâmetros × métricas)")
+            except Exception as e:
+                print(f"[Aviso] Falha ao exibir heatmap: {e}")
 
-        payload = {
-            "version": 1,
-            "method": "spearman",
-            "names": res.names,
-            "spearman_abs_rho": res.rho,
-            "p_values": res.pval,
-            "selected_idx": res.selected_idx,
-            "selected_parameters": [param_to_dict(all_parameters[i]) for i in res.selected_idx],
-        }
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        print(f"[sensitivity] Seleção JSON salva em: {filename}")
+        if overall is not None:
+            print("\n=== Correlação com fitness geral (ρ; ajustado se minimização) ===")
+            print(overall.round(3).to_string())
 
-    def build_parameter_subset(self, all_parameters: Sequence[Any], selected_idx: List[int]) -> List[Any]:
-        """Retorna a sublista de Parameters a calibrar."""
-        return [all_parameters[i] for i in selected_idx]
+        suggested, ranking = recommend_cut(corr_df, strategy=strategy, tau=tau, topk=topk)
+
+        print("\n=== Ranking por importância (|ρ| → score) ===")
+        print(ranking.round(3).to_string())
+
+        all_params = list(corr_df.index)
+        print("\n=== Parâmetros ===")
+        for i, p in enumerate(all_params, start=1):
+            print(f"{i}. {p}")
+        print("0. All")
+        print(f"\nSugerido manter: {suggested}")
+
+        if not interactive:
+            print("[Info] Modo não interativo: usando sugestão automática.")
+            return suggested
+
+        user = input_fn(
+            "\n[ Sensibilidade ]\n"
+            "ENTER para aceitar a sugestão\n"
+            "ou digite índices (ex.: 1,3,5) ou '0' para All: "
+        ).strip()
+
+        if user == "":
+            chosen = suggested
+        elif user == "0":
+            chosen = all_params
+        else:
+            try:
+                idxs = [int(s) for s in user.replace(" ", "").split(",") if s]
+                chosen = [all_params[i - 1] for i in idxs if 1 <= i <= len(all_params)]
+                if not chosen:
+                    print("[Aviso] Nenhum índice válido. Usando sugestão.")
+                    chosen = suggested
+            except Exception:
+                print("[Aviso] Entrada inválida. Usando sugestão.")
+                chosen = suggested
+
+        print(f"\n[OK] Parâmetros selecionados: {chosen}")
+        return chosen
