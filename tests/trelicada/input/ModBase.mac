@@ -1,0 +1,542 @@
+! CÓDIGO PARAMÉTRICO - PROBLEMA 2: PONTE TRELIÇADA
+
+/CLEAR
+
+/PREP7
+
+! CONSTANTES
+L_TRELICA = 40   ! COMPRIMENTO TOTAL
+L_Z = 4.57   ! DISTÂNCIA ENTRE TRELIÇAS (EM Z)
+DIST_LONG = 1.52   ! DISTÂNCIA ENTRE AS LONGARINAS CENTRAIS
+LONG1_Z = (L_Z - DIST_LONG)/2   ! DISTÂNCIA EM Z DA LONGARINA 1 EM RELAÇÃO A TRELIÇA 1 (Z = 0)
+
+! VARIÁVEIS
+
+! LONGARINAS, BANZO_INF, BANZO_SUP
+ex_banz = 205E9     ! módulo de elasticidade (Pa)
+prxy_banz = 0.3      ! poisson
+dens_banz = 7800     ! densidade (kg/m³)
+
+! DIAGONAIS, MONTANTES, TRANSV_INF, TRANSV_SUP
+ex_diag = 215E9     ! módulo de elasticidade (Pa)
+prxy_diag = 0.3      ! poisson
+dens_diag = 7850     ! densidade (kg/m³)
+
+! CONT_INF, CONT_SUP, CONT_LONG, REFORCOS
+ex_contrav = 195E9     ! módulo de elasticidade (Pa)
+prxy_contrav = 0.3      ! poisson
+dens_contrav = 7750     ! densidade (kg/m³)
+
+! rigidez dos apoios
+k1=80e6
+k2=68e6
+k3=76e6
+k4=72e6
+
+! massa adicional
+MASSA_ADD = 600 ! kg/m²
+
+NUMFREQ = 50 ! número de frequências para solução
+
+
+!KEYPOINTS - BANZO INFERIOR
+K,1,0
+K,2,L_TRELICA/6
+K,3,2*L_TRELICA/6
+K,4,3*L_TRELICA/6
+K,5,4*L_TRELICA/6
+K,6,5*L_TRELICA/6
+K,7,L_TRELICA
+
+!LINHAS - BANZO INFERIOR
+L,1,2
+L,2,3
+L,3,4
+L,4,5
+L,5,6
+L,5,6
+L,6,7
+
+!KEYPOINTS BANZO SUPERIOR
+K,8,L_TRELICA/6,7.8
+K,9,2*L_TRELICA/6,7.8
+K,10,3*L_TRELICA/6,7.8
+K,11,4*L_TRELICA/6,7.8
+K,12,5*L_TRELICA/6,7.8
+
+!LINHAS - BANZO SUPERIOR
+L,8,9
+L,9,10
+L,10,11
+L,11,12
+
+!LINHAS - MONTANTES
+*DO,I,1,5,1
+    L,2+(I-1),8+(I-1)
+*ENDDO
+
+!LINHAS - DIAGONAIS
+*DO,I,1,6,2
+    L,1+(I-1),8+(I-1)
+*ENDDO
+
+*DO,I,1,6,2
+    L,3+(I-1),8+(I-1)
+*ENDDO
+
+!DIVISÃO PARA CONECTAR REFORÇOS
+WPOFFS,,3.9
+WPROTA,,90
+LSBW,ALL
+WPCSYS,-1
+
+LSEL,S,LOC,Y,7.8
+LDIV,ALL,.5
+ALLSEL
+
+!NOVAS LINHAS - REFORÇOS
+KP1 = KP(L_TRELICA/12,3.9,0)
+KP2 = KP(L_TRELICA/6,3.9,0)
+L,KP1,KP2
+
+KP1 = KP(L_TRELICA/6,3.9,0)
+KP2 = KP(3*L_TRELICA/12,3.9,0)
+L,KP1,KP2
+
+KP1 = KP(3*L_TRELICA/12,3.9,0)
+KP2 = KP(3*L_TRELICA/12,7.8,0)
+L,KP1,KP2
+
+KP1 = KP(3*L_TRELICA/12,3.9,0)
+KP2 = KP(4*L_TRELICA/12,7.8,0)
+L,KP1,KP2
+
+KP1 = KP(5*L_TRELICA/12,3.9,0)
+KP2 = KP(4*L_TRELICA/12,7.8,0)
+L,KP1,KP2
+
+KP1 = KP(5*L_TRELICA/12,3.9,0)
+KP2 = KP(5*L_TRELICA/12,7.8,0)
+L,KP1,KP2
+
+!OUTRO LADO
+WPOFFS,L_TRELICA
+WPROTA,,,180
+CSYS,WP
+
+KP1 = KP(L_TRELICA/12,3.9,0)
+KP2 = KP(L_TRELICA/6,3.9,0)
+L,KP1,KP2
+
+KP1 = KP(L_TRELICA/6,3.9,0)
+KP2 = KP(3*L_TRELICA/12,3.9,0)
+L,KP1,KP2
+
+KP1 = KP(3*L_TRELICA/12,3.9,0)
+KP2 = KP(3*L_TRELICA/12,7.8,0)
+L,KP1,KP2
+
+KP1 = KP(3*L_TRELICA/12,3.9,0)
+KP2 = KP(4*L_TRELICA/12,7.8,0)
+L,KP1,KP2
+
+KP1 = KP(5*L_TRELICA/12,3.9,0)
+KP2 = KP(4*L_TRELICA/12,7.8,0)
+L,KP1,KP2
+
+KP1 = KP(5*L_TRELICA/12,3.9,0)
+KP2 = KP(5*L_TRELICA/12,7.8,0)
+L,KP1,KP2
+
+CSYS,0
+WPCSYS,-1
+
+
+!SEGUNDA TRELICA
+ALLSEL
+LGEN,2,ALL,,,,,4.57
+
+
+!CRIACAO DE COMPONENTES DAS TRELIÇAS
+LSEL,S,LOC,Y,0
+CM,BANZO_INF,LINE
+
+LSEL,S,LOC,Y,7.8
+CM,BANZO_SUP,LINE
+
+LSEL,S,LOC,X,1*L_TRELICA/6
+LSEL,A,LOC,X,2*L_TRELICA/6
+LSEL,A,LOC,X,3*L_TRELICA/6
+LSEL,A,LOC,X,4*L_TRELICA/6
+LSEL,A,LOC,X,5*L_TRELICA/6
+CM,MONTANTES,LINE
+
+ALLSEL
+KSEL,U,LOC,Y,3.9
+*DO,I,1,4
+    KSEL,U,LOC,X,3/12*L_TRELICA+(I-1)*L_TRELICA/6
+*ENDDO
+LSLK,S
+CMSEL,U,BANZO_INF
+CMSEL,U,BANZO_SUP
+CMSEL,U,MONTANTES
+
+*DO,I,1,2
+    KSEL,S,LOC,Y,7.8
+    KSEL,R,LOC,X,I*L_TRELICA/3
+    LSLK,U
+*ENDDO
+
+!KSEL,S,KP,,KP(2*L_TRELICA/6,7.8,0)
+!LSLK,U
+!KSEL,ALL
+!KSEL,S,KP,,KP(2*L_TRELICA/6,7.8,L_Z) ! PORQUE "A" NÃO FUNCIONOU?
+!LSLK,U
+!KSEL,ALL
+!KSEL,S,KP,,KP(4*L_TRELICA/6,7.8,0)
+!LSLK,U
+!KSEL,ALL
+!KSEL,S,KP,,KP(4*L_TRELICA/6,7.8,L_Z)
+!LSLK,U
+CM,DIAGONAIS,LINE
+
+ALLSEL
+CMSEL,U,BANZO_INF
+CMSEL,U,BANZO_SUP
+CMSEL,U,MONTANTES
+CMSEL,U,DIAGONAIS
+CM,REFORCOS,LINE
+
+
+! TRANVERSINAS INFERIORES
+LSEL,NONE
+*DO,I,1,7,1
+   KP1 = I
+   KPX = KX(KP1)
+   KPY = KY(KP1)
+   KPZ = KZ(KP1)
+   KP2 = KP(KPX,KPY,4.57)
+   L,KP1,KP2
+*ENDDO
+
+! DIVISÃO DAS TRANSVERSINAS INF. PARA CONECTAR AS LONGARINAS
+z1 = LONG1_Z        ! EIXO 1 DAS LONGARINAS
+z2 = L_Z - LONG1_Z  ! EIXO 2 DAS LONGARINAS
+
+lsel,s,loc,y,0
+wpoffs,,,z1   ! desloca o WP em z
+lsbw,all
+wpoffs,,,DIST_LONG
+lsbw,all
+wpcsys,-1
+
+CMSEL,U,BANZO_INF !DESSELECIONAR BANZOS INFERIORES PARA ISOLAR AS TRANSVERSINAS
+
+CM,TRANSV_INF,LINE ! COMPONENTE DE TRANVERSINAS INFERIORES
+
+! LONGARINAS
+ksel,s,loc,z,z1
+ksel,a,loc,z,z2
+
+lsel,none
+*do,i,1,6,1
+    xi = (i-1)*l_trelica/6
+    xf = (i)*l_trelica/6
+    l,kp(xi,0,z1),kp(xf,0,z1)
+    l,kp(xi,0,z2),kp(xf,0,z2)
+*enddo
+
+ldiv,all,,,4! dividir as longarinas para conectar os contraventamentos
+
+CM,LONGARINAS,LINE ! COMPONENTE DE LONGARINAS
+
+! CONTRAVENTAMENTO DAS LONGARINAS
+lsel,none
+*do,i,1,24,1
+    xi = l_trelica/24*(i-1)
+    xf = l_trelica/24*i
+    l,kp(xi,0,z1),kp(xf,0,z2)
+    zaux = z1
+    z1 = z2
+    z2 = zaux
+*enddo
+
+CM,CONT_LONG,LINE ! COMPONENTE DE CONTRAVENTAMENTO DAS LONGARINAS
+
+!CONTRAVENTAMENTO INFERIOR
+ksel,s,loc,z,0
+ksel,a,loc,z,L_Z
+ksel,r,loc,y,0
+
+lsel,none
+*do,i,1,6,1
+    xi = l_trelica/6*(i-1)
+    xf = l_trelica/6*(i)
+    l,kp(xi,0,0),kp(xf,0,L_Z)
+    l,kp(xf,0,0),kp(xi,0,L_Z)
+*enddo
+
+!! ALTERAÇÃO R04: linhas contínuas no contraventamento, com elemento LINK180
+!wpoffs,,,L_Z/2  !desloca plano para o centro da ponte
+!lsbw,all        !divide os contraventamentos para conectá-los
+!LGLUE,ALL       !conecta as linhas na interseção
+!wpcsys,-1       !redefine o WP
+
+CM,CONT_INF,LINE ! COMPONENTE CONTRAVENTAMENTO INFERIOR
+
+
+! TRANSVERSINAS SUPERIORES
+ALLSEL
+LSEL,NONE
+*DO,I,8,12,1
+   KP1 = I
+   KPX = KX(KP1)
+   KPY = KY(KP1)
+   KPZ = KZ(KP1)
+   KP2 = KP(KPX,KPY,4.57)
+   L,KP1,KP2
+*ENDDO
+CM,TRANSV_SUP,LINE !COMPONENTE TRANSVERSINAS SUPERIORES
+
+!CONTRAVENTAMENTO SUPERIOR
+lsel,s,loc,y,7.8
+KSLL,S
+
+lsel,none
+*do,i,1,4,1
+    xi = l_trelica/6*(i)
+    xf = l_trelica/6*(i+1)
+    l,kp(xi,7.8,0),kp(xf,7.8,L_Z)
+    l,kp(xf,7.8,0),kp(xi,7.8,L_Z)
+*enddo
+
+!! ALTERAÇÃO R04: linhas contínuas no contraventamento, com elemento LINK180
+!wpoffs,,,L_Z/2
+!lsbw,all
+!lglue,all
+!wpcsys,-1
+
+CM,CONT_SUP,LINE !COMPONENTE CONTRAVENTAMENTO SUPERIOR
+
+
+ALLSEL
+
+
+! DEFINIÇÃO DE MATERIAIS, ELEMENTO E SEÇÕES PARA AS BARRAS
+
+! LONGARINAS, BANZO_INF, BANZO_SUP
+mp,ex,11,ex_banz       ! Define o módulo de elasticidade
+mp,prxy,11,prxy_banz   ! Define o coeficiente de Poisson
+mp,dens,11,dens_banz   ! Define a densidade do material
+
+! DIAGONAIS, MONTANTES, TRANSV_INF, TRANSV_SUP
+mp,ex,12,ex_diag       ! Define o módulo de elasticidade
+mp,prxy,12,prxy_diag   ! Define o coeficiente de Poisson
+mp,dens,12,dens_diag   ! Define a densidade do material
+
+! CONT_INF, CONT_SUP, CONT_LONG, REFORCOS
+mp,ex,13,ex_contrav       ! Define o módulo de elasticidade
+mp,prxy,13,prxy_contrav   ! Define o coeficiente de Poisson
+mp,dens,13,dens_contrav   ! Define a densidade do material
+
+
+ET,1,BEAM188
+ET,4,LINK180
+
+SECTYPE,   1, BEAM, I, VL, 0
+SECOFFSET, CENT
+SECDATA,0.29,.29,.845,.0225,.0225,.01448,0,0,0,0,0,0
+SECTYPE,   2, BEAM, I, VT, 0
+SECOFFSET, CENT
+SECDATA,.3048,.3048,.941,.0259,.0259,.01612,0,0,0,0,0,0
+SECTYPE,   3, BEAM, I, M, 0
+SECOFFSET, CENT
+SECDATA,.205,.205,.31,.018,.018,.01,0,0,0,0,0,0
+SECTYPE,   4, BEAM, I, D2-D5, 0
+SECOFFSET, CENT
+SECDATA,0.255,.255,.305,.0193,.0193,.0131,0,0,0,0,0,0
+SECTYPE,   5, BEAM, I, BI, 0
+SECOFFSET, CENT
+SECDATA,0.31,.31,.315,.0163,.0163,.0127,0,0,0,0,0,0
+SECTYPE,   6, BEAM, I, VTS, 0
+SECOFFSET, CENT
+SECDATA,0.205,.205,.35,.015,.015,.01,0,0,0,0,0,0
+
+!! ALTERAÇÃO R04: linhas contínuas no contraventamento, com elemento LINK180
+SECTYPE,101,LINK, ,CBI
+SECDATA,0.003585,
+SECCONTROL,0,1 !só tração: SECCONTROL,0,1
+!SECTYPE,   101, BEAM, L, CBI, 0
+!SECOFFSET, CENT
+!SECDATA,.152,.102,.015,.015,0,0,0,0,0,0,0,0
+SECTYPE,   102, BEAM, L, CL, 0
+SECOFFSET, CENT
+SECDATA,.101,.101,.0095,.0095,0,0,0,0,0,0,0,0
+
+SECTYPE,   201, BEAM, I, D-, 0
+SECOFFSET, CENT
+SECDATA,0.205,.205,.35,.015,.015,.01,0,0,0,0,0,0
+SECTYPE,   202, BEAM, I, BS, 0
+SECOFFSET, CENT
+SECDATA,0.205,.205,.35,.015,.015,.01,0,0,0,0,0,0
+SECTYPE,   203, BEAM, CHAN, CTD, 0
+SECOFFSET, CENT
+SECDATA,0.127,.127,.31,.01,.01,.01,0,0,0,0,0,0
+
+
+! ATRIBUIR PROPRIEDADES
+
+K,1000,0,1000,0 !KEYPOINT DE ORIENTAÇÃO PARA PERFIS VERTICAIS
+K,2000,0,0,1000 !KEYPOINT DE ORIENTAÇÃO PARA PERFIS HORIZONTAIS
+
+CMSEL,S,LONGARINAS
+LATT,11, ,1, ,    1000, ,1
+
+CMSEL,S,TRANSV_INF
+LATT,12, ,1, ,    1000, ,2
+
+CMSEL,S,MONTANTES
+LATT,12, ,1, ,    2000, ,3
+
+! selecionar apenas D2 e D5 para aplicar seção 4
+CMSEL,S,DIAGONAIS
+*DO,I,1,2,1
+    KSEL,S,LOC,Y,7.8/2
+    KSEL,R,LOC,X,L_TRELICA/6*(1/2+2*(I-1))
+    KSEL,A,LOC,X,L_TRELICA-(L_TRELICA/6*(1/2+2*(I-1)))
+    LSLK,U
+*ENDDO
+LATT,12, ,1, ,    1000, ,4
+
+CMSEL,S,DIAGONAIS
+LATT,12, ,1, ,    1000, ,201
+
+CMSEL,S,BANZO_INF
+LATT,11, ,1, ,    2000, ,5
+
+CMSEL,S,BANZO_SUP
+LATT,11, ,1, ,    1000, ,202
+
+CMSEL,S,TRANSV_SUP
+LATT,12, ,1, ,    1000, ,6
+
+CMSEL,S,CONT_INF
+LATT,13, ,4, ,    1000, ,101 !!alteração para elemento 4 (LINK180)
+
+CMSEL,S,CONT_SUP
+LATT,13, ,4, ,    1000, ,101 !!alteração para elemento 4 (LINK180)
+
+CMSEL,S,CONT_LONG
+LATT,13, ,1, ,    1000, ,102
+
+CMSEL,S,REFORCOS
+LATT,13, ,1, ,    2000, ,203
+
+
+! MESH
+ALLSEL
+LESIZE,ALL,0.4, , , ,1, , ,1, ! malha geral
+
+CMSEL,S,CONT_INF
+CMSEL,A,CONT_SUP
+LESIZE,ALL, , ,1, ,1, , ,1, ! malha LINK180 (contraventamentos): 1 elemento
+
+ALLSEL
+lmesh,all
+
+
+! APOIOS
+
+! condições de contorno
+*DO,I,1,2
+    NSEL,S,LOC,Z,0
+    NSEL,A,LOC,Z,L_Z
+    NSEL,R,LOC,X,L_TRELICA*(I-1)
+    NSEL,R,LOC,Y,0
+    d,all,ux
+    d,all,uz
+*ENDDO
+allsel
+
+! nós auxiliares
+n,,,-1
+n,,L_TRELICA,-1
+n,,,-1,L_Z
+n,,L_TRELICA,-1,L_Z
+
+! elemento
+ET,2,14
+keyopt,2,2,2
+keyopt,2,3,0
+
+! constantes reais
+r,1,
+r,2,k1
+r,3,k2
+r,4,k3
+r,5,k4
+
+! Criação dos elementos de rigidez
+type,2
+real,2
+e,node(0,-1,0),node(0,0,0)
+
+type,2
+real,3
+e,node(L_TRELICA,-1,0),node(L_TRELICA,0,0)
+
+type,2
+real,4
+e,node(0,-1,L_Z),node(0,0,L_Z)
+
+type,2
+real,5
+e,node(L_TRELICA,-1,L_Z),node(L_TRELICA,0,L_Z)
+
+! travamento dos elementos de apoio
+nsel,s,loc,y,-1
+d,all,all
+
+ALLSEL
+
+!/ESHAPE,1.0
+!EPLOT
+
+
+! MASSA ADICIONAL
+
+! elemento
+ET,3,MASS21
+KEYOPT,3,1,0
+KEYOPT,3,2,0
+KEYOPT,3,3,2
+
+! seleção dos nós
+CMSEL,S,BANZO_INF
+CMSEL,A,TRANSV_INF
+CMSEL,A,LONGARINAS
+NSLL,S
+NSEL,R,EXT  ! garante que apenas os nós no eixo do elemento são selecionados, ignorando nós de orientação (conferir com João)
+
+!NSEL,S,LOC,Y,0
+!CMSEL,S,CONT_INF
+!ESLL,S
+!NSLE,U
+!CMSEL,S,CONT_LONG
+!ESLL,S
+!NSLE,U
+
+*GET,NUMNODES,NODE,,COUNT
+*GET,MINNODE,NODE,,NUM,MIN
+
+MASSA_TOTAL = MASSA_ADD*L_TRELICA*L_Z
+MASSA_NO = MASSA_TOTAL / NUMNODES
+
+r,6,MASSA_NO
+
+type,3
+real,6
+*DO,I,1,NUMNODES,1
+    E,MINNODE
+    MINNODE = NDNEXT (MINNODE)
+*ENDDO

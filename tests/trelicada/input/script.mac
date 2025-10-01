@@ -1,0 +1,127 @@
+resume,ModBase,db
+/prep7
+
+! VARIÁVEIS
+
+! LONGARINAS, BANZO_INF, BANZO_SUP
+ex_banz = %modulo_banz%     ! módulo de elasticidade (Pa)
+!prxy_banz = %poisson_banz%      ! poisson
+!dens_banz = %dens_banz%     ! densidade (kg/m³)
+
+! DIAGONAIS, MONTANTES, TRANSV_INF, TRANSV_SUP
+ex_diag = %modulo_diag%     ! módulo de elasticidade (Pa)
+!prxy_diag = %poisson_diag%      ! poisson
+!dens_diag = %dens_diag%     ! densidade (kg/m³)
+
+! CONT_INF, CONT_SUP, CONT_LONG, REFORCOS
+ex_contrav = %modulo_contrav%     ! módulo de elasticidade (Pa)
+!prxy_contrav = %poisson_contrav%      ! poisson
+!dens_contrav = %dens_contrav%     ! densidade (kg/m³)
+
+! rigidez dos apoios
+k1=%rigidez1%
+k2=%rigidez2%
+k3=%rigidez3%
+k4=%rigidez4%
+
+! massa adicional
+MASSA_ADD = %massa% ! kg/m²
+MASSA_TOTAL = MASSA_ADD*L_TRELICA*L_Z
+MASSA_NO = MASSA_TOTAL / NUMNODES
+
+
+! MATERIAIS
+
+! LONGARINAS, BANZO_INF, BANZO_SUP
+mp,ex,11,ex_banz       ! Define o módulo de elasticidade
+mp,prxy,11,prxy_banz   ! Define o coeficiente de Poisson
+mp,dens,11,dens_banz   ! Define a densidade do material
+
+! DIAGONAIS, MONTANTES, TRANSV_INF, TRANSV_SUP
+mp,ex,12,ex_diag       ! Define o módulo de elasticidade
+mp,prxy,12,prxy_diag   ! Define o coeficiente de Poisson
+mp,dens,12,dens_diag   ! Define a densidade do material
+
+! CONT_INF, CONT_SUP, CONT_LONG, REFORCOS
+mp,ex,13,ex_contrav       ! Define o módulo de elasticidade
+mp,prxy,13,prxy_contrav   ! Define o coeficiente de Poisson
+mp,dens,13,dens_contrav   ! Define a densidade do material
+
+! constantes reais
+r,1,
+r,2,k1
+r,3,k2
+r,4,k3
+r,5,k4
+r,6,MASSA_NO
+
+
+! SOLUÇÃO
+
+ALLSEL
+/solu
+antype,modal
+modopt,lanb,NUMFREQ
+solve
+
+! EXPORTAÇÃO DOS RESULTADOS
+/post1
+
+NUMPONTOS = 16
+NUMFREQ = 16
+
+! definição dos pontos
+*dim, Nos, array, NUMPONTOS
+
+*do, g, 1, 7    ! NÓS INFERIORES (Z=0)
+    x_pos = L_TRELICA/6*(g-1)
+    Nos(g) = node(x_pos, 0, 0)
+*enddo
+
+*do, g, 1, 7    ! NÓS INFERIORS (Z=L_Z)
+    x_pos = L_TRELICA/6*(g-1)
+    Nos(7+g) = node(x_pos, 0, L_Z)  ! (x, y=0, z=L_Z)
+*enddo
+
+Nos(15) = node(L_TRELICA/2, 7.8, 0)     ! NÓ CENTRAL SUPERIOR
+Nos(16) = node(L_TRELICA/2, 7.8, L_Z)
+
+! FREQUÊNCIAS E DESLOCAMENTOS
+*dim, Freq, array, NUMFREQ
+*dim, ModosX, array, NUMPONTOS, NUMFREQ  ! Matriz para deslocamentos X
+*dim, ModosY, array, NUMPONTOS, NUMFREQ  ! Matriz para deslocamentos Y
+*dim, ModosZ, array, NUMPONTOS, NUMFREQ  ! Matriz para deslocamentos Z
+
+*do, i, 1, NUMFREQ
+    set,,i
+    *get, Freq(i), ACTIVE, 0, SET, FREQ  ! Armazena frequência
+
+    *do, j, 1, NUMPONTOS
+        ModosX(j,i) = ux(Nos(j))        ! Deslocamento em X
+        ModosY(j,i) = uy(Nos(j))        ! Deslocamento em Y
+        ModosZ(j,i) = uz(Nos(j))        ! Deslocamento em Z
+    *enddo
+*enddo
+
+
+! GERAR ARQUIVOS
+
+*CREATE, scratch, gui
+
+*cfopen, out_freq, txt
+*VWRITE, Freq(1)
+(f12.5)
+*cfclose
+
+*MWRITE,ModosX,out_modos_x,txt
+(f8.5)
+*MWRITE,ModosY,out_modos_y,txt
+(f8.5)
+*MWRITE,ModosZ,out_modos_z,txt
+(f8.5)
+
+*END
+/INPUT, scratch, gui
+
+
+
