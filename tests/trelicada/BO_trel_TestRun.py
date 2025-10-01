@@ -41,7 +41,7 @@ def BO_run(parameters, irun, tuning):
         peso_mac  = 1
         fitness = peso_freq * freq_error_sum + peso_mac * mac_error_sum
 
-        return fitness, {"Freq.": paired_comp_freq, "Mode": paired_comp_modes}
+        return fitness, {"freq error": freq_error_sum, "mac error": mac_error_sum, "Freq.": paired_comp_freq, "Mode": paired_comp_modes}
 
     # default: já calcula init_points = max(8, ceil(3 * n_dims))
     cfg = BOConfig()

@@ -44,7 +44,7 @@ def GA_run(parameters, irun):
         peso_mac = 1
         fitness = peso_freq * freq_error_sum + peso_mac * mac_error_sum
 
-        return fitness, {"Freq.": paired_comp_freq, "Mode": paired_comp_modes}
+        return fitness, {"freq error": freq_error_sum, "mac error": mac_error_sum, "Freq.": paired_comp_freq, "Mode": paired_comp_modes}
 
     # parâmetros do algoritmo:
     elitism_rate = 0.10 # proporção dos melhores da população que serão preservados

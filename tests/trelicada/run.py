@@ -18,22 +18,22 @@ def run_PSO(parameters, irun):
 if __name__ == '__main__':
 
     parameters = [
-        Continuous(150e9, 250e9, 'modulo_banz'),
+        Continuous(180e9, 220e9, 'modulo_banz'),
         # Continuous(0.1, 0.49, 'poisson_banz'),
         # Continuous(7500, 8200, 'dens_banz'),
 
-        Continuous(150e9, 250e9, 'modulo_diag'),
+        Continuous(180e9, 220e9, 'modulo_diag'),
         # Continuous(0.1, 0.49, 'poisson_diag'),
         # Continuous(7500, 8200, 'dens_diag'),
 
-        Continuous(150e9, 250e9, 'modulo_contrav'),
+        Continuous(180e9, 220e9, 'modulo_contrav'),
         # Continuous(0.1, 0.49, 'poisson_contrav'),
         # Continuous(7500, 8200, 'dens_contrav'),
 
-        Continuous(1e5, 1e7, 'rigidez1'),
-        Continuous(1e5, 1e7, 'rigidez2'),
-        Continuous(1e5, 1e7, 'rigidez3'),
-        Continuous(1e5, 1e7, 'rigidez4'),
+        Continuous(40e5, 100e6, 'rigidez1'),
+        Continuous(40e5, 100e6, 'rigidez2'),
+        Continuous(40e5, 100e6, 'rigidez3'),
+        Continuous(40e5, 100e6, 'rigidez4'),
 
         Continuous(400, 800, 'massa')
     ]
@@ -46,14 +46,14 @@ if __name__ == '__main__':
         p.start()
         p.join()
 
-        p = Process(target=run_PSO, args=(parameters, irun))
-        p.start()
-        p.join()
-
         p = Process(target=run_BO, args=(parameters, irun, True))
         p.start()
         p.join()
 
         p = Process(target=run_BO, args=(parameters, irun, False))
+        p.start()
+        p.join()
+
+        p = Process(target=run_PSO, args=(parameters, irun))
         p.start()
         p.join()
