@@ -50,10 +50,10 @@ if __name__ == '__main__':
         p.start()
         p.join()
 
-        p = Process(target=run_BO, args=(parameters, irun, False))
+        p = Process(target=run_BO, args=(parameters, irun, True))
         p.start()
         p.join()
 
-        p = Process(target=run_BO, args=(parameters, irun, True))
+        p = Process(target=run_BO, args=(parameters, irun, False))
         p.start()
         p.join()

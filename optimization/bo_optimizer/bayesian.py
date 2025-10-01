@@ -577,6 +577,9 @@ class BO(Optimizer):
         # Iterações BO
         for it in range(1, int(iterations) + 1):
 
+            if self.config.acq_hyper_tuning and it == int(0.10*iterations):
+                self.config.n_restarts_optimizer = 1
+
             # atualiza GP e propõe batch
             new_pop = self.update()
             # avalia batch
