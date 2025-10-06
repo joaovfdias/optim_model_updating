@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment # usado para pareamento
 
+from typing import Tuple, Optional
+
 class SpecialFun:
     @staticmethod
     def modal_assurance_criterion(mode1, mode2):
@@ -27,12 +29,27 @@ class SpecialFun:
 
     @staticmethod
     def mac_matrix(base_modes, comp_modes):
+        """
+        Calcula a matriz MAC entre mode-sets. Número de modos de referência (Nb) pode ser diferente dos modos numéricos (Nc), desde que possuam o mesmo grau de liberdade (Ndof).
+        base_modes: shape (Nb, Ndof)
+        comp_modes: shape (Nc, Ndof)
+        Retorna mac: shape (Nb, Nc)
+        """
+        base_modes = np.asarray(base_modes, dtype=float)
+        comp_modes = np.asarray(comp_modes, dtype=float)
+
+        # verificações
+        if base_modes.ndim != 2 or comp_modes.ndim != 2:
+            raise ValueError("base_modes e comp_modes devem ser arrays 2D (modos x dofs).")
+        if base_modes.shape[1] != comp_modes.shape[1]:
+            raise ValueError(f"Incompatibilidade de DOFs: base={base_modes.shape[1]} "
+                             f"!= comp={comp_modes.shape[1]}")
+
         numerador = np.abs(base_modes @ comp_modes.T)**2 # [modos, modos]
         norma_base = np.sum(base_modes**2, axis=1, keepdims=True) # [modos, 1]
         norma_comp = np.sum(comp_modes**2, axis=1, keepdims=True).T # [1, modos]
         denominador = norma_base @ norma_comp
-        # if np.any(np.isclose(denominador, 0)):
-        #     raise RuntimeError('Denominator cannot be zero — invalid or ill-conditioned vibration mode detected.')
+
         return numerador / denominador
 
     @staticmethod
