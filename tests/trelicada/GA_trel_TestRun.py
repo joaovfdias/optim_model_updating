@@ -6,7 +6,7 @@ from external.special_functions import SpecialFun
 import os
 
 
-def GA_run(parameters, irun):
+def GA_run(parameters, irun, input_dir, log_dir):
 
     keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
 
@@ -14,14 +14,14 @@ def GA_run(parameters, irun):
 
     ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
     ansys_working_dir = None
-    input_dir = os.path.join(os.getcwd(), 'input')
+    # input_dir = input_dir
     base_script_filename = "script.mac"
     base_freq_filename = "out_freq.txt"
-    base_modes_filename = ["out_modos_x.txt", "out_modos_y.txt", "out_modos_z.txt"]
+    base_modes_filename = "out_modos_y.txt"
     output_dir = os.path.join(os.getcwd(), 'output')
 
     out_freq_filename = "out_freq.txt"
-    out_modes_filename = ["out_modos_x.txt", "out_modos_y.txt", "out_modos_z.txt"]
+    out_modes_filename = "out_modos_y.txt"
 
     ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename, base_freq_filename,
                   base_modes_filename, output_dir)
@@ -62,7 +62,7 @@ def GA_run(parameters, irun):
     # ajuste do registro:
     log = "full" # tipo de registro (True: simplificado - melhor de cada iteração, "full": todos os indivíduos)
     log_title = f"GA_trel_{irun}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
-    log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
+    # log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
     rodada.set_log(log_title, log_dir)
 
     # caso queira retomar a rodada de algum log cvs:

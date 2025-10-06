@@ -6,16 +6,19 @@ from optimization.parameter import *
 from multiprocessing import Process
 
 
-def run_BO(parameters, irun, tuning):
-    BO_run(parameters, irun, tuning)
+def run_BO(parameters, irun, input_dir, log_dir, tuning):
+    BO_run(parameters, irun, input_dir, log_dir, tuning)
 
-def run_GA(parameters, irun):
-    GA_run(parameters, irun)
+def run_GA(parameters, irun, input_dir, log_dir):
+    GA_run(parameters, irun, input_dir, log_dir)
 
-def run_PSO(parameters, irun):
-    PSO_run(parameters, irun)
+def run_PSO(parameters, irun, input_dir, log_dir):
+    PSO_run(parameters, irun, input_dir, log_dir)
 
 if __name__ == '__main__':
+
+    input_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 2\input"
+    log_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 2\log"
 
     parameters = [
         Continuous(180e9, 220e9, 'modulo_banz'),
@@ -42,18 +45,18 @@ if __name__ == '__main__':
 
     for irun in range(1, num_runs+1):
 
-        p = Process(target=run_GA, args=(parameters, irun))
+        p = Process(target=run_GA, args=(parameters, irun, input_dir, log_dir))
         p.start()
         p.join()
 
-        p = Process(target=run_BO, args=(parameters, irun, True))
+        p = Process(target=run_BO, args=(parameters, irun, input_dir, log_dir, True))
         p.start()
         p.join()
 
-        p = Process(target=run_BO, args=(parameters, irun, False))
+        p = Process(target=run_BO, args=(parameters, irun, input_dir, log_dir, False))
         p.start()
         p.join()
 
-        p = Process(target=run_PSO, args=(parameters, irun))
+        p = Process(target=run_PSO, args=(parameters, irun, input_dir, log_dir))
         p.start()
         p.join()

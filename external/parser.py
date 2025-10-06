@@ -47,7 +47,7 @@ class Ansys:
         self.index = 0 # usado para numerar os script executáveis
 
         self.base_freq = self.read_frequencies(os.path.join(self.input_dir, base_freq_filename or 'out_base_freq.txt')) # melhorar, dar opção de pegar o caminho
-        self.num_modes = len(self.base_freq) # define o número de modos com base no número de frequências para ajusta a matriz de dados
+        self.num_base_modes = len(self.base_freq) # define o número de modos com base no número de frequências para ajusta a matriz de dados
         if base_modes_filename is None:
             # default: um arquivo só
             path = os.path.join(self.input_dir, 'out_base_modes.txt')
@@ -142,6 +142,9 @@ class Ansys:
         """
         file = path or os.path.join(self.ansys_working_dir, self.out_freq_filename)
         frequencies = np.loadtxt(file)
+
+        self.num_modes = frequencies.shape[0]
+
         return frequencies
 
     def read_modes(self, path: Union[str, List[str]] = None):
