@@ -32,14 +32,14 @@ keys = [p.key for p in parameters]
 
 ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 ansys_working_dir = None
-input_dir = os.path.join(os.getcwd(), 'input')
+input_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 2\input"
 base_script_filename = "script.mac"
-base_freq_filename   = "out_freq.txt"
-base_modes_filename  = ["out_modos_x.txt", "out_modos_y.txt", "out_modos_z.txt"]
+base_freq_filename = "out_freq.txt"
+base_modes_filename = "out_modos_y.txt"
 output_dir = os.path.join(os.getcwd(), 'output')
 
-out_freq_filename  = "out_freq.txt"
-out_modes_filename = ["out_modos_x.txt", "out_modos_y.txt", "out_modos_z.txt"]
+out_freq_filename = "out_freq.txt"
+out_modes_filename = "out_modos_y.txt"
 
 ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename, base_freq_filename, base_modes_filename, output_dir)
 ansys.set_output_filenames(out_freq_filename, out_modes_filename)

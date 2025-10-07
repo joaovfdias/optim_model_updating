@@ -1,16 +1,18 @@
+# sensitivity.py  (revisto)
 from __future__ import annotations
 
 import math
 import re
+import os
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from scipy.stats import spearmanr
-import os
-from datetime import datetime
 
 
 # ParamSpec + Amostragem (DoE)
@@ -52,26 +54,26 @@ class Sampler:
         return pd.DataFrame(cols)
 
 
+# ---------------------------
 # Detecção de métricas do LOG
+# ---------------------------
 
 _SERVICE_COLS = {"Iteration", "Individual", "Fitness", "Global Best", "Time (s)"}
 
 def _is_service_col(c: str) -> bool:
-    return c in _SERVICE_COLS or c.startswith("pso.v")  # velocidades no PSO
+    return c in _SERVICE_COLS or c.startswith("pso.v")  # velocidade PSO exemplo
 
 
 def _default_metric_detector(c: str) -> bool:
     """
-    Compatível com cabeçalhos gerados pelo teu Optimizer:
-    - vetores: "freq #1", "MAC #1", etc.
-    - permite variações "freq_1", "MAC_1", "metric_*"
+    Heurística para detectar colunas de métricas (freq, MAC, metric_* ou 'nome #n').
     """
     if _is_service_col(c):
         return False
     c0 = c.strip()
     return bool(
         re.match(r'^(freq|Freq|mac|MAC|metric_)\b', c0) or
-        re.search(r'\s#\d+$', c0)  # ex.: "freq #1", "MAC #2", "modos #3"
+        re.search(r'\s#\d+$', c0)  # ex.: "freq #1", "MAC #2"
     )
 
 
@@ -89,13 +91,16 @@ def compute_spearman_multi(
     drop_extra_cols: Iterable[str] = (),
 ) -> Tuple[pd.DataFrame, Optional[pd.Series]]:
     """
+    Calcula a matriz de Spearman (parâmetros x métricas) e, opcionalmente,
+    a correlação de cada parâmetro com o fitness geral.
+
     Retorna:
       - corr_df: DataFrame (index=parâmetros, columns=métricas) com ρ (com sinal)
-      - overall: Series  (index=parâmetros) com ρ vs fitness (se fitness_col fornecida)
+      - overall: Series  (index=parâmetros) com ρ vs fitness (se fitness_col fornecido)
     """
     df = df.copy()
 
-    # Param cols
+    # detecta colunas de parâmetros (se não passadas explicitamente)
     if param_cols is None:
         if param_keys_hint:
             param_cols = [c for c in param_keys_hint if c in df.columns]
@@ -103,13 +108,11 @@ def compute_spearman_multi(
             blacklist = set(drop_extra_cols) | _SERVICE_COLS
             if fitness_col:
                 blacklist.add(fitness_col)
-            # métricas detectadas automaticamente
             metrics_auto = [c for c in df.columns if is_metric_fn(c)]
             blacklist.update(metrics_auto)
-            # tudo que sobrar (numérico) vira candidato a parâmetro
             param_cols = [c for c in df.columns if c not in blacklist]
 
-    # Metric cols
+    # detecta colunas de métricas (se não passadas explicitamente)
     if metric_cols is None:
         metric_cols = [c for c in df.columns if is_metric_fn(c)]
         if not metric_cols:
@@ -121,7 +124,7 @@ def compute_spearman_multi(
     if miss_p or miss_m:
         raise ValueError(f"Colunas ausentes. params={miss_p}, metrics={miss_m}")
 
-    # Spearman por métrica
+    # calcula Spearman (ρ) para cada par (param, métrica)
     rows = []
     for p in param_cols:
         x = pd.to_numeric(df[p], errors="coerce")
@@ -137,7 +140,7 @@ def compute_spearman_multi(
         rows.append(pd.Series(row, name=p))
     corr_df = pd.DataFrame(rows)
 
-    # Spearman com fitness geral (opcional)
+    # correlação com fitness geral (opcional)
     overall = None
     if fitness_col and fitness_col in df.columns:
         f = pd.to_numeric(df[fitness_col], errors="coerce")
@@ -156,45 +159,146 @@ def compute_spearman_multi(
     return corr_df, overall
 
 
-def plot_heatmap_corr(corr_df: pd.DataFrame, title: str = "Spearman (parâmetros × métricas)", auto_save: bool = True):
+# Plot heatmap (ABS 0..1 e cmap azul->amarelo/laranja)
+
+def plot_heatmap_corr(
+    corr_df: pd.DataFrame,
+    title: str = "Spearman (parâmetros × métricas)",
+    auto_save: bool = True,
+    absolute: bool = False,
+    cmap: Optional[mcolors.Colormap] = None,
+    show_values: bool = False,
+    central_gray_range: Tuple[float, float] = (-0.10, 0.10),
+) -> Optional[str]:
+    """
+    Plota e (opcionalmente) salva o heatmap.
+
+    - absolute: se True, usa |ρ| como dados internos; se False, usa ρ com sinal.
+    - show_values: se False, não anota os valores dentro das células (apenas cor).
+    - central_gray_range: faixa central (min, max) que será desenhada em cinza (ex.: (-0.25,0.25)).
+      Valores dentro dessa faixa ficam 'apagados' visualmente; fora dela, gradiente.
+    - retorna o caminho do arquivo salvo (ou None).
+    """
     if corr_df.empty:
         raise ValueError("corr_df vazio")
+
+    # prepara dados
+    data_signed = corr_df.values.astype(float)
+    data = np.abs(data_signed) if absolute else data_signed
+
+    vmin, vmax = -1.0, 1.0  # sempre mostramos escala -1..1 no colorbar (conforme pedido)
+
+    # clamp data to [-1,1] to avoid color issues
+    data = np.clip(data, -1.0, 1.0)
+
+    # central gray
+    gmin, gmax = central_gray_range
+    if not (-1.0 <= gmin < gmax <= 1.0):
+        raise ValueError("central_gray_range deve estar em [-1,1] e gmin < gmax")
+
+    # construir colormap que respeite exatamente a faixa cinza central
+    # mapeamos posições normalizadas [0..1] correspondendo a [-1..1]
+    def pos(v: float) -> float:
+        return (v - vmin) / (vmax - vmin)
+
+    p0 = pos(-1.0)
+    p_gmin = pos(gmin)
+    p_gmax = pos(gmax)
+    p1 = pos(1.0)
+
+    # cores: azul escuro (neg extremo) -> azul claro (próximo ao centro negativo) -> gray (faixa central)
+    #        then gray -> amarelo -> vermelho escuro
+    colors_positions = [
+        (p0, "#08306b"),            # dark blue (neg extreme)
+        (max(p0, min(p_gmin, p_gmax) - 1e-6), "#67a9cf"),  # lighter blue just before gray (ensures grad)
+        (p_gmin, "#d3d3d3"),        # start gray
+        (p_gmax, "#d3d3d3"),        # end gray (flat)
+        (min(p_gmax + 1e-6, p1), "#ffff00"),  # light yellow just after gray
+        (p1, "#b30000"),            # dark red (pos extreme)
+    ]
+
+    # Build lists for from_list
+    cmap_positions = [pos for pos, _ in colors_positions]
+    cmap_colors = [col for _, col in colors_positions]
+    cmap = mcolors.LinearSegmentedColormap.from_list("custom_div_with_gray", list(zip(cmap_positions, cmap_colors)), N=256)
+
+    # mask NaNs
+    ma = np.ma.array(data, mask=np.isnan(data))
+    cmap.set_bad(color="#f0f0f0")  # light gray for NaNs
+
+    # figura
     fig_w = max(6, 0.7 * corr_df.shape[1])
     fig_h = max(4, 0.45 * corr_df.shape[0])
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
-    im = ax.imshow(corr_df.values, aspect="auto", vmin=-1.0, vmax=1.0)
+
+    im = ax.imshow(ma, aspect="auto", vmin=vmin, vmax=vmax, cmap=cmap)
+
     ax.set_xticks(range(corr_df.shape[1]))
     ax.set_xticklabels(corr_df.columns, rotation=45, ha="right")
     ax.set_yticks(range(corr_df.shape[0]))
     ax.set_yticklabels(corr_df.index)
-    cbar = fig.colorbar(im, ax=ax)
+
+    # colorbar com maior espaçamento (pad) e ticks -1..1
+    cbar = fig.colorbar(im, ax=ax, pad=0.12)
     cbar.set_label("ρ (Spearman)")
+    cbar.set_ticks([-1.0, -0.5, 0.0, 0.5, 1.0])
+    cbar.ax.tick_params(pad=6)  # aumenta o espaçamento dos ticks do colorbar
+
     ax.set_title(title)
     ax.set_xlabel("Métricas")
     ax.set_ylabel("Parâmetros")
-    # anota valores se não for gigante
-    if corr_df.shape[0] * corr_df.shape[1] <= 200:
+
+    # valores nas células (opcional)
+    n_cells = corr_df.shape[0] * corr_df.shape[1]
+    if show_values and n_cells <= 200:
         for i in range(corr_df.shape[0]):
             for j in range(corr_df.shape[1]):
                 v = corr_df.iat[i, j]
                 if not (isinstance(v, float) and math.isnan(v)):
-                    ax.text(j, i, f"{v:+.2f}", ha="center", va="center", fontsize=8)
+                    if absolute:
+                        txt = f"{abs(v):.2f}"
+                    else:
+                        # destacamos valores dentro da faixa central com formatação mais 'apagada'
+                        if gmin <= v <= gmax:
+                            txt = f"{v:+.2f}"
+                        else:
+                            txt = f"{v:+.2f}"
+                    ax.text(j, i, txt, ha="center", va="center", fontsize=8, color="black")
+
+    # --- desenhar grade entre células (opção A: minor ticks + grid) ---
+    show_cell_border = True         # toggle: True para bordas, False para sem
+    cell_edge_color = "white"       # cor das linhas da grade
+    cell_linewidth = 0.6            # espessura da linha
+
+    if show_cell_border:
+        nrows, ncols = corr_df.shape
+        # minor ticks em meio às células
+        ax.set_xticks(np.arange(-0.5, ncols, 1), minor=True)
+        ax.set_yticks(np.arange(-0.5, nrows, 1), minor=True)
+        ax.grid(which="minor", color=cell_edge_color, linestyle="-", linewidth=cell_linewidth)
+        # não mostrar as linhas de grade maiores (major ticks)
+        ax.tick_params(which="minor", length=0)
+
     plt.tight_layout()
 
+    saved_path = None
     if auto_save:
         out_dir = os.path.join(os.getcwd(), "plot")
         os.makedirs(out_dir, exist_ok=True)
-
-        # gera nome do arquivo com timestamp
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         fname = f"heatmap_sensitivity_{ts}.png"
         fpath = os.path.join(out_dir, fname)
-
-        plt.savefig(fpath, dpi=300)
+        plt.savefig(fpath, dpi=300, bbox_inches="tight")
+        saved_path = fpath
         print(f"[OK] Heatmap salvo em {fpath}")
 
     plt.show()
+    return saved_path
 
+
+# ---------------------------
+# Recomendação / ranking
+# ---------------------------
 
 def recommend_cut(
     corr_df: pd.DataFrame,
@@ -203,6 +307,11 @@ def recommend_cut(
     tau: Optional[float] = None,
     topk: Optional[int] = None,
 ) -> Tuple[List[str], pd.DataFrame]:
+    """
+    Gera score por parâmetro (max(|ρ|) ou mean(|ρ|)) e retorna:
+      - keep: lista recomendada a manter
+      - ranking: DataFrame param -> score (decrescente)
+    """
     if corr_df.empty:
         return [], pd.DataFrame(columns=["score"])
     abs_df = corr_df.abs()
@@ -212,7 +321,7 @@ def recommend_cut(
     else:
         if tau is None:
             with np.errstate(invalid="ignore"):
-                tau = float(np.nanquantile(score.values, 0.7))  # heurística ~top 30%
+                tau = float(np.nanquantile(score.values, 0.3))
         keep = list(score[score >= float(tau)].index)
     ranking = pd.DataFrame({"score": score}).sort_values("score", ascending=False)
     return keep, ranking
@@ -225,7 +334,6 @@ class SensitivityAnalyzer:
         self.minimize = minimize
         self.is_metric_fn = is_metric_fn
 
-    # (1) Histórico / DoE já avaliados
     def from_history(
         self,
         df: pd.DataFrame,
@@ -245,7 +353,6 @@ class SensitivityAnalyzer:
             param_keys_hint=param_keys_hint,
         )
 
-    # (2) Gera DoE a partir do teu Optimizer.parameters
     def from_optimizer_doe(
         self,
         optimizer,
@@ -259,7 +366,6 @@ class SensitivityAnalyzer:
     ) -> Tuple[pd.DataFrame, Optional[pd.Series], pd.DataFrame]:
         specs: List[ParamSpec] = []
         for p in optimizer.parameters:
-            # compatível com .key, .lower_bound, .upper_bound do teu código
             name = p.key
             lb = float(p.lower_bound)
             ub = float(p.upper_bound)
@@ -284,14 +390,13 @@ class SensitivityAnalyzer:
         corr_df, overall = compute_spearman_multi(
             df_eval,
             param_cols=[s.name for s in specs],
-            metric_cols=metric_cols,  # se None, detecta automaticamente
+            metric_cols=metric_cols,
             fitness_col=fitness_col if fitness_col in df_eval.columns else None,
             minimize=self.minimize,
             is_metric_fn=self.is_metric_fn,
         )
         return corr_df, overall, df_eval
 
-    # (3) Workflow completo com prompt opcional
     def workflow(
         self,
         df: pd.DataFrame,
@@ -318,9 +423,10 @@ class SensitivityAnalyzer:
         print("\n=== Correlação por métrica (ρ de Spearman) ===")
         print(corr_df.round(3).to_string())
 
+        saved_path = None
         if show_plot:
             try:
-                plot_heatmap_corr(corr_df, title="Spearman por métrica (parâmetros × métricas)")
+                saved_path = plot_heatmap_corr(corr_df, title="Spearman por métrica (parâmetros × métricas)")
             except Exception as e:
                 print(f"[Aviso] Falha ao exibir heatmap: {e}")
 
@@ -339,6 +445,8 @@ class SensitivityAnalyzer:
             print(f"{i}. {p}")
         print("0. All")
         print(f"\nSugerido manter: {suggested}")
+        if saved_path:
+            print(f"[Info] Heatmap salvo em: {saved_path}")
 
         if not interactive:
             print("[Info] Modo não interativo: usando sugestão automática.")
