@@ -50,7 +50,13 @@ class SpecialFun:
         norma_comp = np.sum(comp_modes**2, axis=1, keepdims=True).T # [1, modos]
         denominador = norma_base @ norma_comp
 
-        return numerador / denominador
+        # evita divisão por zero
+        small = 1e-30
+        denominador[denominador < small] = small
+
+        mac = numerador / denominador
+
+        return mac
 
     @staticmethod
     def pair_modes_mac(comp_freq, comp_modes, base_modes): # matrizes de modos no formato [modos, nós]

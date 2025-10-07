@@ -70,3 +70,5 @@ def GA_run(parameters, irun, input_dir, log_dir):
 
     # chamada:
     best = rodada.run(generations, log=log)
+
+    ansys.mapdl.exit()

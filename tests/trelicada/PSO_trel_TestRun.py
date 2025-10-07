@@ -70,3 +70,5 @@ def PSO_run(parameters, irun, input_dir, log_dir):
 
     # chamada:
     best = rodada.run(iteracoes, log=log)
+
+    ansys.mapdl.exit()

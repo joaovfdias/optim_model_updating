@@ -17,8 +17,8 @@ def run_PSO(parameters, irun, input_dir, log_dir):
 
 if __name__ == '__main__':
 
-    input_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 2\input"
-    log_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 2\log"
+    input_dir = r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 2\input"
+    log_dir = r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 2\log"
 
     parameters = [
         Continuous(180e9, 220e9, 'modulo_banz'),
@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     for irun in range(1, num_runs+1):
 
-        p = Process(target=run_GA, args=(parameters, irun, input_dir, log_dir))
+        p = Process(target=run_PSO, args=(parameters, irun, input_dir, log_dir))
         p.start()
         p.join()
 
@@ -57,6 +57,6 @@ if __name__ == '__main__':
         p.start()
         p.join()
 
-        p = Process(target=run_PSO, args=(parameters, irun, input_dir, log_dir))
+        p = Process(target=run_GA, args=(parameters, irun, input_dir, log_dir))
         p.start()
         p.join()
