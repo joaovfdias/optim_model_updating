@@ -1,4 +1,5 @@
 from tests.trelicada.BO_trel_TestRun import BO_run
+from tests.trelicada.BO_skopt_trel_TestRun import BO_skopt_run
 from tests.trelicada.GA_trel_TestRun import GA_run
 from tests.trelicada.PSO_trel_TestRun import PSO_run
 from optimization.parameter import *
@@ -8,6 +9,9 @@ from multiprocessing import Process
 
 def run_BO(parameters, irun, input_dir, log_dir, tuning):
     BO_run(parameters, irun, input_dir, log_dir, tuning)
+
+def run_BO_skopt(parameters, irun, input_dir, log_dir):
+    BO_skopt_run(parameters, irun, input_dir, log_dir)
 
 def run_GA(parameters, irun, input_dir, log_dir):
     GA_run(parameters, irun, input_dir, log_dir)
@@ -41,22 +45,26 @@ if __name__ == '__main__':
         Continuous(400, 800, 'massa')
     ]
 
-    num_runs = 3
+    num_runs = 2
 
     for irun in range(1, num_runs+1):
 
-        p = Process(target=run_PSO, args=(parameters, irun, input_dir, log_dir))
-        p.start()
-        p.join()
+        # p = Process(target=run_PSO, args=(parameters, irun, input_dir, log_dir))
+        # p.start()
+        # p.join()
+        #
+        # p = Process(target=run_BO, args=(parameters, irun, input_dir, log_dir, True))
+        # p.start()
+        # p.join()
+        #
+        # p = Process(target=run_BO, args=(parameters, irun, input_dir, log_dir, False))
+        # p.start()
+        # p.join()
+        #
+        # p = Process(target=run_GA, args=(parameters, irun, input_dir, log_dir))
+        # p.start()
+        # p.join()
 
-        p = Process(target=run_BO, args=(parameters, irun, input_dir, log_dir, True))
-        p.start()
-        p.join()
-
-        p = Process(target=run_BO, args=(parameters, irun, input_dir, log_dir, False))
-        p.start()
-        p.join()
-
-        p = Process(target=run_GA, args=(parameters, irun, input_dir, log_dir))
+        p = Process(target=run_BO_skopt, args=(parameters, irun, input_dir, log_dir))
         p.start()
         p.join()
