@@ -45,7 +45,7 @@ if __name__ == '__main__':
         Continuous(400, 800, 'massa')
     ]
 
-    num_runs = 2
+    num_runs = 1
 
     for irun in range(1, num_runs+1):
 
@@ -53,9 +53,9 @@ if __name__ == '__main__':
         # p.start()
         # p.join()
         #
-        # p = Process(target=run_BO, args=(parameters, irun, input_dir, log_dir, True))
-        # p.start()
-        # p.join()
+        p = Process(target=run_BO, args=(parameters, irun, input_dir, log_dir, True))
+        p.start()
+        p.join()
         #
         # p = Process(target=run_BO, args=(parameters, irun, input_dir, log_dir, False))
         # p.start()
@@ -65,6 +65,6 @@ if __name__ == '__main__':
         # p.start()
         # p.join()
 
-        p = Process(target=run_BO_skopt, args=(parameters, irun, input_dir, log_dir))
-        p.start()
-        p.join()
+        # p = Process(target=run_BO_skopt, args=(parameters, irun, input_dir, log_dir))
+        # p.start()
+        # p.join()

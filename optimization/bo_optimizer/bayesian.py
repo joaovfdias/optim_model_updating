@@ -41,7 +41,7 @@ class BOConfig:
 
     # otimização da aquisição
     acq_optimizer: str = "lbfgs"  # "sampling" (tradicional) | "lbfgs"
-    acq_hyper_tuning = True
+    acq_hyper_tuning = 3 # quantidade de vezes em que os hiperparâmetros podem ser reduzidos em caso de estagnação (0 or None para desligar). use set_tolerance para definir os critérios para alteração.
     # lbfgs:
     acq_n_points: int = 10000        # pontos para pré-seleção
     acq_n_restarts: int = 5          # multi-starts
@@ -170,6 +170,7 @@ class BO(Optimizer):
 
         if self.config.acq_hyper_tuning:
             self.set_tolerance(fit_rel=1e-2, patience=10)
+        self.acq_hyper_tuning = self.config.acq_hyper_tuning
 
     # -----------------
     # Normalização (GP)
@@ -590,7 +591,10 @@ class BO(Optimizer):
                 ind.data = ind.data or {}
                 ind.data.update(diag)
 
-            if self.tolerance([self.best], new_pop): # critério de parada, determinado com a função set_tolerance
+            if self.acq_hyper_tuning and self.tolerance([self.best], [min(new_pop + [self.best], key=lambda p: p.fitness)]): # critério de parada, determinado com a função set_tolerance
+                self.tolerance_flag = [0] * len(self.tolerance_flag)
+                self.acq_hyper_tuning -= 1
+
                 self.config.xi = self.config.xi / 10
                 self.config.kappa = self.config.kappa * 0.60
                 print(f"Hyperparameter {'kappa' if self.config.acquisition.upper() == 'UCB' else 'xi'} reduced to {self.config.kappa if self.config.acquisition == 'UCB' else self.config.xi} due to fitness stagnation [set config.acq_hyper_tuning=False to keep hyperparameters fixed]")

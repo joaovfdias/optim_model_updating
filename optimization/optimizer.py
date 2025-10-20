@@ -418,7 +418,7 @@ class Optimizer:
                 self.tolerance_flag[0] += 1
                 if self.tolerance_flag[0] >= self.patience:
                     print(
-                        f"\nCritério de convergência atingido: fitness menor que {self.fitness_abs_tol} por {self.patience} iterações consecutivas. \nExecução interrompida.")
+                        f"\nCritério de convergência atingido: fitness menor que {self.fitness_abs_tol} por {self.patience} iterações consecutivas.")
                     return True
             else:
                 self.tolerance_flag[0] = 0
@@ -428,7 +428,7 @@ class Optimizer:
                 self.tolerance_flag[1] += 1
                 if self.tolerance_flag[1] >= self.patience:
                     print(
-                        f"\nCritério de convergência atingido: valores de fitness entre iterações apresentaram diferença menor que {self.fitness_rel_tol*100}% por {self.patience} vezes consecutivas. \nExecução interrompida.")
+                        f"\nCritério de convergência atingido: valores de fitness entre iterações apresentaram diferença menor que {self.fitness_rel_tol*100}% por {self.patience} vezes consecutivas.")
                     return True
             else:
                 self.tolerance_flag[1] = 0
@@ -438,7 +438,7 @@ class Optimizer:
                 self.tolerance_flag[2] += 1
                 if self.tolerance_flag[2] >= self.patience:
                     print(
-                        f"\nCritério de convergência atingido: valores de parâmetros entre iterações apresentaram diferença menor que {self.parameters_rel_tol*100}% do intervalo de busca por {self.patience} vezes consecutivas. \nExecução interrompida.")
+                        f"\nCritério de convergência atingido: valores de parâmetros entre iterações apresentaram diferença menor que {self.parameters_rel_tol*100}% do intervalo de busca por {self.patience} vezes consecutivas.")
                     return True
             else:
                 self.tolerance_flag[2] = 0
@@ -762,6 +762,7 @@ class PopulationBased(Optimizer):
                 print(f"{self.iter_label} {iteration + 1}: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
 
             if self.tolerance(self.populations[-2], self.populations[-1]): # critério de parada, determinado com a função set_tolerance
+                print("Execução interrompida.")
                 break
 
         fim = time.time()

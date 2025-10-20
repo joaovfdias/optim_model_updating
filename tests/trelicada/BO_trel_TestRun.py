@@ -46,7 +46,7 @@ def BO_run(parameters, irun, input_dir, log_dir, tuning):
     # default: já calcula init_points = max(8, ceil(3 * n_dims))
     cfg = BOConfig()
     cfg.acquisition = "POI"
-    cfg.acq_hyper_tuning = tuning
+    if tuning: cfg.acq_hyper_tuning = 3
 
     iterations = 400
 
