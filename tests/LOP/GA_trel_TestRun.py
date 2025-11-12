@@ -15,7 +15,7 @@ def GA_run(parameters, irun, input_dir, log_dir):
     ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
     ansys_working_dir = None
     # input_dir = input_dir
-    base_script_filename = "script.mac"
+    base_script_filename = "scriptLOP.mac"
     base_freq_filename = "out_freq.txt"
     base_modes_filename = "out_modos_y.txt"
     output_dir = os.path.join(os.getcwd(), 'output')
@@ -52,7 +52,7 @@ def GA_run(parameters, irun, input_dir, log_dir):
     mutation_strength = 0.10 # taxa máxima de mutação de cada gene daqueles indivíduos não originados de crossover
 
     population_size = len(keys)*10 # indivíduos avaliados por geração (recomendado ao menos 10x o número de variáveis)
-    generations = 30 # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
+    generations = 40 # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
 
     # declaração do otimizador:
     rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength) # objeto otimizador
