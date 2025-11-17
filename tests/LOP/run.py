@@ -23,11 +23,15 @@ if __name__ == '__main__':
 
     input_dir = [r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 1",
                  r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 2",
-                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 3"
+                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 3",
+                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 4",
+                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 5"
                  ]
     log_dir = [r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 1",
                r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 2",
-               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 3"
+               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 3",
+               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 4",
+               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 5"
                ]
 
     parameters = [
@@ -59,16 +63,44 @@ if __name__ == '__main__':
             Continuous(1e6,1e9,'GXY'),
             Continuous(1e6, 1e9, 'GYZ'),
             Continuous(1e6, 1e9, 'GXZ')
+        ],
+        [
+            Continuous(20e9, 35e9, 'modulo_concreto'),
+            Continuous(10e9, 20e9, 'modulo_madeira'),
+            Continuous(1e6, 1e9, 'GXY'),
+            Continuous(1e6, 1e9, 'GYZ'),
+            Continuous(1e6, 1e9, 'GXZ'),
+            Continuous(150e9, 250e9, 'modulo_aco_a36'),
+
+            Continuous(0.25, 0.6, 'h_concreto'),
+
+            Continuous(1e7, 1e9, 'kv'),
+            Continuous(1e7, 1e9, 'kh'),
+            Continuous(1e7, 1e9, 'kt')
+        ],
+        [
+            Continuous(20e9, 35e9, 'modulo_concreto'),
+            Continuous(10e9, 20e9, 'modulo_madeira'),
+            Continuous(1e6, 1e9, 'GXY'),
+            # Continuous(1e6, 1e9, 'GYZ'),
+            Continuous(1e6, 1e9, 'GXZ'),
+            # Continuous(150e9, 250e9, 'modulo_aco_a36'),
+
+            # Continuous(0.25, 0.6, 'h_concreto'),
+
+            Continuous(1e7, 1e9, 'kv'),
+            Continuous(1e7, 1e9, 'kh'),
+            Continuous(1e7, 1e9, 'kt')
         ]
     ]
 
-    num_runs = 1
-    ini_case = 3
-    cases = 3
+    num_runs = 4
+    # cases = [1,2,3,4]
+    cases = [5]
 
     for irun in range(1, num_runs+1):
 
-        for case in range(ini_case-1, cases):
+        for case in cases:
 
             p = Process(target=run_PSO, args=(parameters[case], f"case{case+1}_run{irun}", input_dir[case], log_dir[case]))
             p.start()
@@ -81,11 +113,11 @@ if __name__ == '__main__':
             # p = Process(target=run_BO, args=(parameters[case], f"case{case+1}_run{irun}", input_dir[case], log_dir[case], False))
             # p.start()
             # p.join()
-            #
-            # p = Process(target=run_GA, args=(parameters[case], f"case{case+1}_run{irun}", input_dir[case], log_dir[case]))
-            # p.start()
-            # p.join()
-            #
-            # p = Process(target=run_BO_skopt, args=(parameters[case], f"case{case+1}_run{irun}", input_dir[case], log_dir[case]))
-            # p.start()
-            # p.join()
+
+            p = Process(target=run_GA, args=(parameters[case], f"case{case+1}_run{irun}", input_dir[case], log_dir[case]))
+            p.start()
+            p.join()
+
+            p = Process(target=run_BO_skopt, args=(parameters[case], f"case{case+1}_run{irun}", input_dir[case], log_dir[case]))
+            p.start()
+            p.join()

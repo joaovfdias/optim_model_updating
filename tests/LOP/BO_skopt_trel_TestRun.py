@@ -47,8 +47,8 @@ def BO_skopt_run(parameters, irun, input_dir, log_dir):
     sampling_method = 'lhs'
     xi = 0.01
     kappa = xi
-    initial_points = 24
-    evaluations = 400
+    initial_points = 5*len(parameters)
+    evaluations = 50*len(parameters)
     acq_func = 'PI'
 
     rodada = BO(fitness_function, parameters, initial_points)
