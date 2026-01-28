@@ -17,9 +17,9 @@ from optimization.bo_optimizer.bayesian_from_skopt import BO
 
 
 # Caminhos
-ANSYS_EXE_PATH = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
+ANSYS_EXE_PATH = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 # Pasta FIXA onde o ModBase.db já deve estar (sem subpastas)
-BASE_DIR = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
+BASE_DIR = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
 
 ANSYS_WORKING_DIR = os.path.join(BASE_DIR, 'ANSYS')
 INPUT_DIR = os.path.join(BASE_DIR, 'input')
@@ -112,7 +112,7 @@ def worker_optimization(config, run_id, result_queue):
                 return 1e6, {}  # Penalidade por falha
 
         # D. Otimizador
-        log_dir = os.path.join(os.getcwd(), 'auto_meta_logs')
+        log_dir = os.path.join(r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros\meta-opt", 'BO_auto_meta_logs')
         if not os.path.exists(log_dir): os.makedirs(log_dir)
 
         optimizer = BO(fitness_function, parameters, N_INITIAL_POINTS)
@@ -140,15 +140,15 @@ def worker_optimization(config, run_id, result_queue):
         # F. Retorno
         result_queue.put({'fitness': result.fun, 'time': elapsed, 'success': True})
 
-        # Limpeza Final (Force Kill ANSYS para liberar .lock da pasta)
-        try:
-            ansys.mapdl.exit()
-        except:
-            pass
+        # # Limpeza Final (Force Kill ANSYS para liberar .lock da pasta)
+        # try:
+        #     ansys.mapdl.exit()
+        # except:
+        #     pass
 
     except Exception as e:
-        print(f"[ERRO WORKER] {e}")
-        result_queue.put({'fitness': 1e6, 'time': 0, 'success': False})
+        print(f"[ERRO WORKER: Run {run_id}] {e}")
+        result_queue.put({'fitness': None, 'time': 0, 'success': False})
 
 
 
@@ -271,19 +271,45 @@ if __name__ == '__main__':
                 fits = []
                 times = []
 
-                # Loop de Repetições Estatísticas
-                for i in range(1, N_REPETICOES + 1):
-                    print(f"    Run {i}/{N_REPETICOES} ... ", end="")
+                # parâmetros para repetição de tentativa falha
+                run_idx = 1
+                max_consecutive_fails = 5 # tentativas até dar pass
+                fails_count = 0
+
+                # Loop de Repetições Estatísticas -> alterado para While para comportar repetição de falhas
+                while run_idx <= N_REPETICOES:
+                    print(f"    Run {run_idx}/{N_REPETICOES} ... ", end="")
                     queue = Queue()
-                    # worker_optimization deve ser importado/definido antes
-                    p = Process(target=worker_optimization, args=(config, i, queue))
+                    # lançamento do processo
+                    p = Process(target=worker_optimization, args=(config, run_idx, queue))
                     p.start()
+                    # bloqueia no aguardo de resposta:
                     res = queue.get()
                     p.join()
 
-                    fits.append(res['fitness'])
-                    times.append(res['time'])
-                    print(f"{'OK' if res['success'] else 'FAIL'} (Fit: {res['fitness']:.2e})")
+                    if res['success']:
+                        # SUCESSO: Registra e avança
+                        fits.append(res['fitness'])
+                        times.append(res['time'])
+                        print(f"OK (Fit: {res['fitness']:.2e})")
+
+                        run_idx += 1  # Avança para a próxima rodada
+                        fails_count = 0  # Reseta contador de falhas
+                    else:
+                        # FALHA: Não avança run_idx, tenta novamente
+                        fails_count += 1
+                        print(f"FALHA (Tentativa {fails_count}/{max_consecutive_fails}). Tentando novamente...")
+
+                        time.sleep(1.5)  # Respiro para o Windows liberar arquivos .lock
+
+                        # Segurança: Se falhar 5x seguidas na MESMA rodada, aborta a config inteira
+                        if fails_count >= max_consecutive_fails:
+                            print(
+                                f"\n[ERRO CRÍTICO] Configuração {config['tag']} falhou {max_consecutive_fails}x seguidas. Abortando config.")
+                            # Preenche com penalidade para não quebrar o log e sai do while
+                            fits.append(1e6)
+                            times.append(0)
+                            break
 
                 # Consolida Dados
                 valid_fits = [f for f in fits if f < 1e5]
@@ -342,6 +368,8 @@ if __name__ == '__main__':
 
             # Salva parcial seguro
             pd.DataFrame(global_history).to_csv("meta_history_partial.csv", index=False)
+
+    Ansys.kill_ansys_process() # matar processo ao final das rodadas
 
     # --- Relatório Final Unificado ---
     df_final = pd.DataFrame(global_history)
