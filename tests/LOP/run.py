@@ -25,17 +25,21 @@ if __name__ == '__main__':
                  r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 2",
                  r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 3",
                  r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 4",
-                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 5"
+                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 5",
+                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 6",
+                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 7"
                  ]
     log_dir = [r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 1",
                r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 2",
                r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 3",
                r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 4",
-               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 5"
+               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 5",
+               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 6",
+               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 7"
                ]
 
     parameters = [
-        [
+        [ #1
         Continuous(20e9, 35e9, 'modulo_concreto'),
         Continuous(10e9, 20e9, 'modulo_madeira'),
         Continuous(150e9, 250e9, 'modulo_aco_a36'),
@@ -46,7 +50,7 @@ if __name__ == '__main__':
         Continuous(1e7, 1e9, 'kh'),
         Continuous(1e7, 1e9, 'kt')
         ],
-        [
+        [ #2
             # Continuous(20e9, 35e9, 'modulo_concreto'),
             # Continuous(10e9, 20e9, 'modulo_madeira'),
             # Continuous(150e9, 250e9, 'modulo_aco_a36'),
@@ -59,12 +63,12 @@ if __name__ == '__main__':
             Continuous(1e7, 1e9, 'kh'),
             Continuous(1e7, 1e9, 'kt')
         ],
-        [
+        [ #3
             Continuous(1e6,1e9,'GXY'),
             Continuous(1e6, 1e9, 'GYZ'),
             Continuous(1e6, 1e9, 'GXZ')
         ],
-        [
+        [ #4
             Continuous(20e9, 35e9, 'modulo_concreto'),
             Continuous(10e9, 20e9, 'modulo_madeira'),
             Continuous(1e6, 1e9, 'GXY'),
@@ -78,7 +82,7 @@ if __name__ == '__main__':
             Continuous(1e7, 1e9, 'kh'),
             Continuous(1e7, 1e9, 'kt')
         ],
-        [
+        [ #5
             Continuous(20e9, 35e9, 'modulo_concreto'),
             Continuous(10e9, 20e9, 'modulo_madeira'),
             Continuous(1e6, 1e9, 'GXY'),
@@ -91,33 +95,61 @@ if __name__ == '__main__':
             Continuous(1e7, 1e9, 'kv'),
             Continuous(1e7, 1e9, 'kh'),
             Continuous(1e7, 1e9, 'kt')
+        ],
+        [ #6
+            Continuous(20e9, 35e9, 'modulo_concreto'),
+            Continuous(10e9, 20e9, 'modulo_madeira'),
+            Continuous(1e6, 1e9, 'GXY'),
+            Continuous(1e6, 1e9, 'GYZ'),
+            Continuous(1e6, 1e9, 'GXZ'),
+            # Continuous(150e9, 250e9, 'modulo_aco_a36'),
+
+            # Continuous(0.25, 0.6, 'h_concreto'),
+
+            Continuous(1e7, 1e9, 'kv'),
+            Continuous(1e7, 1e9, 'kh'),
+            Continuous(1e7, 1e9, 'kt')
+        ],
+        [  #7
+            Continuous(20e9, 35e9, 'modulo_concreto'),
+            Continuous(10e9, 20e9, 'modulo_madeira'),
+            Continuous(1e6, 1e9, 'GXY'),
+            Continuous(1e6, 1e9, 'GYZ'),
+            Continuous(1e6, 1e9, 'GXZ'),
+            # Continuous(150e9, 250e9, 'modulo_aco_a36'),
+
+            # Continuous(0.25, 0.6, 'h_concreto'),
+
+            Continuous(5e7, 5e8, 'kv'),
+            Continuous(5e7, 5e8, 'kh'),
+            Continuous(5e7, 5e8, 'kt')
         ]
     ]
 
     num_runs = 4
     # cases = [1,2,3,4]
-    cases = [5]
+    cases = [7]
 
     for irun in range(1, num_runs+1):
 
-        for case in cases:
+        for i, case in enumerate(cases):
 
-            p = Process(target=run_PSO, args=(parameters[case], f"case{case+1}_run{irun}", input_dir[case], log_dir[case]))
+            p = Process(target=run_PSO, args=(parameters[case-1], f"case{case}_run{irun}", input_dir[case-1], log_dir[case-1]))
             p.start()
             p.join()
 
-            # p = Process(target=run_BO, args=(parameters[case], f"case{case+1}_run{irun}", input_dir[case], log_dir[case], True))
+            # p = Process(target=run_BO, args=(parameters[case-1], f"case{case}_run{irun}", input_dir[case-1], log_dir[case-1], True))
             # p.start()
             # p.join()
             #
-            # p = Process(target=run_BO, args=(parameters[case], f"case{case+1}_run{irun}", input_dir[case], log_dir[case], False))
+            # p = Process(target=run_BO, args=(parameters[case-1], f"case{case}_run{irun}", input_dir[case-1], log_dir[case-1], False))
             # p.start()
             # p.join()
 
-            p = Process(target=run_GA, args=(parameters[case], f"case{case+1}_run{irun}", input_dir[case], log_dir[case]))
+            p = Process(target=run_GA, args=(parameters[case-1], f"case{case}_run{irun}", input_dir[case-1], log_dir[case-1]))
             p.start()
             p.join()
 
-            p = Process(target=run_BO_skopt, args=(parameters[case], f"case{case+1}_run{irun}", input_dir[case], log_dir[case]))
+            p = Process(target=run_BO_skopt, args=(parameters[case-1], f"case{case}_run{irun}", input_dir[case-1], log_dir[case-1]))
             p.start()
             p.join()
