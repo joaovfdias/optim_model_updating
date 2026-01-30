@@ -21,13 +21,16 @@ parameters = [
 
 keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
 
-ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
-ansys_working_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros\ANSYS"
-input_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros\input"
+ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
+# caminhos
+base_dir = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
+ansys_working_dir = os.path.join(base_dir, 'ANSYS')
+input_dir = os.path.join(base_dir, 'input')
+output_dir = os.path.join(base_dir, 'output')
+
 base_script_filename = "script problema 2.mac"
 base_freq_filename = "target_freq.txt"
 base_modes_filename = "target_modes.txt"
-output_dir = os.path.join(r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros", 'output')
 
 out_freq_filename = "out_freq.txt"
 out_modes_filename = "out_modes.txt"

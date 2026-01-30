@@ -1,4 +1,3 @@
-from optimization.parameter import *
 from optimization.ga_optimizer import GA
 from external.parser import Ansys
 from external.special_functions import SpecialFun
@@ -6,22 +5,25 @@ from external.special_functions import SpecialFun
 import os
 
 
-def GA_run(parameters, irun, input_dir, log_dir):
+def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rate, crossover_rate, mutation_strength):
 
     keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
 
     keys = [p.key for p in parameters]
 
-    ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
-    ansys_working_dir = None
-    # input_dir = input_dir
-    base_script_filename = "script.mac"
-    base_freq_filename = "out_freq.txt"
-    base_modes_filename = "out_modos_y.txt"
-    output_dir = os.path.join(os.getcwd(), 'output')
+    ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
+    # caminhos
+    # base_dir = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
+    ansys_working_dir = os.path.join(base_dir, 'ANSYS')
+    input_dir = os.path.join(base_dir, 'input')
+    output_dir = os.path.join(base_dir, 'output')
+
+    base_script_filename = "script problema 2.mac"
+    base_freq_filename = "target_freq.txt"
+    base_modes_filename = "target_modes.txt"
 
     out_freq_filename = "out_freq.txt"
-    out_modes_filename = "out_modos_y.txt"
+    out_modes_filename = "out_modes.txt"
 
     ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename, base_freq_filename,
                   base_modes_filename, output_dir)
@@ -46,13 +48,13 @@ def GA_run(parameters, irun, input_dir, log_dir):
 
         return fitness, {"freq error": freq_error_sum, "mac error": mac_error_sum, "Freq.": paired_comp_freq, "Mode": paired_comp_modes}
 
-    # parâmetros do algoritmo:
-    elitism_rate = 0.10 # proporção dos melhores da população que serão preservados
-    crossover_rate = 0.60 # chance de ocorrência de cruzamento entre indivíduos selecionados
-    mutation_strength = 0.10 # taxa máxima de mutação de cada gene daqueles indivíduos não originados de crossover
-
-    population_size = len(keys)*10 # indivíduos avaliados por geração (recomendado ao menos 10x o número de variáveis)
-    generations = 30 # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
+    # parâmetros do algoritmo: serão agora passados na chamada do meta-otimizador
+    # elitism_rate = 0.10 # proporção dos melhores da população que serão preservados
+    # crossover_rate = 0.60 # chance de ocorrência de cruzamento entre indivíduos selecionados
+    # mutation_strength = 0.10 # taxa máxima de mutação de cada gene daqueles indivíduos não originados de crossover
+    #
+    # population_size = len(keys)*10 # indivíduos avaliados por geração (recomendado ao menos 10x o número de variáveis)
+    # generations = 30 # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
 
     # declaração do otimizador:
     rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength) # objeto otimizador
@@ -60,8 +62,9 @@ def GA_run(parameters, irun, input_dir, log_dir):
     rodada.sync_time(ansys.anstime) # sincroniza timestamp de optimizer e ansys para facilitar controle dos registros
 
     # ajuste do registro:
+    log_dir = os.path.join(base_dir, 'meta-opt', 'results', 'GA')
     log = "full" # tipo de registro (True: simplificado - melhor de cada iteração, "full": todos os indivíduos)
-    log_title = f"GA_trel_{irun}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
+    log_title = f"GA_pop({population_size})_gen({generations})_elit({elitism_rate})_cross({crossover_rate})_mut({mutation_strength})_{irun}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
     # log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
     rodada.set_log(log_title, log_dir)
 
@@ -71,4 +74,4 @@ def GA_run(parameters, irun, input_dir, log_dir):
     # chamada:
     best = rodada.run(generations, log=log)
 
-    ansys.mapdl.exit()
+    # ansys.mapdl.exit()

@@ -1,4 +1,3 @@
-from optimization.parameter import *
 from optimization.pso_optimizer.pso_optimizer import PSO
 from external.parser import Ansys
 from external.special_functions import SpecialFun
@@ -6,20 +5,23 @@ from external.special_functions import SpecialFun
 import os
 
 
-def PSO_run(parameters, irun, input_dir, log_dir):
+def PSO_run(irun, base_dir, parameters, population_size, iterations, w, w_rate, c1, c2, init_vel_ratio):
 
     keys = [p.key for p in parameters]
 
-    ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
-    ansys_working_dir = None
-    # input_dir = input_dir
-    base_script_filename = "script.mac"
-    base_freq_filename = "out_freq.txt"
-    base_modes_filename = "out_modos_y.txt"
-    output_dir = os.path.join(os.getcwd(), 'output')
+    ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
+    # caminhos
+    # base_dir = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
+    ansys_working_dir = os.path.join(base_dir, 'ANSYS')
+    input_dir = os.path.join(base_dir, 'input')
+    output_dir = os.path.join(base_dir, 'output')
+
+    base_script_filename = "script problema 2.mac"
+    base_freq_filename = "target_freq.txt"
+    base_modes_filename = "target_modes.txt"
 
     out_freq_filename = "out_freq.txt"
-    out_modes_filename = "out_modos_y.txt"
+    out_modes_filename = "out_modes.txt"
 
     ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename, base_freq_filename,
                   base_modes_filename, output_dir)
@@ -45,14 +47,14 @@ def PSO_run(parameters, irun, input_dir, log_dir):
         return fitness, {"freq error": freq_error_sum, "mac error": mac_error_sum, "Freq.": paired_comp_freq, "Mode": paired_comp_modes}
 
     # parâmetros do algoritmo:
-    w = 0.6 # proporção da velocidade atual que participa da próxima
-    w_rate = 0.99 # taxa de decaimento de inércia por iteração
-    c1 = 2.05 # influencia a exploração individual
-    c2 = 2.05 # influencia a convergência para o mínimo do grupo
-    init_vel_ratio = 0.2 # proporção do espaço de busca que pode ser empregado para velocidade inicial
-
-    population_size = len(keys)*10 # indivíduos avaliados por geração (recomendado ao menos 10x o número de variáveis)
-    iteracoes = 30 # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
+    # w = 0.6 # proporção da velocidade atual que participa da próxima
+    # w_rate = 0.99 # taxa de decaimento de inércia por iteração
+    # c1 = 2.05 # influencia a exploração individual
+    # c2 = 2.05 # influencia a convergência para o mínimo do grupo
+    # init_vel_ratio = 0.2 # proporção do espaço de busca que pode ser empregado para velocidade inicial
+    #
+    # population_size = len(keys)*10 # indivíduos avaliados por geração (recomendado ao menos 10x o número de variáveis)
+    # iteracoes = 30 # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
 
     # declaração do otimizador:
     rodada = PSO(fitness_function, parameters, population_size, w, w_rate, c1, c2, init_vel_ratio) # objeto otimizador
@@ -60,8 +62,9 @@ def PSO_run(parameters, irun, input_dir, log_dir):
     rodada.sync_time(ansys.anstime) # sincroniza timestamp de optimizer e ansys para facilitar controle dos registros
 
     # ajuste do registro:
-    log = "full" # tipo de registro (True: simplificado - melhor de cada iteração, "full": todos os indivíduos)
-    log_title = f"PSO_trel_{irun}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
+    log_dir = os.path.join(base_dir, 'meta-opt', 'results', 'PSO')
+    log = "full"  # tipo de registro (True: simplificado - melhor de cada iteração, "full": todos os indivíduos)
+    log_title = f"PSO_pop({population_size})_iter({iterations})_w({w})_wrate({w_rate})_c1({c1})_c2({c2})_initvel({init_vel_ratio})_{irun}"  # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
     # log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
     rodada.set_log(log_title, log_dir)
 
@@ -69,6 +72,6 @@ def PSO_run(parameters, irun, input_dir, log_dir):
     # rodada.resume_from_log(r"D:\Users\Thiago\Documents\.Mestrado (Local)\Python\GitGeral\tests\log\teste_PSO_rec_laje_20250820_114950 - Copia (2).csv")
 
     # chamada:
-    best = rodada.run(iteracoes, log=log)
+    best = rodada.run(iterations, log=log)
 
-    ansys.mapdl.exit()
+    # ansys.mapdl.exit()
