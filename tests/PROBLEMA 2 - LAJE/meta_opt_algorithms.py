@@ -15,7 +15,7 @@ from skopt.utils import use_named_args
 from optimization.parameter import Continuous
 from external.parser import Ansys
 
-# Importação dos Algoritmos (Mockup para importação real)
+# Importação dos Algoritmos
 from GA_run_TEST2 import GA_run
 from PSO_run_TEST2 import PSO_run
 
@@ -42,22 +42,18 @@ class MetaOptimizerRunner:
         if not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir)
 
-    # -------------------------------------------------------------------------
-    # 1. FUNÇÕES WORKER (Execução Isolada)
-    # -------------------------------------------------------------------------
+
+    # 1. FUNÇÕES WORKER (Isolada)
 
     @staticmethod
     def _worker_ga(run_id, work_dir, struct_params, ga_args, result_queue):
         """Worker isolado para o GA."""
         try:
-            # Chama a função original do seu arquivo GA_run_TEST2
-            # Assumindo que GA_run retorna ou salva o melhor fitness.
+            # Chama a função original do arquivo GA_run_TEST2
+            # GA_run retorna o melhor fitness.
             # ADAPTAÇÃO: GA_run precisa retornar (best_fitness, time_elapsed)
-            # ou você precisa ler do log que ele gerou.
             # Aqui assumo que GA_run foi adaptada para colocar na Queue ou retornar.
 
-            # Se GA_run não retorna nada, precisamos ler o log gerado por ele.
-            # Vou assumir um wrapper que captura isso.
 
             start_t = time.time()
 
@@ -78,7 +74,7 @@ class MetaOptimizerRunner:
 
             # Se a sua GA_run retorna o fitness, ótimo. Senão, leia do arquivo.
             # Supondo que retorne um dict ou tupla:
-            fitness = result_data if isinstance(result_data, float) else result_data['fitness']
+            fitness = result_data[0]
 
             result_queue.put({'fitness': fitness, 'time': end_t - start_t, 'success': True})
 
@@ -106,7 +102,7 @@ class MetaOptimizerRunner:
             )
 
             end_t = time.time()
-            fitness = result_data if isinstance(result_data, float) else result_data['fitness']
+            fitness = result_data[0]
 
             result_queue.put({'fitness': fitness, 'time': end_t - start_t, 'success': True})
 
@@ -114,57 +110,88 @@ class MetaOptimizerRunner:
             print(f"[ERRO PSO Worker] {e}")
             result_queue.put({'fitness': 1e6, 'time': 0, 'success': False})
 
-    # -------------------------------------------------------------------------
+
     # 2. SISTEMA DE SCORING
-    # -------------------------------------------------------------------------
 
     def calculate_score(self, fits, times):
         """
-        Calcula o Score ponderado.
-        IMPORTANTE: Como Fitness é 1e-16 e Tempo é 100, precisamos normalizar ou usar Log.
-        Aqui uso Log10 para Fitness para linearizar a escala.
-        """
-        # Limpeza de dados (remove falhas)
-        valid_fits = [f for f in fits if f < 1e5]
-        if not valid_fits: return 1e6  # Penalidade máxima
+        Calcula o score escalar para meta-otimização (BO) a partir de múltiplas
+        execuções estocásticas de GA/PSO.
 
-        avg_fit = np.mean(valid_fits)
-        std_fit = np.std(valid_fits)
+        O score combina:
+          - Qualidade média da solução (fitness médio)
+          - Robustez do algoritmo (variabilidade entre execuções)
+          - Custo computacional (tempo médio)
+
+        Estratégias adotadas:
+          - Uso de log10 do fitness para lidar com escalas muito distintas
+          - Coeficiente de variação baseado no fitness em escala log
+          - Normalização online (running normalization) para BO
+        """
+
+        # -------------------------
+        # 1. Limpeza de dados
+        # -------------------------
+        valid_fits = [f for f in fits if np.isfinite(f) and f < 1e5]
+        if not valid_fits:
+            # Penalidade máxima para falha total
+            return 1e6, None, None, None
+
+        # -------------------------
+        # 2. Fitness em escala log
+        # -------------------------
+        log_fits = [np.log10(abs(f) + 1e-20) for f in valid_fits]
+
+        avg_log_fit = np.mean(log_fits)
+        std_log_fit = np.std(log_fits)
+
+        # -------------------------
+        # 3. Robustez (CV em escala log)
+        # -------------------------
+        cv = std_log_fit / (abs(avg_log_fit) + 1e-6)
+        cv = np.log10(1.0 + cv)  # suavização para evitar explosões
+
+        # -------------------------
+        # 4. Tempo médio
+        # -------------------------
         avg_time = np.mean(times)
 
-        # CV (Coeficiente de Variação) - Adiciona epsilon para evitar div por zero
-        cv = std_fit / (abs(avg_fit) + 1e-12)
+        # -------------------------
+        # 5. Armazenamento global (normalização dinâmica)
+        # -------------------------
+        self.global_results.append({
+            'log_fit': avg_log_fit,
+            'time': avg_time,
+            'cv': cv
+        })
 
-        # NORMALIZAÇÃO LOCAL (Simplificada para o contexto da função objetivo)
-        # Como o BO precisa de um escalar para minimizar, e não sabemos o Máximo global ainda,
-        # usamos uma normalização baseada em expectativas físicas ou Log.
-
-        # Estratégia Log para Fitness (Transforma 1e-16 em -16, 1e-5 em -5)
-        # Queremos minimizar. Quanto mais negativo o log, melhor.
-        # Mas o score deve ser positivo.
-        # Score = w1 * (LogFit_Penalty) + w2 * CV + w3 * Time
-
-        # Vamos usar a abordagem simples: Retornar uma média ponderada ad-hoc
-        # Assumindo que o BO vai aprender a minimizar essa função "estranha".
-        # Para ser robusto: Normalizamos pelo histórico global (Running Normalization)
-
-        self.global_results.append({'fit': avg_fit, 'time': avg_time, 'cv': cv})
-
-        # Pega maximos e minimos globais vistos até agora para normalizar
-        all_fits = [x['fit'] for x in self.global_results]
+        all_log_fits = [x['log_fit'] for x in self.global_results]
         all_times = [x['time'] for x in self.global_results]
         all_cvs = [x['cv'] for x in self.global_results]
 
+        # -------------------------
+        # 6. Normalização Min-Max
+        # -------------------------
         def norm(val, lst):
-            if max(lst) == min(lst): return 0.5
-            return (val - min(lst)) / (max(lst) - min(lst))
+            vmin, vmax = min(lst), max(lst)
+            if vmax == vmin:
+                return 0.5
+            return (val - vmin) / (vmax - vmin)
 
-        n_fit = norm(avg_fit, all_fits)
+        n_fit = norm(avg_log_fit, all_log_fits)
         n_time = norm(avg_time, all_times)
         n_cv = norm(cv, all_cvs)
 
-        score = (self.W_FIT * n_fit) + (self.W_CV * n_cv) + (self.W_TIME * n_time)
-        return score, avg_fit, cv, avg_time
+        # -------------------------
+        # 7. Score final (minimização)
+        # -------------------------
+        score = (
+                self.W_FIT * n_fit +
+                self.W_CV * n_cv +
+                self.W_TIME * n_time
+        )
+
+        return score, avg_log_fit, cv, avg_time
 
     # -------------------------------------------------------------------------
     # 3. MÉTODOS DE AVALIAÇÃO (Chamados pelo skopt)
