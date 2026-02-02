@@ -2,6 +2,7 @@ from optimization.ga_optimizer import GA
 from external.parser import Ansys
 from external.special_functions import SpecialFun
 
+import numpy as np
 import os
 
 
@@ -29,6 +30,24 @@ def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rat
                   base_modes_filename, output_dir)
     ansys.set_output_filenames(out_freq_filename, out_modes_filename)
     ansys.max_attempts = 6
+
+    # --- APLICAÇÃO DE RUÍDO NOS DADOS DE REFERÊNCIA ---
+    # Simula incerteza experimental diferente para cada rodada
+    # Nível de Ruído (Sigma): 1% (0.01) ou 3% (0.03) são valores comuns
+    NOISE_LEVEL = 0.03
+
+    # Semente aleatória única para este processo (garante variação entre workers)
+    np.random.seed(int(time.time()) + run_id)
+
+    # 1. Ruído nas Frequências (Multiplicativo)
+    # freq_new = freq_old * (1 + N(0, sigma))
+    freq_noise = np.random.normal(0, NOISE_LEVEL, ansys.base_freq.shape)
+    ansys.base_freq = ansys.base_freq * (1 + freq_noise)
+
+    # 2. Ruído nos Modos (Multiplicativo)
+    # Afeta a amplitude de cada ponto do modo
+    mode_noise = np.random.normal(0, NOISE_LEVEL, ansys.base_modes.shape)
+    ansys.base_modes = ansys.base_modes * (1 + mode_noise)
 
     def fitness_function(param):
         input_file = ansys.create_input_file(param, keys)

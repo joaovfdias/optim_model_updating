@@ -25,9 +25,9 @@ parameters = [
 
 keys = [p.key for p in parameters]
 
-ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
+ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 
-base_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
+base_dir = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
 ansys_working_dir = os.path.join(base_dir, 'ANSYS')
 input_dir = os.path.join(base_dir, 'input', 'sensib')
 output_dir = os.path.join(base_dir, 'output')
