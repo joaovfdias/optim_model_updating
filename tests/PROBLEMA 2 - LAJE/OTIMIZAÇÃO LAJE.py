@@ -5,13 +5,14 @@ from external.special_functions import SpecialFun
 from external.parser import Ansys
 
 parameters = [
-
     Continuous(20e9,35e9, 'modulo_viga_1'),
     Continuous(20e9, 35e9, 'modulo_viga_2'),
-
     Continuous(20e9, 35e9, 'modulo_centro'),
-    Continuous(20e9, 35e9, 'modulo_borda_1'),
-    Continuous(20e9, 35e9, 'modulo_borda_2'),
+    # Continuous(20e9, 35e9, 'modulo_borda_1'),
+    # Continuous(20e9, 35e9, 'modulo_borda_2'),
+
+    Continuous(0.1, 0.40, 'poisson'),
+    Continuous (2400, 2600, 'dens'),
 
     Continuous(50e6, 50e8, 'rigidez1'),
     Continuous(50e6, 50e8, 'rigidez2'),
@@ -26,7 +27,7 @@ ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\lau
 base_dir = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
 ansys_working_dir = os.path.join(base_dir, 'ANSYS')
 input_dir = os.path.join(base_dir, 'input')
-output_dir = os.path.join(base_dir, 'output')
+output_dir = os.path.join(os.getcwd(), 'output')
 
 base_script_filename = "script problema 2.mac"
 base_freq_filename = "target_freq.txt"
@@ -60,7 +61,7 @@ def fitness_function(param):
 
 # agora basta passar os parâmetros corretos para a função e averiguar se o fitness zera para validar o modelo e script
 
-params = [32e9,28e9,30e9,22e9,25e9,50e7,40e7,55e7,60e7]
+params = [32e9,28e9,30e9,0.2,2500,50e7,40e7,55e7,60e7] # v2: E uniforme pra laje e add do poison e dens.
 
 fitness, datas = fitness_function(params)
 print(fitness)

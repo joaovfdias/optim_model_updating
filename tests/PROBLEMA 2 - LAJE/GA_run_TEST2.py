@@ -17,7 +17,7 @@ def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rat
     # base_dir = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
     ansys_working_dir = os.path.join(base_dir, 'ANSYS')
     input_dir = os.path.join(base_dir, 'input')
-    output_dir = os.path.join(base_dir, 'output')
+    output_dir = os.path.join(os.getcwd(), 'output')
 
     base_script_filename = "script problema 2.mac"
     base_freq_filename = "target_freq.txt"
