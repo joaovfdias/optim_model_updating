@@ -19,16 +19,22 @@ from optimization.bo_optimizer.bayesian_from_skopt import BO
 # Caminhos
 ANSYS_EXE_PATH = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 # Pasta FIXA onde o ModBase.db já deve estar (sem subpastas)
-BASE_DIR = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
 
+# LEST
+BASE_DIR = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros" # LEST
 ANSYS_WORKING_DIR = os.path.join(BASE_DIR, 'ANSYS')
+
+# CASA
+# BASE_DIR = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros" # CASA
+# ANSYS_WORKING_DIR = os.path.join(BASE_DIR, 'ANSYS','HOME')
+
 INPUT_DIR = os.path.join(BASE_DIR, 'input')
 OUTPUT_DIR = os.path.join(os.getcwd(), 'output')
 
 # Configuração da Otimização
-N_REPETICOES = 5  # Rodadas por configuração para média estatística
+N_REPETICOES = 3  # Rodadas por configuração para média estatística
 N_INITIAL_POINTS = 45  # Pontos Iniciais
-N_EVALUATIONS = 150  # Total (45 iniciais + 105 iterações do BO)
+N_EVALUATIONS = 195  # Total (45 iniciais + 105 iterações do BO)
 
 # Critérios de Parada do Refinamento
 MIN_PARAM_DELTA = 1e-3  # Se a mudança no Xi/Kappa for menor que isso, para.
@@ -116,7 +122,7 @@ def worker_optimization(config, run_id, result_queue):
                 return 1e6, {}  # Penalidade por falha
 
         # D. Otimizador
-        log_dir = os.path.join(r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros\meta-opt", 'BO_auto_meta_logs')
+        log_dir = os.path.join(BASE_DIR, "meta-opt", 'BO_auto_meta_logs')
         if not os.path.exists(log_dir): os.makedirs(log_dir)
 
         optimizer = BO(fitness_function, parameters, N_INITIAL_POINTS)
@@ -249,6 +255,8 @@ if __name__ == '__main__':
 
     global_history = []  # Guardará o histórico de TODAS as famílias
 
+    metatimestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     # --- LOOP EXTERNO: Itera sobre cada Família (EI, depois PI, depois LCB) ---
     for fam_name, initial_grid in optimization_families.items():
         print(f"\n\n{'-' * 60}")
@@ -339,6 +347,8 @@ if __name__ == '__main__':
             best_row = df_scored.iloc[0]
             current_best_score = best_row['Score']
 
+            global_history.append(current_best_score)
+
             # Parâmetro vencedor local
             param_val = best_row['Xi'] if fam_name in ['EI', 'PI'] else best_row['Kappa']
 
@@ -371,12 +381,12 @@ if __name__ == '__main__':
             current_grid = generate_refined_grid(best_row, delta_log=delta_log)
 
             # Salva parcial seguro
-            pd.DataFrame(global_history).to_csv("meta_history_partial.csv", index=False)
+            pd.DataFrame(global_history).to_csv(os.path.join(BASE_DIR, "meta-opt", f"meta_history_partial_{metatimestamp}.csv"), index=False)
 
     Ansys.kill_ansys_process() # matar processo ao final das rodadas
 
     # --- Relatório Final Unificado ---
     df_final = pd.DataFrame(global_history)
-    df_final.to_csv("meta_history_FINAL_BY_FAMILY.csv", index=False)
+    df_final.to_csv(os.path.join(BASE_DIR, f"meta_history_FINAL_BY_FAMILY{metatimestamp}.csv"), index=False)
     print("\n=== TODAS AS FAMÍLIAS PROCESSADAS ===")
     print("Consulte 'meta_history_FINAL_BY_FAMILY.csv' para comparar os melhores de cada grupo.")
