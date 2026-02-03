@@ -28,7 +28,7 @@ ANSYS_EXE_PATH = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\lau
 BASE_DIR = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
 ANSYS_WORKING_DIR = os.path.join(BASE_DIR, 'ANSYS')
 INPUT_DIR = os.path.join(BASE_DIR, 'input')
-
+OUTPUT_DIR = os.path.join(os.getcwd(), 'output')
 
 
 # 2. WORKER
@@ -40,8 +40,12 @@ def worker_optimization(run_id, xi_val, kappa_val, result_queue):
             Continuous(20e9, 35e9, 'modulo_viga_1'),
             Continuous(20e9, 35e9, 'modulo_viga_2'),
             Continuous(20e9, 35e9, 'modulo_centro'),
-            Continuous(20e9, 35e9, 'modulo_borda_1'),
-            Continuous(20e9, 35e9, 'modulo_borda_2'),
+            # Continuous(20e9, 35e9, 'modulo_borda_1'),
+            # Continuous(20e9, 35e9, 'modulo_borda_2'),
+
+            Continuous(0.1, 0.40, 'poisson'),
+            Continuous(2400, 2600, 'dens'),
+
             Continuous(50e6, 50e8, 'rigidez1'),
             Continuous(50e6, 50e8, 'rigidez2'),
             Continuous(50e6, 50e8, 'rigidez3'),
@@ -50,7 +54,7 @@ def worker_optimization(run_id, xi_val, kappa_val, result_queue):
         keys = [p.key for p in parameters]
 
         # B. ANSYS
-        ansys_output_dir = os.path.join(ANSYS_WORKING_DIR, 'output')
+        ansys_output_dir = OUTPUT_DIR
         ansys = Ansys(ANSYS_EXE_PATH, ANSYS_WORKING_DIR, INPUT_DIR, "script problema 2.mac",
                       "target_freq.txt", "target_modes.txt", ansys_output_dir)
         ansys.set_output_filenames("out_freq.txt", "out_modes.txt")

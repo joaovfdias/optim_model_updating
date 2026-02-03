@@ -19,8 +19,12 @@ if __name__ == '__main__':
         Continuous(20e9, 35e9, 'modulo_viga_1'),
         Continuous(20e9, 35e9, 'modulo_viga_2'),
         Continuous(20e9, 35e9, 'modulo_centro'),
-        Continuous(20e9, 35e9, 'modulo_borda_1'),
-        Continuous(20e9, 35e9, 'modulo_borda_2'),
+        # Continuous(20e9, 35e9, 'modulo_borda_1'),
+        # Continuous(20e9, 35e9, 'modulo_borda_2'),
+
+        Continuous(0.1, 0.40, 'poisson'),
+        Continuous(2400, 2600, 'dens'),
+
         Continuous(50e6, 50e8, 'rigidez1'),
         Continuous(50e6, 50e8, 'rigidez2'),
         Continuous(50e6, 50e8, 'rigidez3'),
@@ -28,18 +32,25 @@ if __name__ == '__main__':
     ]
 
     population_size = 90
-    generations = iterations = 1500
+    generations = iterations = 30
+
     elitism_rate = 0.1
     crossover_rate = 0.6
     mutation_strength = 0.2
 
-    num_runs = 5
+    w = 0.6  # proporção da velocidade atual que participa da próxima
+    w_rate = 0.99  # taxa de decaimento de inércia por iteração
+    c1 = 2.05  # influencia a exploração individual
+    c2 = 2.05  # influencia a convergência para o mínimo do grupo
+    init_vel_ratio = 0.2  # proporção do espaço de busca que pode ser empregado para velocidade inicial
+
+    num_runs = 2
 
     for irun in range(1, num_runs+1):
 
-        # p = Process(target=run_PSO, args=(irun, base_dir, parameters, population_size, iterations, w, w_rate, c1, c2, init_vel_ratio))
-        # p.start()
-        # p.join()
+        p = Process(target=run_PSO, args=(irun, base_dir, parameters, population_size, iterations, w, w_rate, c1, c2, init_vel_ratio))
+        p.start()
+        p.join()
 
         p = Process(target=run_GA, args=(irun, base_dir, parameters, population_size, generations, elitism_rate, crossover_rate, mutation_strength))
         p.start()
