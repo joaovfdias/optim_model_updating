@@ -339,15 +339,18 @@ if __name__ == '__main__':
                     'Avg_Time': np.mean(times)
                 }
                 iter_results.append(entry)
-                global_history.append(entry)
+                # global_history.append(entry)
 
             # Análise da Iteração Local
             df_iter = pd.DataFrame(iter_results)
-            df_scored = calculate_scores(df_iter)  # Sua função de score
+            df_scored = calculate_scores(df_iter)  # calcula e adiciona a coluna 'Score'
+
+            # Adiciona os resultados JÁ COM SCORE ao histórico global
+            # .to_dict('records') converte o DataFrame pontuado em lista de dicionários
+            global_history.extend(df_scored.to_dict('records'))
+
             best_row = df_scored.iloc[0]
             current_best_score = best_row['Score']
-
-            global_history.append(current_best_score)
 
             # Parâmetro vencedor local
             param_val = best_row['Xi'] if fam_name in ['EI', 'PI'] else best_row['Kappa']
