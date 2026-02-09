@@ -29,8 +29,10 @@ class MetaOptimizerRunner:
 
         self.global_results = []
 
-        self.log_dir = os.path.join(base_dir, 'meta_opt_logs')
+        self.log_dir = os.path.join(base_dir, 'meta_opt', 'populational logs')
         os.makedirs(self.log_dir, exist_ok=True)
+
+        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
     # EXECUTORES DOS ALGORITMOS
@@ -207,23 +209,21 @@ class MetaOptimizerRunner:
         fits, times = [], []
 
         for i in range(1, self.n_repetitions + 1):
-            run_dir = os.path.join(self.base_dir, f"temp_{algo_type}_{i}")
-            os.makedirs(run_dir, exist_ok=True)
 
             q = Queue()
 
             if algo_type == "GA":
                 p = Process(target=self._worker_ga,
-                            args=(i, run_dir, self.struct_params, param_dict, q))
+                            args=(i, self.base_dir, self.struct_params, param_dict, q))
             else:
                 p = Process(target=self._worker_pso,
-                            args=(i, run_dir, self.struct_params, param_dict, q))
+                            args=(i, self.base_dir, self.struct_params, param_dict, q))
 
             p.start()
             res = q.get()
             p.join()
 
-            shutil.rmtree(run_dir, ignore_errors=True)
+            # shutil.rmtree(run_dir, ignore_errors=True)
 
             if res['success']:
                 fits.append(res['fitness'])
@@ -238,7 +238,7 @@ class MetaOptimizerRunner:
     # LOG
 
     def log_step(self, algo, params, score, avg_fit, cv, avg_time):
-        filename = os.path.join(self.log_dir, f"meta_opt_{algo}.csv")
+        filename = os.path.join(self.log_dir, f"meta_opt_{algo}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv")
         exists = os.path.isfile(filename)
 
         with open(filename, 'a', newline='') as f:
@@ -300,8 +300,8 @@ class MetaOptimizerRunner:
             n_calls=n_calls,
             n_initial_points=10,
             acq_func="EI",
-            xi=0.01,
-            random_state=42
+            xi=0.01
+            # random_state=42
         )
 
 
@@ -311,18 +311,22 @@ class MetaOptimizerRunner:
 if __name__ == "__main__":
 
     struct_params = [
-        Continuous(20e9, 35e9, 'E1'),
-        Continuous(20e9, 35e9, 'E2'),
-        Continuous(20e9, 35e9, 'E3'),
-        Continuous(20e9, 35e9, 'E4'),
-        Continuous(20e9, 35e9, 'E5'),
-        Continuous(50e6, 50e8, 'K1'),
-        Continuous(50e6, 50e8, 'K2'),
-        Continuous(50e6, 50e8, 'K3'),
-        Continuous(50e6, 50e8, 'K4')
-    ]
+            Continuous(20e9, 35e9, 'modulo_viga_1'),
+            Continuous(20e9, 35e9, 'modulo_viga_2'),
+            Continuous(20e9, 35e9, 'modulo_centro'),
+            # Continuous(20e9, 35e9, 'modulo_borda_1'),
+            # Continuous(20e9, 35e9, 'modulo_borda_2'),
 
-    BASE_DIR = r"C:\AnsysMetaOpt"
+            Continuous(0.1, 0.40, 'poisson'),
+            Continuous(2400, 2600, 'dens'),
+
+            Continuous(50e6, 50e8, 'rigidez1'),
+            Continuous(50e6, 50e8, 'rigidez2'),
+            Continuous(50e6, 50e8, 'rigidez3'),
+            Continuous(50e6, 50e8, 'rigidez4')
+        ]
+
+    BASE_DIR = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
 
     runner = MetaOptimizerRunner(BASE_DIR, struct_params)
 

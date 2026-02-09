@@ -44,11 +44,11 @@ def worker_optimization(run_id, xi_val, kappa_val, result_queue):
             # Continuous(20e9, 35e9, 'modulo_borda_2'),
 
             Continuous(0.1, 0.40, 'poisson'),
-            # Continuous(2400, 2600, 'dens'),
+            Continuous(2400, 2600, 'dens'),
 
             Continuous(50e6, 50e8, 'rigidez1'),
             Continuous(50e6, 50e8, 'rigidez2'),
-            # Continuous(50e6, 50e8, 'rigidez3'),
+            Continuous(50e6, 50e8, 'rigidez3'),
             Continuous(50e6, 50e8, 'rigidez4')
         ]
         keys = [p.key for p in parameters]
@@ -113,6 +113,8 @@ if __name__ == '__main__':
     print(f"--- INICIANDO RODADA FINAL: {TAG_RODADA} ---")
     print(f"Algoritmo: gp_hedge | Xi: {MELHOR_XI} | Kappa: {MELHOR_KAPPA}")
 
+    metatimestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     fits = []
     times = []
 
@@ -150,7 +152,7 @@ if __name__ == '__main__':
     }])
 
     # Salva
-    filename = f"Resultado_Final_GPHedge_{datetime.now().strftime('%H%M')}.csv"
+    filename = f"Resultado_Final_GPHedge_{metatimestamp}.csv"
     df_result.to_csv(os.path.join(BASE_DIR, "meta-opt", filename), index=False)
     print(f"\nConcluído! Resultado salvo em {filename}")
     print(df_result.to_string())
