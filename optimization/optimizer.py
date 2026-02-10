@@ -35,6 +35,7 @@ class Optimizer:
         self.logfilename = None # função set
         self.log_dir = None # função set
         self.log_path = None
+        self.logtimestamp = True
         self.status = True
 
         self.log_history = None
@@ -206,13 +207,14 @@ class Optimizer:
         return min(pop, key=lambda x: x.fitness)
 
 
-    def set_log(self, log_title=None, log_dir=None):
+    def set_log(self, log_title=None, log_dir=None, timestamp=True):
         """
 
         :param log_title: nome do arquivo de log. por padrão: {nome_do_algoritmo}_{data_hora}
         :param log_dir: diretório em que log será salvo. por padrão, subpasta log no diretório de chamada
         :return:
         """
+        self.logtimestamp = timestamp
         self.logfilename = log_title
         self.log_dir = log_dir
         if not log_title:
@@ -225,8 +227,14 @@ class Optimizer:
 
     def create_log_path(self):
         timestamp = self.opttime or datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{self.logfilename}_{timestamp}" if self.logfilename else f"{self.__class__.__name__}_{timestamp}"
-        self.logfilename = f"{filename}.csv"
+        if self.logfilename:
+            # fname, ext = os.path.splitext(self.logfilename)
+            fname = self.logfilename[:-4] if self.logfilename.lower().endswith(".csv") else self.logfilename
+            filename = f"{fname}_{timestamp}" if self.logtimestamp else self.logfilename
+        else:
+            filename = f"{self.__class__.__name__}_{timestamp}"
+        self.logfilename = filename if filename.endswith(".csv") else f"{filename}.csv"
+            # f"{filename}.csv"
         self.log_dir = self.log_dir or os.path.join(self.current_dir, "log")
         os.makedirs(self.log_dir, exist_ok=True)
         self.log_path = os.path.join(self.log_dir, self.logfilename)

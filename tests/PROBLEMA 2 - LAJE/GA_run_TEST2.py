@@ -92,12 +92,14 @@ def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rat
         log_title = f"GA_pop({population_size})_gen({generations})_elit({elitism_rate})_cross({crossover_rate})_mut({mutation_strength})_{irun}_{datetime.now().strftime("%Y%m%d_%H%M%S")}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
 
     # log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
-    rodada.set_log(log_title, log_dir)
+    rodada.set_log(log_title, log_dir, False)
 
     # caso de retornar log csv:
-    if log_data["resume"]: rodada.resume_from_log(log_data["resume"])
+    if log_data["resume"]: rodada.resume_from_log(os.path.join(log_data["dir"], log_data["resume"]))
 
     # chamada:
-    return rodada.run(generations, log=log)
+    best = rodada.run(generations, log=log)
 
-    # ansys.mapdl.exit()
+    # saída
+    ansys.mapdl.exit()
+    return best

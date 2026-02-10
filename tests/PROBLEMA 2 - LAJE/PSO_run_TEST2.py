@@ -72,12 +72,14 @@ def PSO_run(irun, base_dir, parameters, population_size, iterations, w, w_rate, 
         log_title = f"PSO_pop({population_size})_iter({iterations})_w({w})_wrate({w_rate})_c1({c1})_c2({c2})_initvel({init_vel_ratio})_{irun}_{datetime.now().strftime("%Y%m%d_%H%M%S")}"  # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
 
     # log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
-    rodada.set_log(log_title, log_dir)
+    rodada.set_log(log_title, log_dir, False)
 
     # caso de retornar log csv:
     if log_data["resume"]: rodada.resume_from_log(log_data["resume"])
 
     # chamada:
-    return rodada.run(iterations, log=log)
+    best = rodada.run(iterations, log=log)
 
-    # ansys.mapdl.exit()
+    # saída
+    ansys.mapdl.exit()
+    return best

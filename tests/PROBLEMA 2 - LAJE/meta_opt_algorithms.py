@@ -202,10 +202,11 @@ class MetaOptimizerRunner:
 
         return results
 
-    def pretest_generations(self, algo_type, fixed_population, max_generations=100, expected_fit = 0.36):
+    def pretest_generations(self, algo_type, fixed_population, max_generations=100, expected_fit=0.30, resume=None):
         """
         Roda o algoritmo com população fixa e incrementa gerações até detectar estagnação.
         Retorna a média de gerações onde a convergência ocorreu.
+        :param resume: entra com nome do arquivo log caso se deseje retomar uma rodada inicial
         """
 
         pretest_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -227,7 +228,7 @@ class MetaOptimizerRunner:
             count_resume = 0
             pretest_log_path = os.path.join(self.base_dir, 'meta-opt', 'results', 'pretest-generations')
             os.makedirs(pretest_log_path, exist_ok=True)
-            log_title = None
+            log_title = resume
             for gen in range(10, max_generations + 1, 10):
 
                 previous_log = log_title
@@ -264,7 +265,7 @@ class MetaOptimizerRunner:
                 count_resume += 1
 
                 # Verifica estagnação usando sua função estática
-                if self.detect_stagnation(history, window=1, tol=1e-2):
+                if self.detect_stagnation(history, window=1, tol=1e-3):
                     print(f"Convergiu na geração {gen}. Fitness: {history[-1]}.")
                     if history[-1] < expected_fit:
                         detected_gen = gen
@@ -422,7 +423,7 @@ if __name__ == "__main__":
         # population, generations = min(pop_tests, key=lambda x: x[1])
 
         # teste de gerações:
-        optimal_generations = runner.pretest_generations("GA", population, max_generations=120)
+        optimal_generations = runner.pretest_generations("GA", population, max_generations=120, resume="GA_rep(0)_gen(10)_20260210_152031")
         runner.run_meta_optimization("GA", optimal_generations, population)
 
     if choice == "PSO":
