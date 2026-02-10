@@ -54,7 +54,7 @@ class MetaOptimizerRunner:
             )
 
             end_t = time.time()
-            fitness = result[0]
+            fitness = result.fitness
 
             result_queue.put({'fitness': fitness, 'time': end_t - start_t, 'success': True})
 
@@ -80,7 +80,7 @@ class MetaOptimizerRunner:
             )
 
             end_t = time.time()
-            fitness = result[0]
+            fitness = result.fitness
 
             result_queue.put({'fitness': fitness, 'time': end_t - start_t, 'success': True})
 
@@ -145,7 +145,7 @@ class MetaOptimizerRunner:
     # ESTAGNAÇÃO
 
     @staticmethod
-    def detect_stagnation(history, window=3, tol=1e-3):
+    def detect_stagnation(history, window=10, tol=1e-3):
         if len(history) < window + 1:
             return False
 
@@ -173,9 +173,9 @@ class MetaOptimizerRunner:
                             parameters=self.struct_params,
                             population_size=pop,
                             generations=gen,
-                            elitism_rate=0.05,
-                            crossover_rate=0.7,
-                            mutation_strength=0.1
+                            elitism_rate=0.10,
+                            crossover_rate=0.60,
+                            mutation_strength=0.10
                         )
                     else:
                         result = PSO_run(
@@ -184,14 +184,14 @@ class MetaOptimizerRunner:
                             parameters=self.struct_params,
                             population_size=pop,
                             iterations=gen,
-                            w=0.7,
-                            w_rate=0.98,
-                            c1=1.5,
-                            c2=1.5,
+                            w=0.6,
+                            w_rate=0.99,
+                            c1=2.05,
+                            c2=2.05,
                             init_vel_ratio=0.2
                         )
 
-                    history.append(result[0])
+                    history.append(result.fitness)
 
                     if self.detect_stagnation(history):
                         stagnation_gens.append(gen)
@@ -202,6 +202,89 @@ class MetaOptimizerRunner:
 
         return results
 
+    def pretest_generations(self, algo_type, fixed_population, max_generations=100, expected_fit = 0.36):
+        """
+        Roda o algoritmo com população fixa e incrementa gerações até detectar estagnação.
+        Retorna a média de gerações onde a convergência ocorreu.
+        """
+
+        pretest_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        print(f"\n Calibrando Gerações para {algo_type} (População Fixa: {fixed_population}) \n")
+
+        stagnation_points = []
+        n_reps = 3  # Número de repetições para média estatística
+
+        for rep in range(n_reps):
+            print(f"  Repetição {rep + 1}/{n_reps} ... ", end="")
+
+            history = []
+            detected_gen = max_generations  # Valor padrão caso não estagne
+
+            # Loop incremental de gerações
+            # NOTA: Se o GA_run não tiver "resume", isso roda do zero a cada passo (lento).
+            # Se tiver acesso ao histórico de uma rodada única, seria muito mais rápido.
+            count_resume = 0
+            pretest_log_path = os.path.join(self.base_dir, 'meta-opt', 'results', 'pretest-generations')
+            os.makedirs(pretest_log_path, exist_ok=True)
+            log_title = None
+            for gen in range(10, max_generations + 1, 10):
+
+                previous_log = log_title
+                log_title = f"GA_rep({rep})_gen({gen})_{pretest_timestamp}"
+
+                # Executa o algoritmo com 'gen' gerações
+                if algo_type == "GA":
+                    result = GA_run(
+                        irun=rep,
+                        base_dir=self.base_dir,
+                        parameters=self.struct_params,
+                        population_size=fixed_population,
+                        generations=gen,
+                        elitism_rate=0.10,
+                        crossover_rate=0.60,
+                        mutation_strength=0.10,
+                        log_data={"dir": pretest_log_path, "resume": previous_log, "title": log_title} # algoritmo retoma rodada anterior, exceto pela primeira (resume = 0)
+                    )
+                else:  # PSO
+                    result = PSO_run(
+                        irun=rep,
+                        base_dir=self.base_dir,
+                        parameters=self.struct_params,
+                        population_size=fixed_population,
+                        iterations=gen,
+                        w=0.6, w_rate=0.99, c1=2.05, c2=2.05, init_vel_ratio=0.2,
+                        log_data={"dir": pretest_log_path, "resume": previous_log, "title": log_title} # algoritmo retoma rodada anterior, exceto pela primeira (resume = 0)
+                    )
+
+                # Assume que result.fitness é o melhor valor encontrado até aquela geração
+                val = result.fitness if not isinstance(result, float) else result
+                history.append(val) # armazena o melhor fit de 10 em 10
+
+                count_resume += 1
+
+                # Verifica estagnação usando sua função estática
+                if self.detect_stagnation(history, window=1, tol=1e-2):
+                    print(f"Convergiu na geração {gen}. Fitness: {history[-1]}.")
+                    if history[-1] < expected_fit:
+                        detected_gen = gen
+                        break
+                    else:
+                        print(f"Fitness alto ({history[-1]}), dando sequência.")
+                        continue
+            else:
+                print(f"Não convergiu até {max_generations} gerações. Fitness alcançado: {history[-1]}.")
+
+            stagnation_points.append(detected_gen)
+
+        # Calcula a média de gerações necessárias
+        optimal_gens = int(np.ceil(np.mean(stagnation_points)))
+
+        # Opcional: Adiciona uma margem de segurança (+10% ou +5 gens)
+        safe_gens = optimal_gens + 5
+
+        print(f">>> Média de Estagnação: {optimal_gens} -> Definido: {safe_gens} gerações.")
+        return safe_gens
 
     # AVALIAÇÃO BO
 
@@ -299,8 +382,8 @@ class MetaOptimizerRunner:
             dimensions=space,
             n_calls=n_calls,
             n_initial_points=10,
-            acq_func="EI",
-            xi=0.01
+            acq_func="PI",
+            xi=0.075
             # random_state=42
         )
 
@@ -325,16 +408,30 @@ if __name__ == "__main__":
             Continuous(50e6, 50e8, 'rigidez3'),
             Continuous(50e6, 50e8, 'rigidez4')
         ]
+    population = len(struct_params)*10
 
+    # alterar com base na máquina:
     BASE_DIR = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
 
     runner = MetaOptimizerRunner(BASE_DIR, struct_params)
 
-    pop_tests = runner.pretest_population_size("GA", [30, 60, 90, 120])
-    population, generations = min(pop_tests, key=lambda x: x[1])
+    choice = "GA" # alterar conforme algoritmo desejado
 
-    runner.run_meta_optimization("GA", generations, population)
-    runner.run_meta_optimization("PSO", generations, population)
+    if choice == "GA":
+        # pop_tests = runner.pretest_population_size("GA", [30, 60, 90, 120])
+        # population, generations = min(pop_tests, key=lambda x: x[1])
+
+        # teste de gerações:
+        optimal_generations = runner.pretest_generations("GA", population, max_generations=120)
+        runner.run_meta_optimization("GA", optimal_generations, population)
+
+    if choice == "PSO":
+        # pop_tests = runner.pretest_population_size("PSO", [30, 60, 90, 120])
+        # population, generations = min(pop_tests, key=lambda x: x[1])
+
+        # teste de gerações:
+        optimal_generations = runner.pretest_generations("PSO", population, max_generations=120)
+        runner.run_meta_optimization("PSO", optimal_generations, population)
 
     try:
         Ansys.kill_ansys_process()

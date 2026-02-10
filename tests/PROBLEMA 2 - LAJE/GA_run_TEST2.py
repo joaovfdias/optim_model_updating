@@ -5,9 +5,10 @@ from external.special_functions import SpecialFun
 import numpy as np
 import time
 import os
+from datetime import datetime
 
 
-def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rate, crossover_rate, mutation_strength):
+def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rate, crossover_rate, mutation_strength, log_data=None):
 
     keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
 
@@ -82,16 +83,21 @@ def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rat
     rodada.sync_time(ansys.anstime) # sincroniza timestamp de optimizer e ansys para facilitar controle dos registros
 
     # ajuste do registro:
-    log_dir = os.path.join(base_dir, 'meta-opt', 'results', 'GA')
     log = "full" # tipo de registro (True: simplificado - melhor de cada iteração, "full": todos os indivíduos)
-    log_title = f"GA_pop({population_size})_gen({generations})_elit({elitism_rate})_cross({crossover_rate})_mut({mutation_strength})_{irun}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
+    if log_data:
+        log_dir = log_data["dir"]
+        log_title = log_data["title"]
+    else:
+        log_dir = os.path.join(base_dir, 'meta-opt', 'results', 'GA')
+        log_title = f"GA_pop({population_size})_gen({generations})_elit({elitism_rate})_cross({crossover_rate})_mut({mutation_strength})_{irun}_{datetime.now().strftime("%Y%m%d_%H%M%S")}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
+
     # log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
     rodada.set_log(log_title, log_dir)
 
-    # caso queira retomar a rodada de algum log cvs:
-    # rodada.resume_from_log(r"C:\Users\Thiago Artur\Documents\.Mestrado (Local)\PyGit\tests\test log recovery\teste_GA_log_completo.csv")
+    # caso de retornar log csv:
+    if log_data["resume"]: rodada.resume_from_log(log_data["resume"])
 
     # chamada:
-    best = rodada.run(generations, log=log)
+    return rodada.run(generations, log=log)
 
     # ansys.mapdl.exit()

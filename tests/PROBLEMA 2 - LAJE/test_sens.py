@@ -5,6 +5,7 @@ from optimization.parameter import *
 from external.parser import Ansys
 from external.special_functions import SpecialFun
 
+import time
 import os
 
 parameters = [
@@ -14,8 +15,8 @@ parameters = [
     Continuous(20e9, 35e9, 'modulo_viga_1'),
     Continuous(20e9, 35e9, 'modulo_viga_2'),
     Continuous(20e9, 35e9, 'modulo_centro'),
-    Continuous(20e9, 35e9, 'modulo_borda_1'),
-    Continuous(20e9, 35e9, 'modulo_borda_2'),
+    # Continuous(20e9, 35e9, 'modulo_borda_1'),
+    # Continuous(20e9, 35e9, 'modulo_borda_2'),
 
     Continuous(50e6, 50e8, 'rigidez1'),
     Continuous(50e6, 50e8, 'rigidez2'),
@@ -29,10 +30,10 @@ ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\lau
 
 base_dir = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
 ansys_working_dir = os.path.join(base_dir, 'ANSYS')
-input_dir = os.path.join(base_dir, 'input', 'sensib')
+input_dir = os.path.join(base_dir, 'input')
 output_dir = os.path.join(base_dir, 'output')
 
-base_script_filename = "script problema 2 sensib.mac"
+base_script_filename = "script problema 2.mac"
 base_freq_filename = "target_freq.txt"
 base_modes_filename = "target_modes.txt"
 
@@ -70,16 +71,26 @@ def evaluate(row):
 
     return ddata
 
+start_time = time.time()
+
 # Gera DoE sem precisar do Optimizer
-rng = np.random.default_rng(42)
+rng = np.random.default_rng()
 specs = [ParamSpec(p.key, p.lower_bound, p.upper_bound) for p in parameters]
 
-X = Sampler.lhs(550, specs, rng)
+amostragem = 9999
+
+X = Sampler.lhs(amostragem, specs, rng)
 Y = X.apply(evaluate, axis=1, result_type="expand")
 
 df_eval = pd.concat([X, Y], axis=1)
 
 # Rodar análise de sensibilidade
 sa = SensitivityAnalyzer(minimize=True)
-selected = sa.workflow(df_eval, fitness_col="Fitness", interactive=True)
+selected = sa.workflow(df_eval, fitness_col="Fitness", interactive=False)
 print("Parâmetros escolhidos:", selected)
+
+end_time = time.time()
+elapsed = end_time - start_time
+
+print(f"\nTempo para amostragem de {amostragem} indivíduos ({amostragem/len(parameters)}x o número de parâmetros: "
+      f"\n{elapsed:.4f} s")
