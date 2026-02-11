@@ -211,13 +211,12 @@ class MetaOptimizerRunner:
 
         pretest_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        print(f"\n Calibrando Gerações para {algo_type} (População Fixa: {fixed_population}) \n")
+        print(f"\n Calibrando Gerações para {algo_type} (População Fixa: {fixed_population})")
 
         stagnation_points = []
         n_reps = 3  # Número de repetições para média estatística
 
         for rep in range(n_reps):
-            print(f"  Repetição {rep + 1}/{n_reps} ... ", end="")
 
             history = []
             detected_gen = max_generations  # Valor padrão caso não estagne
@@ -228,8 +227,11 @@ class MetaOptimizerRunner:
             count_resume = 0
             pretest_log_path = os.path.join(self.base_dir, 'meta-opt', 'results', 'pretest-generations')
             os.makedirs(pretest_log_path, exist_ok=True)
-            log_title = resume
+            log_title = resume if rep == 0 else None
             for gen in range(10, max_generations + 1, 10):
+
+                if rep==0: print("\n\n" + "-" * 50)
+                print(f"\n\n Iniciando rodada com {gen} gerações" + f"\nRepetição {rep + 1}/{n_reps} . . .")
 
                 previous_log = log_title
                 log_title = f"GA_rep({rep})_gen({gen})_{pretest_timestamp}"
@@ -378,6 +380,10 @@ class MetaOptimizerRunner:
                 }
                 return self._evaluate_batch("PSO", params)
 
+
+        print("\n" + "-" * 50)
+        print(f"\n\nRODANDO META-OTIMIZAÇÃO DO {algo_type} . . .")
+
         return gp_minimize(
             func=objective,
             dimensions=space,
@@ -410,28 +416,30 @@ if __name__ == "__main__":
             Continuous(50e6, 50e8, 'rigidez4')
         ]
     population = len(struct_params)*10
+    population = 3
 
     # alterar com base na máquina:
     BASE_DIR = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
+    resume = "GA_rep(0)_gen(10)_20260210_152031"
 
     runner = MetaOptimizerRunner(BASE_DIR, struct_params)
 
-    choice = "GA" # alterar conforme algoritmo desejado
+    choice = "GA, PSO" # alterar conforme algoritmo desejado
 
-    if choice == "GA":
+    if "GA" in choice:
         # pop_tests = runner.pretest_population_size("GA", [30, 60, 90, 120])
         # population, generations = min(pop_tests, key=lambda x: x[1])
 
         # teste de gerações:
-        optimal_generations = runner.pretest_generations("GA", population, max_generations=120, resume="GA_rep(0)_gen(10)_20260210_152031")
+        optimal_generations = runner.pretest_generations("GA", population, max_generations=120, resume=None)
         runner.run_meta_optimization("GA", optimal_generations, population)
 
-    if choice == "PSO":
+    if "PSO" in choice:
         # pop_tests = runner.pretest_population_size("PSO", [30, 60, 90, 120])
         # population, generations = min(pop_tests, key=lambda x: x[1])
 
         # teste de gerações:
-        optimal_generations = runner.pretest_generations("PSO", population, max_generations=120)
+        optimal_generations = runner.pretest_generations("PSO", population, max_generations=120, resume=None)
         runner.run_meta_optimization("PSO", optimal_generations, population)
 
     try:

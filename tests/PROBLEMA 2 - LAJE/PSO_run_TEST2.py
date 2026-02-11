@@ -4,6 +4,7 @@ from external.special_functions import SpecialFun
 
 import os
 from datetime import datetime
+import time
 
 
 def PSO_run(irun, base_dir, parameters, population_size, iterations, w, w_rate, c1, c2, init_vel_ratio, log_data=None):
@@ -75,11 +76,16 @@ def PSO_run(irun, base_dir, parameters, population_size, iterations, w, w_rate, 
     rodada.set_log(log_title, log_dir, False)
 
     # caso de retornar log csv:
-    if log_data["resume"]: rodada.resume_from_log(log_data["resume"])
+    if log_data["resume"]: rodada.resume_from_log(os.path.join(log_data["dir"], log_data["resume"]))
 
     # chamada:
     best = rodada.run(iterations, log=log)
 
     # saída
     ansys.mapdl.exit()
+
+    # garantia de encerramento
+    time.sleep(2)
+    # Ansys.kill_ansys_process()
+
     return best

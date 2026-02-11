@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from abc import abstractmethod
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Any
 
 import os
@@ -98,7 +100,7 @@ class Optimizer:
         Retoma rodada de otimização com base em log no caminho indicado
         {Não funciona no Bayesiano até implementação própria}
         """
-        self.log_history = csv_path
+        self.log_history = csv_path if csv_path.endswith(".csv") else f"{csv_path}.csv"
 
     def resume_initial_population(self):
         """
@@ -785,5 +787,6 @@ class PopulationBased(Optimizer):
 
         return self.global_best # retorna o melhor indivíduo final
 
+    # @abstractmethod
     def opt_step(self, iteration): # definida nos algoritmos específicos
         pass

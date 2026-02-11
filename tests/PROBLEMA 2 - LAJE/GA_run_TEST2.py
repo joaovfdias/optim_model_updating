@@ -102,4 +102,9 @@ def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rat
 
     # saída
     ansys.mapdl.exit()
+
+    # garantia de encerramento
+    time.sleep(2)
+    # Ansys.kill_ansys_process()
+
     return best
