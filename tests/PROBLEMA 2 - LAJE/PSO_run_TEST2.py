@@ -82,10 +82,10 @@ def PSO_run(irun, base_dir, parameters, population_size, iterations, w, w_rate, 
     best = rodada.run(iterations, log=log)
 
     # saída
-    ansys.mapdl.exit()
+    ansys.mapdl.exit(force=True)
 
     # garantia de encerramento
-    time.sleep(2)
     # Ansys.kill_ansys_process()
+    time.sleep(2)
 
     return best

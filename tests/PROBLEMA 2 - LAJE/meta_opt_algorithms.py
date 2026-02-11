@@ -155,6 +155,19 @@ class MetaOptimizerRunner:
         rel_change = abs(f_new - f_old) / (abs(f_old) + 1e-12)
         return rel_change < tol
 
+    # rodada ISOLADA do processo
+    @staticmethod
+    def target_wrapper(queue, algo_type, run_kwargs):
+        try:
+            result = GA_run(**run_kwargs) if algo_type == "GA" else PSO_run(**run_kwargs)
+
+            # extração enxuta
+            val = result.fitness if hasattr(result, 'fitness') else result
+            queue.put({'success': True, 'fitness': val})
+        except Exception as e:
+            print(f"[ERRO NO PROCESSAMENTO DO {algo_type}]: {e}")
+            queue.put({'success': False, 'error': e})
+
     def pretest_population_size(self, algo_type, populations, max_generations=10):
         results = []
 
@@ -167,31 +180,36 @@ class MetaOptimizerRunner:
                 for gen in range(1, max_generations + 1):
 
                     if algo_type == "GA":
-                        result = GA_run(
-                            irun=rep,
-                            base_dir=self.base_dir,
-                            parameters=self.struct_params,
-                            population_size=pop,
-                            generations=gen,
-                            elitism_rate=0.10,
-                            crossover_rate=0.60,
-                            mutation_strength=0.10
-                        )
-                    else:
-                        result = PSO_run(
-                            irun=rep,
-                            base_dir=self.base_dir,
-                            parameters=self.struct_params,
-                            population_size=pop,
-                            iterations=gen,
-                            w=0.6,
-                            w_rate=0.99,
-                            c1=2.05,
-                            c2=2.05,
-                            init_vel_ratio=0.2
-                        )
+                        run_kwargs = {
+                            'irun': rep,
+                            'base_dir': self.base_dir,
+                            'parameters': self.struct_params,
+                            'population_size': pop,
+                            'generations': gen,
+                            'elitism_rate': 0.10,
+                            'crossover_rate': 0.60,
+                            'mutation_strength': 0.10
+                        }
 
-                    history.append(result.fitness)
+                    else:  # PSO
+                        run_kwargs = {
+                            'irun': rep,
+                            'base_dir': self.base_dir,
+                            'parameters': self.struct_params,
+                            'population_size': pop,
+                            'iterations': gen,
+                            'w': 0.6, 'w_rate': 0.99, 'c1': 2.05, 'c2': 2.05, 'init_vel_ratio': 0.2
+                        }
+
+                    queue = Queue()
+                    p = Process(target=self.target_wrapper, args=(queue, algo_type, run_kwargs))
+                    p.start()
+
+                    qres = queue.get()  # extrai resultado
+                    p.join()
+
+                    if qres['success']:
+                        history.append(qres['fitness'])
 
                     if self.detect_stagnation(history):
                         stagnation_gens.append(gen)
@@ -218,6 +236,9 @@ class MetaOptimizerRunner:
 
         for rep in range(n_reps):
 
+            print("\n\n" + "-" * 60)
+            print(f"\nREPETIÇÃO {rep + 1}/{n_reps} . . .")
+
             history = []
             detected_gen = max_generations  # Valor padrão caso não estagne
 
@@ -230,39 +251,63 @@ class MetaOptimizerRunner:
             log_title = resume if rep == 0 else None
             for gen in range(10, max_generations + 1, 10):
 
-                if rep==0: print("\n\n" + "-" * 50)
-                print(f"\n\n Iniciando rodada com {gen} gerações" + f"\nRepetição {rep + 1}/{n_reps} . . .")
+                print(f"\n\nINICIANDO RODADA COM {gen} GERAÇÕES . . .\n")
 
                 previous_log = log_title
                 log_title = f"GA_rep({rep})_gen({gen})_{pretest_timestamp}"
 
                 # Executa o algoritmo com 'gen' gerações
                 if algo_type == "GA":
-                    result = GA_run(
-                        irun=rep,
-                        base_dir=self.base_dir,
-                        parameters=self.struct_params,
-                        population_size=fixed_population,
-                        generations=gen,
-                        elitism_rate=0.10,
-                        crossover_rate=0.60,
-                        mutation_strength=0.10,
-                        log_data={"dir": pretest_log_path, "resume": previous_log, "title": log_title} # algoritmo retoma rodada anterior, exceto pela primeira (resume = 0)
-                    )
-                else:  # PSO
-                    result = PSO_run(
-                        irun=rep,
-                        base_dir=self.base_dir,
-                        parameters=self.struct_params,
-                        population_size=fixed_population,
-                        iterations=gen,
-                        w=0.6, w_rate=0.99, c1=2.05, c2=2.05, init_vel_ratio=0.2,
-                        log_data={"dir": pretest_log_path, "resume": previous_log, "title": log_title} # algoritmo retoma rodada anterior, exceto pela primeira (resume = 0)
-                    )
+                    run_kwargs = {
+                        'irun':rep,
+                        'base_dir':self.base_dir,
+                        'parameters':self.struct_params,
+                        'population_size':fixed_population,
+                        'generations':gen,
+                        'elitism_rate':0.10,
+                        'crossover_rate':0.60,
+                        'mutation_strength':0.10,
+                        'log_data':{"dir": pretest_log_path, "resume": previous_log, "title": log_title} # algoritmo retoma rodada anterior, exceto pela primeira (resume = 0)
+                        }
 
-                # Assume que result.fitness é o melhor valor encontrado até aquela geração
-                val = result.fitness if not isinstance(result, float) else result
-                history.append(val) # armazena o melhor fit de 10 em 10
+                else:  # PSO
+                    run_kwargs = {
+                        'irun':rep,
+                        'base_dir':self.base_dir,
+                        'parameters':self.struct_params,
+                        'population_size':fixed_population,
+                        'iterations':gen,
+                        'w':0.6, 'w_rate':0.99, 'c1':2.05, 'c2':2.05, 'init_vel_ratio':0.2,
+                        'log_data':{"dir": pretest_log_path, "resume": previous_log, "title": log_title}
+                        # algoritmo retoma rodada anterior, exceto pela primeira (resume = 0)
+                        }
+
+                attempt = 0
+                max_attempts = 5
+                success = False
+
+                while attempt < max_attempts:
+                    attempt += 1
+
+                    queue = Queue()
+                    p = Process(target=self.target_wrapper, args=(queue, algo_type, run_kwargs))
+                    p.start()
+
+                    qres = queue.get() # extrai resultado
+                    p.join()
+
+                    if qres['success']:
+                        success = True
+                        history.append(qres['fitness'])  # armazena o melhor fit de 10 em 10
+                        break
+                    else:
+                        print(f"\n[AVISO] Falha na tentativa {attempt}/{max_attempts}. Tentatando novamente . . .\n")
+                        Ansys.kill_ansys_process()
+                        time.sleep(4)
+
+                if not success:
+                    print(f"\n    [ERRO CRÍTICO] Falha persistente na Gen {gen} após {max_attempts} tentativas.\n")
+                    break  # Aborta essa repetição inteira pois perdeu a sequência histórica
 
                 count_resume += 1
 
@@ -415,8 +460,9 @@ if __name__ == "__main__":
             Continuous(50e6, 50e8, 'rigidez3'),
             Continuous(50e6, 50e8, 'rigidez4')
         ]
+
     population = len(struct_params)*10
-    population = 3
+    population = 3 # teste
 
     # alterar com base na máquina:
     BASE_DIR = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
