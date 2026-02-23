@@ -49,6 +49,7 @@ class TurBO(Optimizer):
 
         self.sampling_method = 'random'
         self.sampling_methods = ['random', 'lhs']
+        self.bounds = None
         self.build_bounds()
 
     def build_bounds(self, device=None, dtype=torch.double):
@@ -206,62 +207,153 @@ class TurBO(Optimizer):
 
         return X_next
 
+    def population_to_tensor(
+            self,
+            pop,
+            dtype: torch.dtype = torch.double,
+            device: torch.device | str = "cpu",
+    ) -> torch.Tensor:
+        """
+        Convert a list of Individuals/Particles to
+        a normalized torch tensor (n, d) in [0,1]^d.
+        """
 
+        device = torch.device(device)
+
+        # ---- 1) Extract raw parameter matrix (n, d)
+        X_raw = np.array([
+            ind.params  # <-- adjust if attribute name differs
+            for ind in pop
+        ], dtype=float)
+
+        # ---- 2) Build lower/upper bounds arrays
+        lb = np.array([p.lower_bound for p in self.parameters], dtype=float)
+        ub = np.array([p.upper_bound for p in self.parameters], dtype=float)
+
+        # ---- 3) Normalize to [0,1]^d
+        X_unit = (X_raw - lb) / (ub - lb)
+
+        # ---- 4) Convert to torch tensor
+        X_tensor = torch.as_tensor(X_unit, dtype=dtype, device=device)
+
+        # Safety clamp
+        X_tensor = X_tensor.clamp(0.0, 1.0)
+
+        return X_tensor
+
+    def get_initial_points(self) -> torch.Tensor:
+        pop = self.initial_population()
+        return self.population_to_tensor(pop)
 
 
     # Otimizar com scikit-optimize
-    def run(self, evaluations, acq_func=None, xi=None, kappa=None, status=True, log=True):
-
-        acq_func = acq_func or "EI"
-        xi = xi or 0.01 # default
-        kappa = kappa or 1.96 # default
+    def run(self, evaluations: int, acqf: str = "ts", status: bool = True, log: bool = True,
+            batch_size: int = 4, n_init: Optional[int] = None, seed: int = 0):
+        """
+        TuRBO-1 loop like BoTorch tutorial.
+        - evaluations: total evaluation budget
+        - acqf: "ts" or "ei"
+        - batch_size: q
+        - n_init: Sobol initial points (default 2*dim, like tutorial)
+        """
+        assert acqf in ("ts", "ei")
 
         self.inicio = time.time()
         self.status = status
         self.log = log
+
         timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
-        if acq_func in ["EI","PI"]:
-            self.logfilename = self.logfilename or f"BO_{timestamp}_acq_fun={acq_func}_xi={xi}"
-        elif acq_func=="LCB":
-            self.logfilename = self.logfilename or f"BO_{timestamp}_acq_fun={acq_func}_kappa={kappa}"
-        else:
-            self.logfilename = self.logfilename or f"BO_{timestamp}_acq_fun={acq_func}"
+        self.logfilename = self.logfilename or f"TuRBO_{timestamp}_acqf={acqf}_q={batch_size}"
 
-        result = gp_minimize(self.evaluate_model, self.search_space, n_calls=evaluations, n_initial_points=self.initial_evaluations, initial_point_generator=self.sampling_method, acq_func=acq_func, acq_optimizer="sampling", xi=xi, kappa=kappa)
+        device = self.bounds.device
+        dtype = self.bounds.dtype
 
-        best_individual = self.get_best_individual(self.populations)
+        dim = self.bounds.shape[1]
+        n_init = n_init or (2 * dim)
 
-        gp_final = result.models[-1]
-        kernel = gp_final.kernel_
+        # --- 1) initial design in [0,1]^d
+        X = self.get_initial_points(dim=dim, n_pts=n_init, seed=seed, dtype=dtype, device=device)
 
-        # Função para encontrar o componente com length_scale
-        def extract_length_scales(kernel):
-            if hasattr(kernel, "length_scale"):
-                return kernel.length_scale
+        # --- 2) evaluate initial points (convert to real domain inside eval)
+        # We store Y = -fitness, since we minimize fitness but TuRBO maximizes Y
+        Y_list = []
+        for i in range(X.shape[0]):
+            x_raw = unnormalize(X[i], self.bounds)
+            with torch.no_grad():
+                fitness = float(self.evaluate_model(x_raw.detach().tolist()))
+            Y_list.append(-fitness)
 
-            for attr in ("k1", "k2"):
-                if hasattr(kernel, attr):
-                    try:
-                        ls = extract_length_scales(getattr(kernel, attr))
-                        if ls is not None:
-                            return ls
-                    except Exception as e:
-                        print(f"Erro ao extrair length scales de {attr}: {e}")
+        Y = torch.tensor(Y_list, dtype=dtype, device=device).unsqueeze(-1)  # (n_init, 1)
 
-            return None
+        # tracking TuRBO state
+        state = self.TurboState(dim=dim, batch_size=batch_size)
 
-        length_scales = extract_length_scales(kernel)
-        print("Length-scales:", length_scales)
+        # reporting
+        if self.status:
+            best_fitness = -Y.max().item()
+            print(f"[init] n={n_init} | best fitness={best_fitness:.6g} | TR length={state.length:.3g}")
+
+        # --- 3) TuRBO iterations
+        n_evals = n_init
+        while n_evals < evaluations and not state.restart_triggered:
+            # Fit GP on (X,Y)
+            model = self._fit_gp(X, Y)
+
+            # Propose batch in [0,1]^d
+            X_next = self.generate_batch(
+                state=state,
+                model=model,
+                X=X,
+                Y=Y,
+                batch_size=batch_size,
+                acqf=acqf,
+                dtype=dtype,
+                device=device,
+            )
+
+            # Evaluate batch
+            Y_next_list = []
+            for j in range(X_next.shape[0]):
+                x_raw = unnormalize(X_next[j], self.bounds)
+                with torch.no_grad():
+                    fitness = float(self.evaluate_model(x_raw.detach().tolist()))
+                Y_next_list.append(-fitness)
+
+            Y_next = torch.tensor(Y_next_list, dtype=dtype, device=device).unsqueeze(-1)  # (q,1)
+
+            # Append data
+            X = torch.cat([X, X_next], dim=0)
+            Y = torch.cat([Y, Y_next], dim=0)
+            n_evals += X_next.shape[0]
+
+            # Update TR state (based on new Y)
+            state = self.update_state(state, Y_next)
+
+            if self.status:
+                best_fitness = -Y.max().item()
+                print(f"[eval {n_evals:4d}/{evaluations}] best fitness={best_fitness:.6g} | "
+                      f"TR length={state.length:.3g} | restart={state.restart_triggered}")
+
+            # optional logging hook (keep your existing system)
+            if self.log:
+                it = max((len(self.populations) - self.initial_evaluations), 0)
+                self.add_log(it, [self.populations[-1]])
 
         fim = time.time()
         if self.log:
             self.log_time(fim)
-            self.add_log_specs(result.specs, length_scales)
             print(f"\nRegistro salvo em: {self.log_path}")
 
-        print(f"\nMelhor solução encontrada: Fitness = {best_individual.fitness}, Parâmetros: {self.display_parameters(best_individual)}")
+        best_individual = self.get_best_individual(self.populations)
+        print(f"\nMelhor solução encontrada: Fitness = {best_individual.fitness}, "
+              f"Parâmetros: {self.display_parameters(best_individual)}")
 
-        return result
+        return {
+            "X": X,  # normalized (n, d)
+            "Y": Y,  # objective values (maximize) (n,1) where Y=-fitness
+            "best_fitness": -Y.max().item(),
+            "state": state,
+        }
 
 
     def add_log_specs(self, specs_dictionary, length_scales):
