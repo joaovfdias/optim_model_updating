@@ -49,7 +49,23 @@ class TurBO(Optimizer):
 
         self.sampling_method = 'random'
         self.sampling_methods = ['random', 'lhs']
+        self.build_bounds()
 
+    def build_bounds(self, device=None, dtype=torch.double):
+        """
+        Creates BoTorch-compatible bounds tensor of shape (2, d)
+        from a list of skopt.space.Real objects.
+        """
+        device = device or torch.device("cpu")
+
+        lb = [dim.low for dim in self.search_space]
+        ub = [dim.high for dim in self.search_space]
+
+        self.bounds = torch.tensor(
+            [lb, ub],
+            dtype=dtype,
+            device=device
+        )
 
     def set_sampling_method(self, sampling_method):
         if sampling_method in self.sampling_methods:
@@ -78,6 +94,21 @@ class TurBO(Optimizer):
             self.add_log(it, [self.populations[-1]])
 
         return fitness
+
+    def eval_objective(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        TuRBO tutorial style:
+          - input: x is a single point, shape (d,)
+          - output: scalar tensor (0-dim), on x.device and x.dtype
+        """
+
+        x_raw = unnormalize(x, self.get_bounds())  # self.bounds must be shape (2, d) tensor
+
+        # Treat objective as black-box: no autograd graph
+        with torch.no_grad():
+            params = x_raw.detach().tolist()
+            fitness = self.evaluate_model(params)
+            return torch.tensor(fitness, device=x.device, dtype=x.dtype)
 
     @dataclass
     class TurboState:
