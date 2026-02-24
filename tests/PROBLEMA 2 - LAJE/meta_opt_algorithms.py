@@ -92,8 +92,15 @@ class MetaOptimizerRunner:
 
             result_queue.put({'fitness': fitness, 'time': end_t - start_t, 'success': True})
 
-        except Exception:
-            result_queue.put({'fitness': 1e6, 'time': 0.0, 'success': False})
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            result_queue.put({
+                'fitness': 1e6,
+                'time': 0.0,
+                'success': False,
+                'error': str(e)
+            })
 
 
     # SCORE
