@@ -66,8 +66,8 @@ class Ansys:
 
         self.legacy = legacy
         if not self.legacy:
-            from ansys.mapdl.core import launch_mapdl
             self.kill_ansys_process()
+            from ansys.mapdl.core import launch_mapdl
             self.mapdl = launch_mapdl(run_location=self.ansys_working_dir, override=True)
 
 

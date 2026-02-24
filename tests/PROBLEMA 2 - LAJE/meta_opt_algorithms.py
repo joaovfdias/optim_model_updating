@@ -10,7 +10,7 @@ from skopt import gp_minimize
 from skopt.space import Real
 
 from optimization.parameter import Continuous
-from external.parser import Ansys
+from external.kill_ansys import kill_ansys_process
 
 from GA_run_TEST2 import GA_run
 from PSO_run_TEST2 import PSO_run
@@ -58,8 +58,16 @@ class MetaOptimizerRunner:
 
             result_queue.put({'fitness': fitness, 'time': end_t - start_t, 'success': True})
 
-        except Exception:
-            result_queue.put({'fitness': 1e6, 'time': 0.0, 'success': False})
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            result_queue.put({
+                'fitness': 1e6,
+                'time': 0.0,
+                'success': False,
+                'error': str(e)
+            })
 
     @staticmethod
     def _worker_pso(run_id, work_dir, struct_params, pso_args, result_queue):
@@ -302,7 +310,7 @@ class MetaOptimizerRunner:
                         break
                     else:
                         print(f"\n[AVISO] Falha na tentativa {attempt}/{max_attempts}. Tentatando novamente . . .\n")
-                        Ansys.kill_ansys_process()
+                        kill_ansys_process()
                         time.sleep(4)
 
                 if not success:
@@ -331,6 +339,8 @@ class MetaOptimizerRunner:
         # Opcional: Adiciona uma margem de segurança (+10% ou +5 gens)
         safe_gens = optimal_gens + 5
 
+        kill_ansys_process()
+
         print(f">>> Média de Estagnação: {optimal_gens} -> Definido: {safe_gens} gerações.")
         return safe_gens
 
@@ -339,7 +349,11 @@ class MetaOptimizerRunner:
     def _evaluate_batch(self, algo_type, param_dict):
         fits, times = [], []
 
+        print("\n[BO] Avaliando hiperparâmetros:", param_dict)
+
         for i in range(1, self.n_repetitions + 1):
+
+            print(f"\n[META] Repetição {i}/{self.n_repetitions}")
 
             q = Queue()
 
@@ -462,7 +476,7 @@ if __name__ == "__main__":
         ]
 
     population = len(struct_params)*10
-    population = 3 # teste
+    # population = 3 # teste
 
     # alterar com base na máquina:
     BASE_DIR = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
@@ -470,14 +484,15 @@ if __name__ == "__main__":
 
     runner = MetaOptimizerRunner(BASE_DIR, struct_params)
 
-    choice = "GA, PSO" # alterar conforme algoritmo desejado
+    choice = "GA" # alterar conforme algoritmo desejado
 
     if "GA" in choice:
         # pop_tests = runner.pretest_population_size("GA", [30, 60, 90, 120])
         # population, generations = min(pop_tests, key=lambda x: x[1])
 
         # teste de gerações:
-        optimal_generations = runner.pretest_generations("GA", population, max_generations=120, resume=None)
+        # optimal_generations = runner.pretest_generations("GA", population, max_generations=120, resume=None)
+        optimal_generations = 49
         runner.run_meta_optimization("GA", optimal_generations, population)
 
     if "PSO" in choice:
@@ -489,6 +504,6 @@ if __name__ == "__main__":
         runner.run_meta_optimization("PSO", optimal_generations, population)
 
     try:
-        Ansys.kill_ansys_process()
+        kill_ansys_process()
     except:
         pass

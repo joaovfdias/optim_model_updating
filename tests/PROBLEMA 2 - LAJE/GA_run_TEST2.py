@@ -6,6 +6,7 @@ import numpy as np
 import time
 import os
 from datetime import datetime
+import shutil
 
 
 def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rate, crossover_rate, mutation_strength, log_data=None):
@@ -17,9 +18,16 @@ def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rat
     ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
     # caminhos
     # base_dir = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
-    ansys_working_dir = os.path.join(base_dir, 'ANSYS')
+    # ansys_working_dir = os.path.join(base_dir, 'ANSYS')
+    ansys_working_dir = r"C:\Users\Thiago\Documents\Problema 2 (local)\ANSYS"
     input_dir = os.path.join(base_dir, 'input')
-    output_dir = os.path.join(os.getcwd(), 'output')
+    # output_dir = os.path.join(os.getcwd(), 'output')
+    output_dir = r"C:\Users\Thiago\Documents\Problema 2 (local)\output"
+
+    unique_ansys_dir = os.path.join(ansys_working_dir, f"worker_{irun}_{os.getpid()}")
+    os.makedirs(unique_ansys_dir, exist_ok=True)
+    # unique_subdir_name = f"worker_{irun}_{int(time.time() * 1000)}"
+    # unique_ansys_dir = os.path.join(ansys_working_dir, unique_subdir_name)
 
     base_script_filename = "script problema 2.mac"
     base_freq_filename = "target_freq.txt"
@@ -28,7 +36,7 @@ def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rat
     out_freq_filename = "out_freq.txt"
     out_modes_filename = "out_modes.txt"
 
-    ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename, base_freq_filename,
+    ansys = Ansys(ansys_exe_path, unique_ansys_dir, input_dir, base_script_filename, base_freq_filename,
                   base_modes_filename, output_dir)
     ansys.set_output_filenames(out_freq_filename, out_modes_filename)
     ansys.max_attempts = 6
@@ -95,16 +103,31 @@ def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rat
     rodada.set_log(log_title, log_dir, False)
 
     # caso de retornar log csv:
-    if log_data["resume"]: rodada.resume_from_log(os.path.join(log_data["dir"], log_data["resume"]))
+    if log_data and log_data["resume"]: rodada.resume_from_log(os.path.join(log_data["dir"], log_data["resume"]))
 
     # chamada:
-    best = rodada.run(generations, log=log)
-
-    # saída
-    ansys.mapdl.exit(force=True)
+    try:
+        best = rodada.run(generations, log=log)
+    finally:
+        try:
+            ansys.mapdl.exit(force=True)
+        except:
+            pass
 
     # garantia de encerramento
     # Ansys.kill_ansys_process()
-    time.sleep(2)
+    time.sleep(1)
+
+    # # Limpeza (Cleanup) - Executa sempre, dando erro ou sucesso
+    # try:
+    #     # Pequena pausa para garantir que o ANSYS liberou os arquivos .lock
+    #     time.sleep(1)
+    #
+    #     if os.path.exists(unique_ansys_dir):
+    #         shutil.rmtree(unique_ansys_dir)  # Apaga a pasta e tudo dentro
+    #         # print(f"Limpeza concluída: {unique_subdir_name}") # Descomente para debug
+    # except Exception as clean_error:
+    #     # Não queremos parar a otimização se falhar a limpeza, apenas avise
+    #     print(f"[AVISO] Não foi possível limpar a pasta {unique_subdir_name}: {clean_error}")
 
     return best
