@@ -18,8 +18,9 @@ from PSO_run_TEST2 import PSO_run
 
 class MetaOptimizerRunner:
 
-    def __init__(self, base_dir, struct_params, n_repetitions=3):
+    def __init__(self, base_dir, local_dir, struct_params, n_repetitions=3):
         self.base_dir = base_dir
+        self.local_dir = local_dir
         self.struct_params = struct_params
         self.n_repetitions = n_repetitions
 
@@ -38,7 +39,7 @@ class MetaOptimizerRunner:
     # EXECUTORES DOS ALGORITMOS
 
     @staticmethod
-    def _worker_ga(run_id, work_dir, struct_params, ga_args, result_queue):
+    def _worker_ga(run_id, work_dir, local_dir, struct_params, ga_args, result_queue):
         try:
             start_t = time.time()
 
@@ -50,7 +51,8 @@ class MetaOptimizerRunner:
                 generations=ga_args['generations'],
                 elitism_rate=ga_args['elitism_rate'],
                 crossover_rate=ga_args['crossover_rate'],
-                mutation_strength=ga_args['mutation_strength']
+                mutation_strength=ga_args['mutation_strength'],
+                local_dir=local_dir
             )
 
             end_t = time.time()
@@ -70,7 +72,7 @@ class MetaOptimizerRunner:
             })
 
     @staticmethod
-    def _worker_pso(run_id, work_dir, struct_params, pso_args, result_queue):
+    def _worker_pso(run_id, work_dir, local_dir, struct_params, pso_args, result_queue):
         try:
             start_t = time.time()
 
@@ -84,7 +86,8 @@ class MetaOptimizerRunner:
                 w_rate=pso_args['w_rate'],
                 c1=pso_args['c1'],
                 c2=pso_args['c2'],
-                init_vel_ratio=pso_args['init_vel_ratio']
+                init_vel_ratio=pso_args['init_vel_ratio'],
+                local_dir=local_dir
             )
 
             end_t = time.time()
@@ -203,7 +206,8 @@ class MetaOptimizerRunner:
                             'generations': gen,
                             'elitism_rate': 0.10,
                             'crossover_rate': 0.60,
-                            'mutation_strength': 0.10
+                            'mutation_strength': 0.10,
+                            'local_dir': self.local_dir
                         }
 
                     else:  # PSO
@@ -213,7 +217,8 @@ class MetaOptimizerRunner:
                             'parameters': self.struct_params,
                             'population_size': pop,
                             'iterations': gen,
-                            'w': 0.6, 'w_rate': 0.99, 'c1': 2.05, 'c2': 2.05, 'init_vel_ratio': 0.2
+                            'w': 0.6, 'w_rate': 0.99, 'c1': 2.05, 'c2': 2.05, 'init_vel_ratio': 0.2,
+                            'local_dir': self.local_dir
                         }
 
                     queue = Queue()
@@ -269,7 +274,7 @@ class MetaOptimizerRunner:
                 print(f"\n\nINICIANDO RODADA COM {gen} GERAÇÕES . . .\n")
 
                 previous_log = log_title
-                log_title = f"GA_rep({rep})_gen({gen})_{pretest_timestamp}"
+                log_title = f"{algo_type}_rep({rep})_gen({gen})_{pretest_timestamp}"
 
                 # Executa o algoritmo com 'gen' gerações
                 if algo_type == "GA":
@@ -282,6 +287,7 @@ class MetaOptimizerRunner:
                         'elitism_rate':0.10,
                         'crossover_rate':0.60,
                         'mutation_strength':0.10,
+                        'local_dir':self.local_dir,
                         'log_data':{"dir": pretest_log_path, "resume": previous_log, "title": log_title} # algoritmo retoma rodada anterior, exceto pela primeira (resume = 0)
                         }
 
@@ -293,6 +299,7 @@ class MetaOptimizerRunner:
                         'population_size':fixed_population,
                         'iterations':gen,
                         'w':0.6, 'w_rate':0.99, 'c1':2.05, 'c2':2.05, 'init_vel_ratio':0.2,
+                        'local_dir':self.local_dir,
                         'log_data':{"dir": pretest_log_path, "resume": previous_log, "title": log_title}
                         # algoritmo retoma rodada anterior, exceto pela primeira (resume = 0)
                         }
@@ -366,10 +373,10 @@ class MetaOptimizerRunner:
 
             if algo_type == "GA":
                 p = Process(target=self._worker_ga,
-                            args=(i, self.base_dir, self.struct_params, param_dict, q))
+                            args=(i, self.base_dir, self.local_dir, self.struct_params, param_dict, q))
             else:
                 p = Process(target=self._worker_pso,
-                            args=(i, self.base_dir, self.struct_params, param_dict, q))
+                            args=(i, self.base_dir, self.local_dir, self.struct_params, param_dict, q))
 
             p.start()
             res = q.get()
@@ -486,12 +493,13 @@ if __name__ == "__main__":
     # population = 3 # teste
 
     # alterar com base na máquina:
-    BASE_DIR = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
-    resume = "GA_rep(0)_gen(10)_20260210_152031"
+    BASE_DIR = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros\.LEST2"
+    LOCAL_DIR = r"C:\Users\Thiago Artur\Documents\Problema 2 (local)"
+    # resume = "GA_rep(0)_gen(10)_20260210_152031"
 
-    runner = MetaOptimizerRunner(BASE_DIR, struct_params)
+    runner = MetaOptimizerRunner(BASE_DIR, LOCAL_DIR, struct_params)
 
-    choice = "GA" # alterar conforme algoritmo desejado
+    choice = "PSO" # alterar conforme algoritmo desejado
 
     if "GA" in choice:
         # pop_tests = runner.pretest_population_size("GA", [30, 60, 90, 120])
@@ -507,7 +515,7 @@ if __name__ == "__main__":
         # population, generations = min(pop_tests, key=lambda x: x[1])
 
         # teste de gerações:
-        optimal_generations = runner.pretest_generations("PSO", population, max_generations=120, resume=None)
+        optimal_generations = 39 # runner.pretest_generations("PSO", population, max_generations=120, resume=None)
         runner.run_meta_optimization("PSO", optimal_generations, population)
 
     try:
