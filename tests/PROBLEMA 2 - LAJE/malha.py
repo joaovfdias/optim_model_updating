@@ -4,18 +4,18 @@ import numpy as np
 import pandas as pd  # Biblioteca essencial para manipular tabelas e CSV
 from ansys.mapdl.core import launch_mapdl
 
-malha = [0.5, 0.8, 1, 1.25, 1.5, 2]
+malha = [0.25, 0.5, 0.8, 1, 1.25, 1.5, 2]
 key = 'malha'
 
 # Caminhos
-base_dir = r"caminho no notebook"
+base_dir = r"C:\Users\thiag\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros\.NOTEBOOK"
 ansys_working_dir = os.path.join(base_dir, 'ANSYS', 'malha')
 input_dir = os.path.join(base_dir, 'input', 'teste malha')
-base_script_path = os.path.join(input_dir, 'script base teste malha.txt')
+base_script_path = os.path.join(input_dir, 'script base teste malha.mac')
 output_dir = os.path.join(input_dir, 'output')
 
 # Arquivos que o ANSYS gera
-base_freq_path = os.path.join(input_dir, "target_freq.txt")
+base_freq_path = os.path.join(ansys_working_dir, "target_freq.txt")
 
 # Cria diretórios se não existirem
 if not os.path.exists(output_dir):
