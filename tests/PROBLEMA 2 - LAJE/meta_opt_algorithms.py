@@ -529,7 +529,7 @@ if __name__ == "__main__":
 
     runner = MetaOptimizerRunner(BASE_DIR, LOCAL_DIR, struct_params, title=title)
 
-    choice = "PSO" # alterar conforme algoritmo desejado
+    choice = "GA" # alterar conforme algoritmo desejado
 
     if "GA" in choice:
         # pop_tests = runner.pretest_population_size("GA", [30, 60, 90, 120])
