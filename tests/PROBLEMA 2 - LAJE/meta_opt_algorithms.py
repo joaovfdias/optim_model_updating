@@ -5,6 +5,7 @@ import shutil
 import numpy as np
 from datetime import datetime
 from multiprocessing import Process, Queue
+from skopt.utils import dump
 
 from skopt import gp_minimize
 from skopt.space import Real
@@ -18,7 +19,10 @@ from PSO_run_TEST2 import PSO_run
 
 class MetaOptimizerRunner:
 
-    def __init__(self, base_dir, local_dir, struct_params, n_repetitions=3):
+    def __init__(self, base_dir, local_dir, struct_params, n_repetitions=3, title=None):
+
+        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
         self.base_dir = base_dir
         self.local_dir = local_dir
         self.struct_params = struct_params
@@ -30,10 +34,8 @@ class MetaOptimizerRunner:
 
         self.global_results = []
 
-        self.log_dir = os.path.join(base_dir, 'meta_opt', 'populational logs')
+        self.log_dir = os.path.join(base_dir, 'meta-opt', f"rodada_{title if title else 'untitled'}_{self.timestamp}")
         os.makedirs(self.log_dir, exist_ok=True)
-
-        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
     # EXECUTORES DOS ALGORITMOS
@@ -397,18 +399,24 @@ class MetaOptimizerRunner:
     # LOG
 
     def log_step(self, algo, params, score, avg_fit, cv, avg_time):
-        filename = os.path.join(self.log_dir, f"meta_opt_{algo}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv")
+        filename = os.path.join(self.log_dir, f"meta_opt_{algo}.csv")
         exists = os.path.isfile(filename)
 
         with open(filename, 'a', newline='') as f:
             writer = csv.writer(f)
             if not exists:
-                writer.writerow(['Timestamp', 'Score', 'Avg_LogFit', 'CV', 'Avg_Time'] + list(params.keys()))
-
+                writer.writerow(
+                    ['Timestamp', 'Algorithm', 'Score', 'Avg_LogFit', 'CV', 'Avg_Time']
+                    + list(params.keys())
+                )
             writer.writerow([
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                score, avg_fit, cv, avg_time
-            ] + list(params.values()))
+                                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                algo,
+                                score,
+                                avg_fit,
+                                cv,
+                                avg_time
+                            ] + list(params.values()))
 
 
     # EXE
@@ -457,7 +465,7 @@ class MetaOptimizerRunner:
         print("\n" + "-" * 50)
         print(f"\n\nRODANDO META-OTIMIZAÇÃO DO {algo_type} . . .")
 
-        return gp_minimize(
+        res = gp_minimize(
             func=objective,
             dimensions=space,
             n_calls=n_calls,
@@ -467,6 +475,27 @@ class MetaOptimizerRunner:
             # random_state=42
         )
 
+        log_results = os.path.join(self.log_dir, "results")
+        os.makedirs(log_results, exist_ok=True)
+
+        best_csv = os.path.join(log_results, f"best_{algo_type}_{self.timestamp}.csv")
+        with open(best_csv, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["param", "value"])
+            for k, v in zip(res.space.dimension_names, res.x):
+                writer.writerow([k, v])
+        print(f"\nMelhor resultado armazenado em: {best_csv}")
+
+        try:
+            # salva resultado completo
+            metaoptpath = os.path.join(log_results, f"bo_metaopt_{algo_type}_{self.timestamp}.pkl")
+            dump(res, metaoptpath)
+            print(f"\nResultado completo armazenado em: {metaoptpath}")
+        except Exception as e:
+            print("\nNão foi possível armazenar o resultado completo.")
+            print(f"[ERRO] {e}")
+
+        return res
 
 
 # MAIN
@@ -481,11 +510,11 @@ if __name__ == "__main__":
             # Continuous(20e9, 35e9, 'modulo_borda_2'),
 
             Continuous(0.1, 0.40, 'poisson'),
-            Continuous(2400, 2600, 'dens'),
+            # Continuous(2400, 2600, 'dens'),
 
             Continuous(50e6, 50e8, 'rigidez1'),
-            Continuous(50e6, 50e8, 'rigidez2'),
-            Continuous(50e6, 50e8, 'rigidez3'),
+            # Continuous(50e6, 50e8, 'rigidez2'),
+            # Continuous(50e6, 50e8, 'rigidez3'),
             Continuous(50e6, 50e8, 'rigidez4')
         ]
 
@@ -495,9 +524,10 @@ if __name__ == "__main__":
     # alterar com base na máquina:
     BASE_DIR = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros\.LEST2"
     LOCAL_DIR = r"C:\Users\Thiago Artur\Documents\Problema 2 (local)"
+    title = "prob2_6param"
     # resume = "GA_rep(0)_gen(10)_20260210_152031"
 
-    runner = MetaOptimizerRunner(BASE_DIR, LOCAL_DIR, struct_params)
+    runner = MetaOptimizerRunner(BASE_DIR, LOCAL_DIR, struct_params, title=title)
 
     choice = "PSO" # alterar conforme algoritmo desejado
 
@@ -508,7 +538,7 @@ if __name__ == "__main__":
         # teste de gerações:
         # optimal_generations = runner.pretest_generations("GA", population, max_generations=120, resume=None)
         optimal_generations = 49
-        runner.run_meta_optimization("GA", optimal_generations, population)
+        res = runner.run_meta_optimization("GA", optimal_generations, population)
 
     if "PSO" in choice:
         # pop_tests = runner.pretest_population_size("PSO", [30, 60, 90, 120])
@@ -516,7 +546,11 @@ if __name__ == "__main__":
 
         # teste de gerações:
         optimal_generations = 39 # runner.pretest_generations("PSO", population, max_generations=120, resume=None)
-        runner.run_meta_optimization("PSO", optimal_generations, population)
+        res = runner.run_meta_optimization("PSO", optimal_generations, population)
+
+    print(f"\n[META-BO DO {choice} FINALIZADA]")
+    print(f"\nMelhor score: {res.fun}")
+    print(f"Melhores hiperparâmetros: {res.x}")
 
     try:
         kill_ansys_process()
