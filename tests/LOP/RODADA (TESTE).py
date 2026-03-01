@@ -1,12 +1,8 @@
-from optimization.sensitivity import SensitivityAnalyzer, ParamSpec, Sampler
-import pandas as pd
-import numpy as np
-from optimization.parameter import *
-from external.parser import Ansys
-from external.special_functions import SpecialFun
-
-import time
 import os
+
+from optimization.parameter import *
+from external.special_functions import SpecialFun
+from external.parser import Ansys
 
 parameters = [
     Continuous(20e9, 35e9, 'modulo_concreto'),
@@ -27,10 +23,10 @@ parameters = [
     Continuous(1e7, 1e9, 'kt')
 ]
 
-keys = [p.key for p in parameters]
+keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
 
 ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
-
+# caminhos
 base_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Analise 8"
 ansys_working_dir = os.path.join(base_dir, 'ANSYS')
 input_dir = os.path.join(base_dir, 'input')
@@ -47,13 +43,11 @@ ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename
 ansys.set_output_filenames(out_freq_filename, out_modes_filename)
 ansys.max_attempts = 6
 
-def evaluate(row):
-    param = row
-
+def fitness_function(param):
     input_file = ansys.create_input_file(param, keys)
     ansys.run_ansys(input_file, True, True)
 
-    comp_freq  = ansys.read_frequencies()
+    comp_freq = ansys.read_frequencies()
     comp_modes = ansys.read_modes()
 
     paired_comp_freq, paired_comp_modes, mac_error_sum = SpecialFun.pair_modes_mac(
@@ -62,38 +56,16 @@ def evaluate(row):
     freq_error_sum = SpecialFun.norm_freq_errors(ansys.base_freq, paired_comp_freq)
 
     peso_freq = 1
-    peso_mac  = 1
+    peso_mac = 1
     fitness = peso_freq * freq_error_sum + peso_mac * mac_error_sum
 
-    ddata = {}
-    for i, f in enumerate(paired_comp_freq, start=1):
-        ddata[f"freq #{i}"] = f
-    for i, m in enumerate(paired_comp_modes, start=1):
-        mac = SpecialFun.modal_assurance_criterion(comp_modes[i-1], m)
-        ddata[f"MAC #{i}"] = mac
+    return fitness, {"freq error": freq_error_sum, "mac error": mac_error_sum, "Freq.": paired_comp_freq, "Mode": paired_comp_modes}
 
-    return ddata
 
-start_time = time.time()
+# agora basta passar os parâmetros corretos para a função e averiguar se o fitness zera para validar o modelo e script
 
-# Gera DoE sem precisar do Optimizer
-rng = np.random.default_rng()
-specs = [ParamSpec(p.key, p.lower_bound, p.upper_bound) for p in parameters]
+params = [32.206e9, 0.2, 15e9, 0.2, 210e9, 0.3, 210e9, 0.3, 1.1e8, 9.7e7, 0.9e8] # v2: E uniforme pra laje e add do poison e dens.
 
-amostragem = 3300
-
-X = Sampler.lhs(amostragem, specs, rng)
-Y = X.apply(evaluate, axis=1, result_type="expand")
-
-df_eval = pd.concat([X, Y], axis=1)
-
-# Rodar análise de sensibilidade
-sa = SensitivityAnalyzer(minimize=True)
-selected = sa.workflow(df_eval, fitness_col="Fitness", interactive=False)
-print("Parâmetros escolhidos:", selected)
-
-end_time = time.time()
-elapsed = end_time - start_time
-
-print(f"\nTempo para amostragem de {amostragem} indivíduos ({amostragem/len(parameters)}x o número de parâmetros: "
-      f"\n{elapsed:.4f} s")
+fitness, datas = fitness_function(params)
+print(fitness)
+print(datas)
