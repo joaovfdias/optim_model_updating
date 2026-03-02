@@ -3,6 +3,7 @@ from optimization.ga_optimizer import GA
 from external.parser import Ansys
 from external.special_functions import SpecialFun
 
+from datetime import datetime
 import os
 
 
@@ -13,7 +14,7 @@ def GA_run(parameters, irun, input_dir, log_dir):
     keys = [p.key for p in parameters]
 
     ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
-    ansys_working_dir = None
+    ansys_working_dir = os.path.join(input_dir, "ANSYS")
     # input_dir = input_dir
     base_script_filename = "scriptLOP.mac"
     base_freq_filename = "out_freq.txt"
@@ -21,7 +22,7 @@ def GA_run(parameters, irun, input_dir, log_dir):
     output_dir = os.path.join(os.getcwd(), 'output')
 
     out_freq_filename = "out_freq.txt"
-    out_modes_filename = "out_modos_y.txt"
+    out_modes_filename = "out_modes.txt"
 
     ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename, base_freq_filename,
                   base_modes_filename, output_dir)
@@ -56,12 +57,12 @@ def GA_run(parameters, irun, input_dir, log_dir):
 
     # declaração do otimizador:
     rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength) # objeto otimizador
-    # rodada.set_tolerance(fit_abs = 2e-2, patience = 10) # critério de parada
+    rodada.set_tolerance(fit_rel = 10e-3, patience = 10) # critério de parada
     rodada.sync_time(ansys.anstime) # sincroniza timestamp de optimizer e ansys para facilitar controle dos registros
 
     # ajuste do registro:
     log = "full" # tipo de registro (True: simplificado - melhor de cada iteração, "full": todos os indivíduos)
-    log_title = f"GA_trel_{irun}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
+    log_title = f"GA_trel_{irun}_{datetime.now().strftime("%Y%m%d_%H%M%S")}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
     # log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
     rodada.set_log(log_title, log_dir)
 

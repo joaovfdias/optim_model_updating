@@ -16,7 +16,7 @@ def sensitivity_analysis(parameters, base_dir, ansys_exe_path=None):
 
     # base_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 8"
     ansys_working_dir = os.path.join(base_dir, 'ANSYS')
-    input_dir = os.path.join(base_dir, 'input')
+    input_dir = base_dir
     output_dir = os.path.join(os.getcwd(), 'output')
 
     base_script_filename = "scriptLOP.mac"
@@ -80,5 +80,7 @@ def sensitivity_analysis(parameters, base_dir, ansys_exe_path=None):
 
     print(f"\nTempo para amostragem de {amostragem} indivíduos ({amostragem/len(parameters)}x o número de parâmetros: "
           f"\n{elapsed:.4f} s")
+
+    ansys.mapdl.exit()
 
     return

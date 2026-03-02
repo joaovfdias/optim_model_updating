@@ -3,6 +3,7 @@ from tests.LOP.BO_skopt_trel_TestRun import BO_skopt_run
 from tests.LOP.GA_trel_TestRun import GA_run
 from tests.LOP.PSO_trel_TestRun import PSO_run
 from optimization.parameter import *
+import os
 
 from multiprocessing import Process
 
@@ -21,22 +22,7 @@ def run_PSO(parameters, irun, input_dir, log_dir):
 
 if __name__ == '__main__':
 
-    input_dir = [r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 1",
-                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 2",
-                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 3",
-                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 4",
-                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 5",
-                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 6",
-                 r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 7"
-                 ]
-    log_dir = [r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 1",
-               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 2",
-               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 3",
-               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 4",
-               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 5",
-               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 6",
-               r"C:\Users\thiag\OneDrive\Documentos\2025.2\Problema 3\Py\log\Análise 7"
-               ]
+    base_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input"
 
     parameters = [
         [ #1
@@ -123,33 +109,77 @@ if __name__ == '__main__':
             Continuous(5e7, 5e8, 'kv'),
             Continuous(5e7, 5e8, 'kh'),
             Continuous(5e7, 5e8, 'kt')
+        ],
+        [   #8
+            Continuous(20e9, 35e9, 'modulo_concreto'),
+            Continuous(0.1, 0.49, 'poisson_concreto'),
+            # Continuous(0.25, 0.6, 'h_concreto'),
+
+            Continuous(10e9, 20e9, 'modulo_madeira'),
+            Continuous(0.1, 0.49, 'poisson_madeira'),
+
+            Continuous(150e9, 250e9, 'modulo_perfis'),
+            Continuous(0.1, 0.49, 'poisson_perfis'),
+
+            Continuous(150e9, 250e9, 'modulo_cordoalhas'),
+            Continuous(0.1, 0.49, 'poisson_cordoalhas'),
+
+            Continuous(1e7, 1e9, 'kv'),
+            Continuous(1e7, 1e9, 'kh'),
+            Continuous(1e7, 1e9, 'kt')
+        ],
+        [ #9
+            Continuous(1e6, 1e9, 'GXY'),
+            Continuous(1e6, 1e9, 'GYZ'),
+            Continuous(1e6, 1e9, 'GXZ'),
+            Continuous(0.02, 0.06, 'h_concreto')
+        ],
+        [   # 10
+            Continuous(20e9, 35e9, 'modulo_concreto'),
+            Continuous(0.1, 0.49, 'poisson_concreto'),
+            Continuous(0.02, 0.06, 'h_concreto'),
+
+            Continuous(10e9, 20e9, 'modulo_madeira'),
+
+            Continuous(150e9, 250e9, 'modulo_cordoalhas'),
+
+            Continuous(1e7, 1e9, 'kv'),
+            Continuous(1e7, 1e9, 'kh'),
+
+            Continuous(1e6, 1e9, 'GXY'),
+            Continuous(1e6, 1e9, 'GYZ'),
+            Continuous(1e6, 1e9, 'GXZ')
         ]
     ]
 
-    num_runs = 4
+    num_runs = 1
     # cases = [1,2,3,4]
-    cases = [7]
+    cases = [10]
 
     for irun in range(1, num_runs+1):
 
         for i, case in enumerate(cases):
 
-            p = Process(target=run_PSO, args=(parameters[case-1], f"case{case}_run{irun}", input_dir[case-1], log_dir[case-1]))
+            input_dir = os.path.join(base_dir, f"Analise {case}")
+            log_dir = os.path.join(input_dir, f"log")
+            os.makedirs(log_dir, exist_ok=True)
+
+            p = Process(target=run_PSO, args=(parameters[case-1], f"case{case}_run{irun}", input_dir, log_dir))
             p.start()
             p.join()
 
-            # p = Process(target=run_BO, args=(parameters[case-1], f"case{case}_run{irun}", input_dir[case-1], log_dir[case-1], True))
+            # p = Process(target=run_BO, args=(parameters[case-1], f"case{case}_run{irun}", input_dir, log_dir, True))
             # p.start()
             # p.join()
             #
-            # p = Process(target=run_BO, args=(parameters[case-1], f"case{case}_run{irun}", input_dir[case-1], log_dir[case-1], False))
+            # p = Process(target=run_BO, args=(parameters[case-1], f"case{case}_run{irun}", input_dir, log_dir, False))
             # p.start()
             # p.join()
-
-            p = Process(target=run_GA, args=(parameters[case-1], f"case{case}_run{irun}", input_dir[case-1], log_dir[case-1]))
-            p.start()
-            p.join()
-
-            p = Process(target=run_BO_skopt, args=(parameters[case-1], f"case{case}_run{irun}", input_dir[case-1], log_dir[case-1]))
-            p.start()
-            p.join()
+            #
+            # p = Process(target=run_GA, args=(parameters[case-1], f"case{case}_run{irun}", input_dir, log_dir))
+            # p.start()
+            # p.join()
+            #
+            # p = Process(target=run_BO_skopt, args=(parameters[case-1], f"case{case}_run{irun}", input_dir, log_dir))
+            # p.start()
+            # p.join()
