@@ -21,7 +21,7 @@ ANSYS_EXE_PATH = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\lau
 # Pasta FIXA onde o ModBase.db já deve estar (sem subpastas)
 
 # LEST
-BASE_DIR = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros" # LEST
+BASE_DIR = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros\.LEST2" # LEST2 (PC DE 24K)
 ANSYS_WORKING_DIR = os.path.join(BASE_DIR, 'ANSYS')
 
 # CASA
@@ -61,11 +61,11 @@ def worker_optimization(config, run_id, result_queue):
             # Continuous(20e9, 35e9, 'modulo_borda_2'),
 
             Continuous(0.1, 0.40, 'poisson'),
-            Continuous(2400, 2600, 'dens'),
+            # Continuous(2400, 2600, 'dens'),
 
             Continuous(50e6, 50e8, 'rigidez1'),
-            Continuous(50e6, 50e8, 'rigidez2'),
-            Continuous(50e6, 50e8, 'rigidez3'),
+            # Continuous(50e6, 50e8, 'rigidez2'),
+            # Continuous(50e6, 50e8, 'rigidez3'),
             Continuous(50e6, 50e8, 'rigidez4')
         ]
         keys = [p.key for p in parameters]

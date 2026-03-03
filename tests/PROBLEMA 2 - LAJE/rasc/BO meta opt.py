@@ -21,9 +21,9 @@ ANSYS_EXE_PATH = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\lau
 # Pasta FIXA onde o ModBase.db já deve estar (sem subpastas)
 BASE_DIR = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\4. Rodadas e resultados\Teste 2 - hiperparametros"
 
-ANSYS_WORKING_DIR = os.path.join(BASE_DIR, 'ANSYS')
+ANSYS_WORKING_DIR = os.path.join(BASE_DIR, '../ANSYS')
 INPUT_DIR = os.path.join(BASE_DIR, 'input')
-OUTPUT_DIR = os.path.join(BASE_DIR, 'output')
+OUTPUT_DIR = os.path.join(BASE_DIR, '../output')
 
 # Configuração da Otimização
 N_REPETICOES = 5  # Rodadas por configuração para média estatística
@@ -97,7 +97,7 @@ def worker_optimization(config, run_id, result_queue):
                 return 1e6, {}  # Penalidade por falha
 
         # D. Otimizador
-        log_dir = os.path.join(os.getcwd(), 'auto_meta_logs')
+        log_dir = os.path.join(os.getcwd(), '../auto_meta_logs')
         if not os.path.exists(log_dir): os.makedirs(log_dir)
 
         optimizer = BO(fitness_function, parameters, N_INITIAL_POINTS)

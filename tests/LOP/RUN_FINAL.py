@@ -41,7 +41,7 @@ if __name__ == '__main__':
             Continuous(1e6, 1e9, 'GXZ')
     ]
 
-    num_runs = 1
+    num_runs = 4
 
     for irun in range(1, num_runs+1):
 
@@ -53,18 +53,10 @@ if __name__ == '__main__':
         p.start()
         p.join()
 
-        # p = Process(target=run_BO, args=(parameters[case-1], f"case{case}_run{irun}", input_dir, log_dir, True))
-        # p.start()
-        # p.join()
-        #
-        # p = Process(target=run_BO, args=(parameters[case-1], f"case{case}_run{irun}", input_dir, log_dir, False))
-        # p.start()
-        # p.join()
-        #
-        # p = Process(target=run_GA, args=(parameters[case-1], f"case{case}_run{irun}", input_dir, log_dir))
-        # p.start()
-        # p.join()
-        #
-        # p = Process(target=run_BO_skopt, args=(parameters[case-1], f"case{case}_run{irun}", input_dir, log_dir))
-        # p.start()
-        # p.join()
+        p = Process(target=run_GA, args=(parameters, f"run{irun}", input_dir, log_dir))
+        p.start()
+        p.join()
+
+        p = Process(target=run_BO_skopt, args=(parameters, f"run{irun}", input_dir, log_dir))
+        p.start()
+        p.join()

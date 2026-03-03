@@ -9,7 +9,7 @@ from datetime import datetime
 import shutil
 
 
-def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rate, crossover_rate, mutation_strength, local_dir=None, log_data=None):
+def GA_run(irun, base_dir, parameters, population_size=None, generations=None, elitism_rate=0.10, crossover_rate=0.60, mutation_strength=0.10, selection_method='tournament', local_dir=None, log_data=None, base_script_filename=None):
 
     keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
 
@@ -27,7 +27,7 @@ def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rat
     unique_ansys_dir = os.path.join(ansys_working_dir, f"worker_{irun}_{os.getpid()}")
     os.makedirs(unique_ansys_dir, exist_ok=True)
 
-    base_script_filename = "script problema 2.mac"
+    base_script_filename = base_script_filename or "script problema 2.mac"
     base_freq_filename = "target_freq.txt"
     base_modes_filename = "target_modes.txt"
 
@@ -79,12 +79,13 @@ def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rat
     # elitism_rate = 0.10 # proporção dos melhores da população que serão preservados
     # crossover_rate = 0.60 # chance de ocorrência de cruzamento entre indivíduos selecionados
     # mutation_strength = 0.10 # taxa máxima de mutação de cada gene daqueles indivíduos não originados de crossover
-    #
-    # population_size = len(keys)*10 # indivíduos avaliados por geração (recomendado ao menos 10x o número de variáveis)
-    # generations = 30 # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
+
+    population_size = population_size or len(keys)*10 # indivíduos avaliados por geração (recomendado ao menos 10x o número de variáveis)
+    generations = generations or round(5.5*len(keys)) # quantidade de iterações (suficientemente grande para a convergência do algoritmo)
 
     # declaração do otimizador:
     rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength) # objeto otimizador
+    rodada.set_selection_parents(selection_method)
     rodada.set_tolerance(fit_rel = 10e-3, patience = 15) # critério de parada
     rodada.sync_time(ansys.anstime) # sincroniza timestamp de optimizer e ansys para facilitar controle dos registros
 
@@ -95,7 +96,7 @@ def GA_run(irun, base_dir, parameters, population_size, generations, elitism_rat
         log_title = log_data["title"]
     else:
         log_dir = os.path.join(base_dir, 'meta-opt', 'results', 'GA')
-        log_title = f"GA_pop({population_size})_gen({generations})_elit({elitism_rate:.4f})_cross({crossover_rate:.4f})_mut({mutation_strength:.4f})_{irun}_{datetime.now().strftime("%Y%m%d_%H%M%S")}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
+        log_title = f"GA_pop({population_size})_gen({generations})_elit({elitism_rate:.4f})_cross({crossover_rate:.4f})_mut({mutation_strength:.4f})_sel({selection_method})_{irun}_{datetime.now().strftime("%Y%m%d_%H%M%S")}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
 
     # log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
     rodada.set_log(log_title, log_dir, False)
