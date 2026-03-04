@@ -77,18 +77,20 @@ def summarize_and_save(algo_name, conjunto_nome, results, expected_params, outpu
 
 
 # --- 3. COMPILADOR DE CONVERGÊNCIA (NOVIDADE) ---
-def compile_convergence_history(algo_name, conjunto_nome, expected_params, log_dir):
+def compile_convergence_history(algo_name, expected_params, log_dir, file_id=None):
     """
     Lê os arquivos de log individuais de cada repetição e consolida a convergência
     em um único CSV pronto para plotagem.
     """
     # Procura todos os CSVs na pasta do conjunto
     csv_files = glob.glob(os.path.join(log_dir, "*.csv"))
-    csv_files = [f for f in csv_files if f.startswith(f"{algo_name}")]
-    csv_files = [f for f in csv_files if "Convergencia" not in f]  # Ignora caso já exista
+    csv_files = [f for f in csv_files if os.path.basename(f).startswith(algo_name)]
 
     if not csv_files:
+        print(f"\n[AVISO] Nenhum arquivo de log individual encontrado para {algo_name} em {log_dir}")
         return
+
+    print(f"\n[COMPILANDO] Compilando {len(csv_files)} rodadas de {algo_name}")
 
     all_runs_data = []
 
@@ -102,6 +104,34 @@ def compile_convergence_history(algo_name, conjunto_nome, expected_params, log_d
         if 'Fitness' not in df.columns:
             continue
 
+        # 1. Identifica a coluna de passos
+        step_col = 'Generation' if 'Generation' in df.columns else (
+            'Iteration' if 'Iteration' in df.columns else None)
+
+        cols_to_check = ['Fitness']
+        if step_col:
+            cols_to_check.append(step_col)
+
+        # 2. "Passa a tesoura" (corta) na primeira linha vazia (NaN)
+        # Isso isola os dados puros e remove ttodo o resumo de metadados do final
+        invalid_rows = df[df[cols_to_check].isna().any(axis=1)]
+        if not invalid_rows.empty:
+            first_invalid_idx = invalid_rows.index[0]
+            df = df.loc[:first_invalid_idx - 1].copy()
+
+        # 3. Força a conversão para numérico
+        # (Obrigatório porque os textos no final podem ter transformado a coluna toda em formato 'object')
+        df['Fitness'] = pd.to_numeric(df['Fitness'], errors='coerce')
+        if step_col:
+            df[step_col] = pd.to_numeric(df[step_col], errors='coerce')
+
+        # Remove eventuais resquícios por precaução
+        df = df.dropna(subset=cols_to_check)
+
+        if df.empty:
+            continue
+
+        # 4. Agora sim, aplica a lógica de cada algoritmo com os dados 100% limpos
         if algo_name == "BO" or algo_name == "BO_skopt":
             # BO avalia ponto a ponto. O melhor é o mínimo cumulativo até a avaliação 'x'.
             best_so_far = []
@@ -114,16 +144,14 @@ def compile_convergence_history(algo_name, conjunto_nome, expected_params, log_d
                 best_so_far.append(current_best_row)
             df_best = pd.DataFrame(best_so_far)
             df_best['Step'] = range(1, len(df_best) + 1)
+
         else:
             # GA e PSO: Agrupa por geração/iteração e pega o menor fitness
-            step_col = 'Generation' if 'Generation' in df.columns else (
-                'Iteration' if 'Iteration' in df.columns else None)
             if step_col:
                 idx = df.groupby(step_col)['Fitness'].idxmin()
                 df_best = df.loc[idx].sort_values(step_col).copy()
                 df_best['Step'] = df_best[step_col].values
             else:
-                # Fallback genérico
                 df_best = df.copy()
                 df_best['Step'] = range(1, len(df_best) + 1)
 
@@ -168,15 +196,15 @@ def compile_convergence_history(algo_name, conjunto_nome, expected_params, log_d
 
     consolidated = consolidated[cols]
 
-    out_path = os.path.join(log_dir, f"Convergencia_{algo_name}_{conjunto_nome}.csv")
+    out_path = os.path.join(log_dir, f"Convergencia_{algo_name}_{file_id if file_id else datetime.now().strftime("%Y%m%d_%H%M%S")}.csv")
     consolidated.to_csv(out_path, sep=';', decimal='.', index=False)
-    print(f"\n[DADOS] Histórico de convergência consolidado em: {os.path.basename(out_path)}")
+    print(f"[RODADAS COMPILADAS] Histórico de convergência consolidado em: {os.path.basename(out_path)}")
 
 
 # --- 4. ORQUESTRADOR ---
 if __name__ == '__main__':
 
-    problema = r"Problema 4"
+    problema = 4
     teste = True
     computador = "LEST 2"
 
@@ -189,8 +217,8 @@ if __name__ == '__main__':
         devicepath_base = None
         devicepath_local = None
 
-    base_dir = os.path.join(devicepath_base, problema)
-    local_dir = os.path.join(devicepath_local, problema) # copia ModBase.db pro diretório local
+    base_dir = os.path.join(devicepath_base, f"Problema {problema}")
+    local_dir = os.path.join(devicepath_local, f"Problema {problema}") # copia ModBase.db pro diretório local
     if teste: local_dir = os.path.join(local_dir, "teste")
     os.makedirs(local_dir, exist_ok=True)
 
@@ -198,13 +226,13 @@ if __name__ == '__main__':
     global_log_dir = os.path.join(base_dir, "log", f"rodada_{initimestamp}") if not teste else os.path.join(base_dir, "teste", "log", f"rodada_{initimestamp}")
     os.makedirs(global_log_dir, exist_ok=True)
 
-    csv_resultado_path = os.path.join(global_log_dir, f"Resumo Global {problema}.csv")
+    csv_resultado_path = os.path.join(global_log_dir, f"Resumo Global - Problema {problema}.csv")
 
     # definição dos parâmetros do problema
     script_name = None
     noise = None
 
-    if "Problema 3" in problema:
+    if problema == 3:
 
         script_name = "scriptTREL.mac"
         noise = 0.03
@@ -226,7 +254,7 @@ if __name__ == '__main__':
 
         target_params = [205e9, 215e9, 195e9, 8e7, 6.8e7, 7.6e7, 7.2e7, 600]
 
-    elif "Problema 4" in problema:
+    elif problema == 4:
 
         script_name = "scriptLOP.mac"
 
@@ -311,7 +339,7 @@ if __name__ == '__main__':
             ]
         }
 
-    num_runs = 4
+    num_runs = 4 if not teste else 3
 
     print(f"{'=' * 60}\nINICIANDO AVALIAÇÃO DE ALGORITMOS (RODADA {initimestamp})\n{'=' * 60}")
 
@@ -381,6 +409,6 @@ if __name__ == '__main__':
             summarize_and_save(algo, conjunto_nome, algo_results, expected_values, csv_resultado_path)
 
             # CHAMA A NOVA FUNÇÃO DE COMPILAÇÃO APÓS AS 4 RODADAS
-            compile_convergence_history(algo, conjunto_nome, expected_values, conjunto_log_dir)
+            compile_convergence_history(algo, expected_values, conjunto_log_dir, conjunto_nome)
 
-    print(f"\n{'=' * 60}\nAVALIAÇÕES CONCLUÍDAS!\nRegistros em: {global_log_dir}")
+    print(f"\n{'=' * 60}\n\nAVALIAÇÕES CONCLUÍDAS!\nRegistros em: {global_log_dir}")
