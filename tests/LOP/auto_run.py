@@ -84,7 +84,7 @@ def summarize_and_save(algo_name, conjunto_nome, results, expected_params, outpu
 if __name__ == '__main__':
 
     problema = 4
-    teste = True
+    teste = False
     computador = "LEST 2"
 
     # diretórios

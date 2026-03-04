@@ -46,13 +46,20 @@ def compile_convergence_history(algo_name, expected_params, log_dir, file_id=Non
             first_invalid_idx = invalid_rows.index[0]
             df = df.loc[:first_invalid_idx - 1].copy()
 
-        # 3. Força a conversão para numérico
-        # (Obrigatório porque os textos no final podem ter transformado a coluna toda em formato 'object')
-        df['Fitness'] = pd.to_numeric(df['Fitness'], errors='coerce')
+        # 3. Força a conversão para numérico DE TODAS AS COLUNAS MONITORADAS
+        # (Obrigatório porque os textos no final transformaram as colunas em formato 'object'/texto)
+        cols_to_convert = ['Fitness'] + list(expected_params.keys())
         if step_col:
-            df[step_col] = pd.to_numeric(df[step_col], errors='coerce')
+            cols_to_convert.append(step_col)
 
-        # Remove eventuais resquícios por precaução
+        for c in cols_to_convert:
+            if c in df.columns:
+                # Se o Pandas leu como string, previne erros de vírgula decimal e converte pra float
+                if df[c].dtype == 'object':
+                    df[c] = df[c].astype(str).str.replace(',', '.')
+                df[c] = pd.to_numeric(df[c], errors='coerce')
+
+        # Remove eventuais resquícios por precaução baseando-se no Fitness e Step
         df = df.dropna(subset=cols_to_check)
 
         if df.empty:
