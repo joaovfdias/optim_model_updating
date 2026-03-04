@@ -32,7 +32,11 @@ def run_algorithm_worker(algo_name, irun, parameters, base_dir, local_dir, log_d
         fit = best.fitness if hasattr(best, 'fitness') else best['fitness']
         params = best.param if hasattr(best, 'param') else best['param']
 
-        queue.put({'success': True, 'fitness': fit, 'time': elapsed, 'params': params})
+        # Converte a lista em um dicionário {'nome_do_parametro': valor}
+        # Isso garante que a variável p_name funcione perfeitamente depois
+        params_dict = {p.key: valor for p, valor in zip(parameters, params)}
+
+        queue.put({'success': True, 'fitness': fit, 'time': elapsed, 'params': params_dict})
     except Exception as e:
         print(f"\n[ERRO WORKER] Falha no {algo_name} ({irun}): {e}")
         queue.put({'success': False})
@@ -172,7 +176,8 @@ def compile_convergence_history(algo_name, conjunto_nome, expected_params, log_d
 # --- 4. ORQUESTRADOR ---
 if __name__ == '__main__':
 
-    problema = r"Problema 4\teste"
+    problema = r"Problema 4"
+    teste = True
     computador = "LEST 2"
 
     # diretórios
@@ -186,10 +191,11 @@ if __name__ == '__main__':
 
     base_dir = os.path.join(devicepath_base, problema)
     local_dir = os.path.join(devicepath_local, problema) # copia ModBase.db pro diretório local
+    if teste: local_dir = os.path.join(local_dir, "teste")
     os.makedirs(local_dir, exist_ok=True)
 
     initimestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    global_log_dir = os.path.join(base_dir, "log", f"rodada_{initimestamp}")
+    global_log_dir = os.path.join(base_dir, "log", f"rodada_{initimestamp}") if not teste else os.path.join(base_dir, "teste", "log", f"rodada_{initimestamp}")
     os.makedirs(global_log_dir, exist_ok=True)
 
     csv_resultado_path = os.path.join(global_log_dir, f"Resumo Global {problema}.csv")
@@ -255,7 +261,7 @@ if __name__ == '__main__':
     # conjunto 2: médio
     # conjunto 3: intensificador (P2 COM 6 PARAM)
 
-    if "teste" in problema.lower(): # conjunto de teste (rodadas rapidinhas)
+    if teste: # conjunto de teste (rodadas rapidinhas)
         configs_algoritmos = {
             "PSO": [
                 {"population_size": len(parameters), "iterations": 4, "w": 0.73, "w_rate": 0.957, "c1": 1.90, "c2": 1.32,
@@ -336,7 +342,7 @@ if __name__ == '__main__':
             algo_results = []
             max_attempts = 3
             for irun in range(1, num_runs + 1):
-                print(f"    > Executando repetição {irun}/{num_runs}...")
+                print(f"\n    > Executando repetição {irun}/{num_runs}...")
 
                 attempt = 1
                 success_run = False
@@ -355,10 +361,10 @@ if __name__ == '__main__':
 
                     if res['success']:
                         success_run = True
-                        print(f"      [OK] Fit: {res['fitness']:.4e} | Tempo: {res['time']:.2f}s")
+                        print(f"\n[OK] Fit: {res['fitness']:.4e} | Tempo: {res['time']:.2f}s")
                         break  # Deu certo! Sai do loop while (de tentativas) e vai pra próxima rodada.
                     else:
-                        print(f"      [FALHA] A rodada {irun} falhou (Tentativa {attempt}/{max_attempts}).")
+                        print(f"\n      [FALHA] A rodada {irun} falhou (Tentativa {attempt}/{max_attempts}).")
                         attempt += 1
 
                         if attempt <= max_attempts:
@@ -370,7 +376,7 @@ if __name__ == '__main__':
 
                 if not success_run:
                     print(
-                        f"      [ERRO CRÍTICO] Rodada {irun} abortada definitivamente após {max_attempts} tentativas.")
+                        f"\n      [ERRO CRÍTICO] Rodada {irun} abortada definitivamente após {max_attempts} tentativas.")
 
             summarize_and_save(algo, conjunto_nome, algo_results, expected_values, csv_resultado_path)
 
