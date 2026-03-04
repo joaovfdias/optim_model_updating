@@ -315,14 +315,16 @@ if __name__ == '__main__':
         algo_dir = os.path.join(global_log_dir, algo)
         os.makedirs(algo_dir, exist_ok=True)
 
-        txt_path = os.path.join(algo_dir, "hiperparametros.txt")
-        with open(txt_path, 'w', encoding='utf-8') as f:
-            f.write(f"=== Hiperparametros {algo} ===\n\n")
-            for idx, config in enumerate(conjuntos):
-                f.write(f"--- Conjunto {idx + 1} ---\n")
-                for key, val in config.items():
-                    f.write(f"  {key}: {val}\n")
-                f.write("\n")
+        csv_hp_path = os.path.join(algo_dir, f"hiperparametros_{algo}.csv")
+        # Prepara a lista de dicionários adicionando a coluna 'CONJUNTO' no início
+        hp_data = []
+        for idx, config in enumerate(conjuntos):
+            row = {"CONJUNTO": f"Conjunto {idx + 1}"}
+            row.update(config)  # Adiciona os hiperparâmetros (w, c1, c2, etc)
+            hp_data.append(row)
+        # Converte para DataFrame e salva
+        df_hp = pd.DataFrame(hp_data)
+        df_hp.to_csv(csv_hp_path, sep=';', decimal='.', index=False)
 
         for idx, config in enumerate(conjuntos):
             conjunto_nome = f"Conjunto {idx + 1}"
@@ -332,22 +334,43 @@ if __name__ == '__main__':
             print(f"\n  --- {algo} | {conjunto_nome} ---")
 
             algo_results = []
+            max_attempts = 3
             for irun in range(1, num_runs + 1):
                 print(f"    > Executando repetição {irun}/{num_runs}...")
 
-                q = Queue()
+                attempt = 1
+                success_run = False
+                res = None
 
-                p = Process(target=run_algorithm_worker,
-                            args=(algo, irun, parameters, base_dir, local_dir, conjunto_log_dir, script_name, noise, config, q))
-                p.start()
-                res = q.get()
-                p.join()
+                while attempt <= max_attempts:
 
+                    q = Queue()
+
+                    p = Process(target=run_algorithm_worker,
+                                args=(algo, irun, parameters, base_dir, local_dir, conjunto_log_dir, script_name, noise,
+                                      config, q))
+                    p.start()
+                    res = q.get()
+                    p.join()
+
+                    if res['success']:
+                        success_run = True
+                        print(f"      [OK] Fit: {res['fitness']:.4e} | Tempo: {res['time']:.2f}s")
+                        break  # Deu certo! Sai do loop while (de tentativas) e vai pra próxima rodada.
+                    else:
+                        print(f"      [FALHA] A rodada {irun} falhou (Tentativa {attempt}/{max_attempts}).")
+                        attempt += 1
+
+                        if attempt <= max_attempts:
+                            print(f"      [RETRY] Aguardando 4 segundos para limpar memória e tentar novamente...")
+                            time.sleep(4)  # Tempo vital para o Windows/ANSYS soltar arquivos .lock
+
+                # Após o while: adiciona o resultado (seja o sucesso final ou a falha após esgotar tentativas)
                 algo_results.append(res)
-                if res['success']:
-                    print(f"      [OK] Fit: {res['fitness']:.4e} | Tempo: {res['time']:.2f}s")
-                else:
-                    print(f"      [FALHA] A rodada {irun} retornou erro.")
+
+                if not success_run:
+                    print(
+                        f"      [ERRO CRÍTICO] Rodada {irun} abortada definitivamente após {max_attempts} tentativas.")
 
             summarize_and_save(algo, conjunto_nome, algo_results, expected_values, csv_resultado_path)
 
