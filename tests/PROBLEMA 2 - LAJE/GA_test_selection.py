@@ -31,6 +31,8 @@ base_script_filename = "script problema 2 (9 param).mac"
 
 log_dir = os.path.join(BASE_DIR, 'meta-opt', f"rodada_GA_teste_selecao_{datetime.now().strftime("%Y%m%d_%H%M%S")}")
 log_title = f"GA_test_selection_{selections[0]}_{selections[1]}"
+log_path = os.path.join(log_dir, log_title if log_title.endswith('.csv') else f"{log_title}.csv"
+)
 
 
 class SelectionEvaluator:
@@ -111,11 +113,9 @@ def extract_fitness(best_individual):
     return float(best_individual)
 
 
-def save_results_to_csv(log_title, results_summary):
-    # Garante que o arquivo tenha a extensão .csv
-    filename = log_title if log_title.endswith('.csv') else f"{log_title}.csv"
+def save_results_to_csv(log_path, results_summary):
 
-    with open(filename, mode='w', newline='', encoding='utf-8') as f:
+    with open(log_path, mode='w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f, delimiter=';')
 
         # Cabeçalho com os termos individuais
@@ -184,8 +184,8 @@ def main():
         print(
             f"  Resultados para {sel_method}: Score={score:.4f}, Fit Médio (log)={avg_log_fit:.4f}, CV={cv:.4f}, Tempo Médio={avg_time:.2f}s")
 
-    save_results_to_csv(log_title, results_summary)
-    print(f"\nResultados salvos com sucesso em: {log_title}.csv")
+    save_results_to_csv(log_path, results_summary)
+    print(f"\nResultados salvos com sucesso em: {log_path}.csv")
 
     # Resumo Final
     print("\n" + "=" * 50)

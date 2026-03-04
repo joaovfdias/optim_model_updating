@@ -21,7 +21,7 @@ MELHOR_KAPPA = 1.96  # Exemplo: Substitua pelo seu valor
 # Configuração da Rodada
 TAG_RODADA = f"GP_Hedge_Final_Xi{MELHOR_XI}_K{MELHOR_KAPPA}"
 N_REPETICOES = 5
-N_EVALUATIONS = 150  # Aumentar se quiser mais exploração, como conversamos
+N_EVALUATIONS = 150  # Aumentar se quiser mais exploração
 
 # Caminhos (Mantidos iguais)
 ANSYS_EXE_PATH = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"

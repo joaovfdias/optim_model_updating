@@ -15,9 +15,9 @@ def sensitivity_analysis(parameters, base_dir, ansys_exe_path=None):
     ansys_exe_path = ansys_exe_path or r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 
     # base_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 8"
-    ansys_working_dir = os.path.join(base_dir, 'ANSYS')
+    ansys_working_dir = os.path.join(base_dir, '../ANSYS')
     input_dir = base_dir
-    output_dir = os.path.join(os.getcwd(), 'output')
+    output_dir = os.path.join(os.getcwd(), '../output')
 
     base_script_filename = "scriptLOP.mac"
     base_freq_filename = "out_freq.txt"

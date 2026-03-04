@@ -32,9 +32,9 @@ keys = [p.key for p in parameters]
 ansys_exe_path = r"D:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 
 base_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Analise 8"
-ansys_working_dir = os.path.join(base_dir, 'ANSYS')
+ansys_working_dir = os.path.join(base_dir, '../ANSYS')
 input_dir = os.path.join(base_dir, 'input')
-output_dir = os.path.join(os.getcwd(), 'output')
+output_dir = os.path.join(os.getcwd(), '../output')
 
 base_script_filename = "scriptLOP.mac"
 base_freq_filename = "out_freq.txt"

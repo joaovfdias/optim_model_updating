@@ -1,4 +1,3 @@
-from tests.LOP.BO_trel_TestRun import BO_run
 from tests.LOP.BO_skopt_trel_TestRun import BO_skopt_run
 from tests.LOP.GA_trel_TestRun import GA_run
 from tests.LOP.PSO_trel_TestRun import PSO_run
