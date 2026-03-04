@@ -13,18 +13,18 @@ from optimization.parameter import Continuous
 
 
 # --- 1. WORKER UNIFICADO ---
-def run_algorithm_worker(algo_name, irun, parameters, base_dir, local_dir, log_dir, hp_kwargs, queue):
+def run_algorithm_worker(algo_name, irun, parameters, base_dir, local_dir, log_dir, base_script_filename, noise, hp_kwargs, queue):
     start_time = time.time()
     try:
         if algo_name == "PSO":
             best = PSO_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir, log_dir=log_dir,
-                           **hp_kwargs)
+                           base_script_filename=base_script_filename, noise=noise, **hp_kwargs)
         elif algo_name == "GA":
             best = GA_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir, log_dir=log_dir,
-                          **hp_kwargs)
+                          base_script_filename=base_script_filename, noise=noise, **hp_kwargs)
         elif algo_name == "BO":
             best = BO_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir, log_dir=log_dir,
-                          **hp_kwargs)
+                          base_script_filename=base_script_filename, noise=noise, **hp_kwargs)
         else:
             raise ValueError("Algoritmo não reconhecido.")
 
@@ -80,6 +80,7 @@ def compile_convergence_history(algo_name, conjunto_nome, expected_params, log_d
     """
     # Procura todos os CSVs na pasta do conjunto
     csv_files = glob.glob(os.path.join(log_dir, "*.csv"))
+    csv_files = [f for f in csv_files if f.startswith(f"{algo_name}")]
     csv_files = [f for f in csv_files if "Convergencia" not in f]  # Ignora caso já exista
 
     if not csv_files:
@@ -171,10 +172,20 @@ def compile_convergence_history(algo_name, conjunto_nome, expected_params, log_d
 # --- 4. ORQUESTRADOR ---
 if __name__ == '__main__':
 
-    problema = "Problema 4"
+    problema = r"Problema 4\teste"
+    computador = "LEST 2"
 
-    base_dir = os.path.join(r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas", problema)
-    local_dir = os.path.join(r"C:\Users\Thiago Artur\Documents", problema)
+    # diretórios
+    if computador == "LEST 2":
+        devicepath_base = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas"
+        devicepath_local = r"C:\Users\Thiago Artur\Documents\Rodadas"
+
+    if computador == "LEST 1":
+        devicepath_base = None
+        devicepath_local = None
+
+    base_dir = os.path.join(devicepath_base, problema)
+    local_dir = os.path.join(devicepath_local, problema) # copia ModBase.db pro diretório local
     os.makedirs(local_dir, exist_ok=True)
 
     initimestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -183,8 +194,35 @@ if __name__ == '__main__':
 
     csv_resultado_path = os.path.join(global_log_dir, f"Resumo Global {problema}.csv")
 
+    # definição dos parâmetros do problema
+    script_name = None
+    noise = None
 
-    if "Problema 4" in problema:
+    if "Problema 3" in problema:
+
+        script_name = "scriptTREL.mac"
+        noise = 0.03
+
+        parameters = [
+            Continuous(150e9, 250e9, 'modulo_banz'),
+
+            Continuous(150e9, 250e9, 'modulo_diag'),
+
+            Continuous(150e9, 250e9, 'modulo_contrav'),
+
+            Continuous(1e5, 1e7, 'rigidez1'),
+            Continuous(1e5, 1e7, 'rigidez2'),
+            Continuous(1e5, 1e7, 'rigidez3'),
+            Continuous(1e5, 1e7, 'rigidez4'),
+
+            Continuous(400, 800, 'massa')
+        ]
+
+        target_params = [205e9, 215e9, 195e9, 8e7, 6.8e7, 7.6e7, 7.2e7, 600]
+
+    elif "Problema 4" in problema:
+
+        script_name = "scriptLOP.mac"
 
         parameters = [ # analise 10
             Continuous(20e9, 35e9, 'modulo_concreto'),
@@ -203,10 +241,13 @@ if __name__ == '__main__':
             Continuous(1e6, 1e9, 'GXZ')
         ]
 
-        keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
         target_params = [32.209e9, 0.2, 0.6, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8, 4.06e7]
 
-        expected_values = dict(zip(keys, target_params))
+    else:
+        raise ValueError(f"Parâmetros e Gabarito não definidos para o problema: {problema}")
+
+    keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
+    expected_values = dict(zip(keys, target_params))
 
 
     # SEUS DOIS (agora três) CONJUNTOS DE HIPERPARÂMETROS
@@ -214,32 +255,55 @@ if __name__ == '__main__':
     # conjunto 2: médio
     # conjunto 3: intensificador (P2 COM 6 PARAM)
 
-    configs_algoritmos = {
+    if "teste" in problema.lower(): # conjunto de teste (rodadas rapidinhas)
+        configs_algoritmos = {
+            "PSO": [
+                {"population_size": len(parameters), "iterations": 4, "w": 0.73, "w_rate": 0.957, "c1": 1.90, "c2": 1.32,
+                 "init_vel_ratio": 0.06},
+                {"population_size": len(parameters), "iterations": 4, "w": 0.6, "w_rate": 0.99, "c1": 2.05, "c2": 2.05,
+                 "init_vel_ratio": 0.20},
+                {"population_size": len(parameters), "iterations": 4, "w": 1.13, "w_rate": 0.964, "c1": 1.15, "c2": 1.43,
+                 "init_vel_ratio": 0.18}
+            ],
+            "BO": [
+                {"initial_points": len(parameters), "evaluations": 10, "acq_func": 'PI', "xi": 0.1},
+                {"initial_points": len(parameters), "evaluations": 10, "acq_func": 'gp_hedge'},
+                {"initial_points": len(parameters), "evaluations": 10, "acq_func": 'EI', "xi": 0.003162}
+            ],
+            "GA": [
+                {"population_size": len(parameters), "generations": 4, "elitism_rate": 0.12, "crossover_rate": 0.87,
+                 "mutation_strength": 0.185},
+                {"population_size": len(parameters), "generations": 4, "elitism_rate": 0.10, "crossover_rate": 0.60,
+                 "mutation_strength": 0.10},
+                {"population_size": len(parameters), "generations": 4, "elitism_rate": 0.10, "crossover_rate": 0.75,
+                 "mutation_strength": 0.25}
+            ]
+        }
 
-        "PSO": [
-            {"population_size": None, "iterations": None, "w": 0.73, "w_rate": 0.957, "c1": 1.90, "c2": 1.32,
-             "init_vel_ratio": 0.06},
-            {"population_size": None, "iterations": None, "w": 0.6, "w_rate": 0.99, "c1": 2.05, "c2": 2.05,
-             "init_vel_ratio": 0.20},
-            {"population_size": None, "iterations": None, "w": 1.13, "w_rate": 0.964, "c1": 1.15, "c2": 1.43,
-             "init_vel_ratio": 0.18}
-        ],
-
-        "BO": [
-            {"initial_points": None, "evaluations": None, "acq_func": 'PI', "xi": 0.1},
-            {"initial_points": None, "evaluations": None, "acq_func": 'gp_hedge'},
-            {"initial_points": None, "evaluations": None, "acq_func": 'EI', "xi": 0.003162}
-        ],
-
-        "GA": [
-            {"population_size": None, "generations": None, "elitism_rate": 0.12, "crossover_rate": 0.87,
-             "mutation_strength": 0.185},
-            {"population_size": None, "generations": None, "elitism_rate": 0.10, "crossover_rate": 0.60,
-             "mutation_strength": 0.10},
-            {"population_size": None, "generations": None, "elitism_rate": 0.10, "crossover_rate": 0.75,
-             "mutation_strength": 0.25}
-        ]
-    }
+    else:
+        configs_algoritmos = {
+            "PSO": [
+                {"population_size": None, "iterations": None, "w": 0.73, "w_rate": 0.957, "c1": 1.90, "c2": 1.32,
+                 "init_vel_ratio": 0.06},
+                {"population_size": None, "iterations": None, "w": 0.6, "w_rate": 0.99, "c1": 2.05, "c2": 2.05,
+                 "init_vel_ratio": 0.20},
+                {"population_size": None, "iterations": None, "w": 1.13, "w_rate": 0.964, "c1": 1.15, "c2": 1.43,
+                 "init_vel_ratio": 0.18}
+            ],
+            "BO": [
+                {"initial_points": None, "evaluations": None, "acq_func": 'PI', "xi": 0.1},
+                {"initial_points": None, "evaluations": None, "acq_func": 'gp_hedge'},
+                {"initial_points": None, "evaluations": None, "acq_func": 'EI', "xi": 0.003162}
+            ],
+            "GA": [
+                {"population_size": None, "generations": None, "elitism_rate": 0.12, "crossover_rate": 0.87,
+                 "mutation_strength": 0.185},
+                {"population_size": None, "generations": None, "elitism_rate": 0.10, "crossover_rate": 0.60,
+                 "mutation_strength": 0.10},
+                {"population_size": None, "generations": None, "elitism_rate": 0.10, "crossover_rate": 0.75,
+                 "mutation_strength": 0.25}
+            ]
+        }
 
     num_runs = 4
 
@@ -272,9 +336,9 @@ if __name__ == '__main__':
                 print(f"    > Executando repetição {irun}/{num_runs}...")
 
                 q = Queue()
-                run_name = f"run{irun}"
+
                 p = Process(target=run_algorithm_worker,
-                            args=(algo, run_name, parameters, base_dir, local_dir, conjunto_log_dir, config, q))
+                            args=(algo, irun, parameters, base_dir, local_dir, conjunto_log_dir, script_name, noise, config, q))
                 p.start()
                 res = q.get()
                 p.join()

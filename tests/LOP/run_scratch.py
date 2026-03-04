@@ -1,163 +1,293 @@
-from tests.LOP.BO_skopt_trel_TestRun import BO_skopt_run
-from tests.LOP.GA_trel_TestRun import GA_run
-from tests.LOP.PSO_trel_TestRun import PSO_run
-from optimization.parameter import Continuous
-
 import os
 import time
+import glob
 import numpy as np
 import pandas as pd
+from datetime import datetime
 from multiprocessing import Process, Queue
 
+from BO_LOP_run import BO_run
+from GA_LOP_run import GA_run
+from PSO_LOP_run import PSO_run
+from optimization.parameter import Continuous
 
-# --- 1. WORKER UNIFICADO (COM QUEUE E TEMPO) ---
-def run_algorithm_worker(algo_name, parameters, irun, input_dir, log_dir, queue):
-    """
-    Roda o algoritmo e coloca os resultados na Queue para o processo principal.
-    """
+
+# --- 1. WORKER UNIFICADO ---
+def run_algorithm_worker(algo_name, irun, parameters, base_dir, local_dir, log_dir, hp_kwargs, queue):
     start_time = time.time()
     try:
-        # Executa o algoritmo escolhido
         if algo_name == "PSO":
-            best = PSO_run(parameters, irun, input_dir, log_dir)
+            best = PSO_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir, log_dir=log_dir,
+                           **hp_kwargs)
         elif algo_name == "GA":
-            best = GA_run(parameters, irun, input_dir, log_dir)
-        elif algo_name == "BO_skopt":
-            best = BO_skopt_run(parameters, irun, input_dir, log_dir)
+            best = GA_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir, log_dir=log_dir,
+                          **hp_kwargs)
+        elif algo_name == "BO":
+            best = BO_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir, log_dir=log_dir,
+                          **hp_kwargs)
         else:
             raise ValueError("Algoritmo não reconhecido.")
 
         elapsed = time.time() - start_time
-
-        # Extração robusta dos resultados do 'best' individual
         fit = best.fitness if hasattr(best, 'fitness') else best['fitness']
         params = best.param if hasattr(best, 'param') else best['param']
 
-        # Envia de volta para a main
         queue.put({'success': True, 'fitness': fit, 'time': elapsed, 'params': params})
-
     except Exception as e:
-        print(f"\n[ERRO] Falha no {algo_name} ({irun}): {e}")
+        print(f"\n[ERRO WORKER] Falha no {algo_name} ({irun}): {e}")
         queue.put({'success': False})
 
 
-# --- 2. FUNÇÃO DE RESUMO E SALVAMENTO (CSV) ---
-def summarize_and_save(algo_name, results, expected_params, output_csv):
-    """
-    Processa os resultados de N rodadas, calcula estatísticas e salva no CSV.
-    """
+# --- 2. RESUMO GERAL DOS RESULTADOS FINAIS ---
+def summarize_and_save(algo_name, conjunto_nome, results, expected_params, output_csv):
     valid_res = [r for r in results if r['success']]
     if not valid_res:
-        print(f">>> Nenhum resultado válido para {algo_name}. Pulando resumo.")
         return
 
     fits = [r['fitness'] for r in valid_res]
     times = [r['time'] for r in valid_res]
 
-    # Estatísticas Globais
-    mean_fit = np.mean(fits)
-    std_fit = np.std(fits)
+    mean_fit, std_fit = np.mean(fits), np.std(fits)
     cv_fit = std_fit / (abs(mean_fit) + 1e-12)
-    mean_time = np.mean(times)
 
-    # Cria dicionário de linha para o DataFrame
     row_data = {
         'Algoritmo': algo_name,
+        'Hiperparâmetros': conjunto_nome,
         'Rodadas_Validas': len(valid_res),
         'Media_Fit': mean_fit,
         'CV_Fit': cv_fit,
-        'Media_Tempo_s': mean_time
+        'Media_Tempo_s': np.mean(times)
     }
 
-    # Estatísticas e Erro por Parâmetro
     for p_name, expected_val in expected_params.items():
-        # Coleta o valor encontrado em todas as rodadas
         p_vals = [r['params'][p_name] for r in valid_res]
-
         mean_p = np.mean(p_vals)
-        # Erro Relativo Percentual: |(calculado - esperado) / esperado| * 100
-        error_percent = (abs(mean_p - expected_val) / abs(expected_val)) * 100
-
         row_data[f'{p_name}_Media'] = mean_p
-        row_data[f'{p_name}_Erro_%'] = error_percent
+        row_data[f'{p_name}_Erro_%'] = (abs(mean_p - expected_val) / abs(expected_val)) * 100
 
-    # Converte para Pandas e Salva
     df = pd.DataFrame([row_data])
     file_exists = os.path.isfile(output_csv)
+    df.to_csv(output_csv, mode='a', index=False, sep=';', decimal='.', header=not file_exists)
 
-    # Salva no formato PT-BR para abrir bonito no Excel (;) e (,)
-    df.to_csv(output_csv, mode='a', index=False, sep=';', decimal=',', header=not file_exists)
-    print(f"\n>>> Resumo do {algo_name} calculado e salvo com sucesso em {os.path.basename(output_csv)}")
+    print(f"\n[RESUMO] Atualizado com {conjunto_nome} do algoritmo {algo_name} em: {output_csv}")
 
 
-# --- 3. MAIN (ORQUESTRADOR) ---
+# --- 3. COMPILADOR DE CONVERGÊNCIA (NOVIDADE) ---
+def compile_convergence_history(algo_name, conjunto_nome, expected_params, log_dir):
+    """
+    Lê os arquivos de log individuais de cada repetição e consolida a convergência
+    em um único CSV pronto para plotagem.
+    """
+    # Procura todos os CSVs na pasta do conjunto
+    csv_files = glob.glob(os.path.join(log_dir, "*.csv"))
+    csv_files = [f for f in csv_files if "Convergencia" not in f]  # Ignora caso já exista
+
+    if not csv_files:
+        return
+
+    all_runs_data = []
+
+    for f in csv_files:
+        try:
+            # Lê o CSV (engine python lida melhor com detectores de separador)
+            df = pd.read_csv(f, sep=None, engine='python')
+        except Exception as e:
+            continue
+
+        if 'Fitness' not in df.columns:
+            continue
+
+        if algo_name == "BO" or algo_name == "BO_skopt":
+            # BO avalia ponto a ponto. O melhor é o mínimo cumulativo até a avaliação 'x'.
+            best_so_far = []
+            current_best_fit = float('inf')
+            current_best_row = None
+            for _, row in df.iterrows():
+                if row['Fitness'] < current_best_fit:
+                    current_best_fit = row['Fitness']
+                    current_best_row = row.copy()
+                best_so_far.append(current_best_row)
+            df_best = pd.DataFrame(best_so_far)
+            df_best['Step'] = range(1, len(df_best) + 1)
+        else:
+            # GA e PSO: Agrupa por geração/iteração e pega o menor fitness
+            step_col = 'Generation' if 'Generation' in df.columns else (
+                'Iteration' if 'Iteration' in df.columns else None)
+            if step_col:
+                idx = df.groupby(step_col)['Fitness'].idxmin()
+                df_best = df.loc[idx].sort_values(step_col).copy()
+                df_best['Step'] = df_best[step_col].values
+            else:
+                # Fallback genérico
+                df_best = df.copy()
+                df_best['Step'] = range(1, len(df_best) + 1)
+
+        all_runs_data.append(df_best)
+
+    if not all_runs_data:
+        return
+
+    # Descobre o número máximo de passos entre todas as rodadas
+    max_steps = max([len(d) for d in all_runs_data])
+    consolidated = pd.DataFrame({'Iteracao': range(1, max_steps + 1)})
+
+    # Parâmetros que queremos monitorar na convergência
+    params_to_track = ['Fitness'] + list(expected_params.keys())
+
+    for p in params_to_track:
+        run_cols = []
+        for i, df_run in enumerate(all_runs_data):
+            if p not in df_run.columns:
+                continue
+            run_name = f"Run{i + 1}"
+            col_name = f"{run_name}_{p}"
+            run_cols.append(col_name)
+
+            temp_df = df_run[['Step', p]].rename(columns={'Step': 'Iteracao', p: col_name})
+            consolidated = pd.merge(consolidated, temp_df, on='Iteracao', how='left')
+
+            # ffill() mantém o último valor conhecido caso a rodada tenha estagnado/parado antes
+            consolidated[col_name] = consolidated[col_name].ffill()
+
+        if run_cols:
+            consolidated[f'Media_{p}'] = consolidated[run_cols].mean(axis=1)
+            consolidated[f'Desvio_{p}'] = consolidated[run_cols].std(axis=1)
+
+    # Reordena colunas para a Média e Desvio ficarem na frente para facilitar sua vida
+    cols = ['Iteracao']
+    for p in params_to_track:
+        if f'Media_{p}' in consolidated.columns:
+            cols.extend([f'Media_{p}', f'Desvio_{p}'])
+            cols.extend([c for c in consolidated.columns if
+                         c.endswith(f"_{p}") and not c.startswith("Media") and not c.startswith("Desvio")])
+
+    consolidated = consolidated[cols]
+
+    out_path = os.path.join(log_dir, f"Convergencia_{algo_name}_{conjunto_nome}.csv")
+    consolidated.to_csv(out_path, sep=';', decimal='.', index=False)
+    print(f"\n[DADOS] Histórico de convergência consolidado em: {os.path.basename(out_path)}")
+
+
+# --- 4. ORQUESTRADOR ---
 if __name__ == '__main__':
 
-    base_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Analise 10"
-    log_dir = os.path.join(base_dir, "log")
-    os.makedirs(log_dir, exist_ok=True)
+    problema = "Problema 4"
 
-    csv_resultado_path = os.path.join(log_dir, "resultado_rodadas_automaticas.csv")
+    base_dir = os.path.join(r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas", problema)
+    local_dir = os.path.join(r"C:\Users\Thiago Artur\Documents", problema)
+    os.makedirs(local_dir, exist_ok=True)
 
-    # Definição do Espaço de Busca
-    parameters = [
-        Continuous(20e9, 35e9, 'modulo_concreto'),
-        Continuous(0.1, 0.49, 'poisson_concreto'),
-        Continuous(0.02, 0.06, 'h_concreto'),
-        Continuous(10e9, 20e9, 'modulo_madeira'),
-        Continuous(150e9, 250e9, 'modulo_cordoalhas'),
-        Continuous(1e7, 1e9, 'kv'),
-        Continuous(1e7, 1e9, 'kh'),
-        Continuous(1e6, 1e9, 'GXY'),
-        Continuous(1e6, 1e9, 'GYZ'),
-        Continuous(1e6, 1e9, 'GXZ')
-    ]
+    initimestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    global_log_dir = os.path.join(base_dir, "log", f"rodada_{initimestamp}")
+    os.makedirs(global_log_dir, exist_ok=True)
 
-    # --- VALORES ESPERADOS (GABARITO) PARA O CÁLCULO DO ERRO ---
-    # !! ATENÇÃO: Substitua esses valores pelos verdadeiros do seu problema !!
-    expected_values = {
-        'modulo_concreto': 25e9,
-        'poisson_concreto': 0.20,
-        'h_concreto': 0.05,
-        'modulo_madeira': 15e9,
-        'modulo_cordoalhas': 200e9,
-        'kv': 5e8,
-        'kh': 5e8,
-        'GXY': 5e7,
-        'GYZ': 5e7,
-        'GXZ': 5e7
+    csv_resultado_path = os.path.join(global_log_dir, f"Resumo Global {problema}.csv")
+
+
+    if "Problema 4" in problema:
+
+        parameters = [ # analise 10
+            Continuous(20e9, 35e9, 'modulo_concreto'),
+            Continuous(0.1, 0.49, 'poisson_concreto'),
+            Continuous(0.02, 0.06, 'h_concreto'),
+
+            Continuous(10e9, 20e9, 'modulo_madeira'),
+
+            Continuous(150e9, 250e9, 'modulo_cordoalhas'),
+
+            Continuous(1e7, 1e9, 'kv'),
+            Continuous(1e7, 1e9, 'kh'),
+
+            Continuous(1e6, 1e9, 'GXY'),
+            Continuous(1e6, 1e9, 'GYZ'),
+            Continuous(1e6, 1e9, 'GXZ')
+        ]
+
+        keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
+        target_params = [32.209e9, 0.2, 0.6, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8, 4.06e7]
+
+        expected_values = dict(zip(keys, target_params))
+
+
+    # SEUS DOIS (agora três) CONJUNTOS DE HIPERPARÂMETROS
+    # conjunto 1: explorador (P2 COM 9 PARAM)
+    # conjunto 2: médio
+    # conjunto 3: intensificador (P2 COM 6 PARAM)
+
+    configs_algoritmos = {
+
+        "PSO": [
+            {"population_size": None, "iterations": None, "w": 0.73, "w_rate": 0.957, "c1": 1.90, "c2": 1.32,
+             "init_vel_ratio": 0.06},
+            {"population_size": None, "iterations": None, "w": 0.6, "w_rate": 0.99, "c1": 2.05, "c2": 2.05,
+             "init_vel_ratio": 0.20},
+            {"population_size": None, "iterations": None, "w": 1.13, "w_rate": 0.964, "c1": 1.15, "c2": 1.43,
+             "init_vel_ratio": 0.18}
+        ],
+
+        "BO": [
+            {"initial_points": None, "evaluations": None, "acq_func": 'PI', "xi": 0.1},
+            {"initial_points": None, "evaluations": None, "acq_func": 'gp_hedge'},
+            {"initial_points": None, "evaluations": None, "acq_func": 'EI', "xi": 0.003162}
+        ],
+
+        "GA": [
+            {"population_size": None, "generations": None, "elitism_rate": 0.12, "crossover_rate": 0.87,
+             "mutation_strength": 0.185},
+            {"population_size": None, "generations": None, "elitism_rate": 0.10, "crossover_rate": 0.60,
+             "mutation_strength": 0.10},
+            {"population_size": None, "generations": None, "elitism_rate": 0.10, "crossover_rate": 0.75,
+             "mutation_strength": 0.25}
+        ]
     }
 
     num_runs = 4
-    algoritmos = ["PSO", "GA", "BO_skopt"]  # Lista dos algoritmos a rodar
 
-    print(f"{'=' * 50}\nINICIANDO AVALIAÇÃO DE ALGORITMOS\n{'=' * 50}")
+    print(f"{'=' * 60}\nINICIANDO AVALIAÇÃO DE ALGORITMOS (RODADA {initimestamp})\n{'=' * 60}")
 
-    # Loop principal (Algoritmo por Algoritmo)
-    for algo in algoritmos:
-        print(f"\n--- Iniciando {num_runs} rodadas do algoritmo: {algo} ---")
+    for algo, conjuntos in configs_algoritmos.items():
+        print(f"\n[{algo}] Configurando diretórios...")
 
-        algo_results = []
+        algo_dir = os.path.join(global_log_dir, algo)
+        os.makedirs(algo_dir, exist_ok=True)
 
-        for irun in range(1, num_runs + 1):
-            print(f"  > Executando rodada {irun}/{num_runs}...")
+        txt_path = os.path.join(algo_dir, "hiperparametros.txt")
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            f.write(f"=== Hiperparametros {algo} ===\n\n")
+            for idx, config in enumerate(conjuntos):
+                f.write(f"--- Conjunto {idx + 1} ---\n")
+                for key, val in config.items():
+                    f.write(f"  {key}: {val}\n")
+                f.write("\n")
 
-            q = Queue()
-            run_name = f"run{irun}"
+        for idx, config in enumerate(conjuntos):
+            conjunto_nome = f"Conjunto {idx + 1}"
+            conjunto_log_dir = os.path.join(algo_dir, conjunto_nome)
+            os.makedirs(conjunto_log_dir, exist_ok=True)
 
-            p = Process(target=run_algorithm_worker, args=(algo, parameters, run_name, base_dir, log_dir, q))
-            p.start()
+            print(f"\n  --- {algo} | {conjunto_nome} ---")
 
-            # Aguarda a conclusão e coleta resultado
-            res = q.get()
-            p.join()
+            algo_results = []
+            for irun in range(1, num_runs + 1):
+                print(f"    > Executando repetição {irun}/{num_runs}...")
 
-            algo_results.append(res)
+                q = Queue()
+                run_name = f"run{irun}"
+                p = Process(target=run_algorithm_worker,
+                            args=(algo, run_name, parameters, base_dir, local_dir, conjunto_log_dir, config, q))
+                p.start()
+                res = q.get()
+                p.join()
 
-            if res['success']:
-                print(f"    Rodada {irun} concluída. Fit: {res['fitness']:.4e} | Tempo: {res['time']:.2f}s")
+                algo_results.append(res)
+                if res['success']:
+                    print(f"      [OK] Fit: {res['fitness']:.4e} | Tempo: {res['time']:.2f}s")
+                else:
+                    print(f"      [FALHA] A rodada {irun} retornou erro.")
 
-        # Após as 4 rodadas do algoritmo atual, calcula e salva o resumo
-        summarize_and_save(algo, algo_results, expected_values, csv_resultado_path)
+            summarize_and_save(algo, conjunto_nome, algo_results, expected_values, csv_resultado_path)
 
-    print(f"\n{'=' * 50}\nTODAS AS AVALIAÇÕES CONCLUÍDAS!\nConsulte o arquivo: {csv_resultado_path}")
+            # CHAMA A NOVA FUNÇÃO DE COMPILAÇÃO APÓS AS 4 RODADAS
+            compile_convergence_history(algo, conjunto_nome, expected_values, conjunto_log_dir)
+
+    print(f"\n{'=' * 60}\nAVALIAÇÕES CONCLUÍDAS!\nRegistros em: {global_log_dir}")

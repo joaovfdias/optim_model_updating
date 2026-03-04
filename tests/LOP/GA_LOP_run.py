@@ -6,6 +6,7 @@ import numpy as np
 import time
 import os
 from datetime import datetime
+import shutil
 
 
 def GA_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script_filename=None, noise=False, population_size=None, generations=None, elitism_rate=0.10, crossover_rate=0.60, mutation_strength=0.10, selection_method='tournament'):
@@ -25,6 +26,7 @@ def GA_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script
 
     unique_ansys_dir = os.path.join(ansys_working_dir, f"worker_GA_{irun}_{os.getpid()}")
     os.makedirs(unique_ansys_dir, exist_ok=True)
+    shutil.copy(os.path.join(base_dir, "ModBase.db"), unique_ansys_dir)
 
     base_script_filename = base_script_filename or "script.mac"
     base_freq_filename = "target_freq.txt"
@@ -43,7 +45,7 @@ def GA_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script
 
         # Simula incerteza experimental diferente para cada rodada
         # Nível de Ruído (Sigma): 1% (0.01) ou 3% (0.03) são valores comuns
-        NOISE_LEVEL = 0.03
+        NOISE_LEVEL = noise
 
         # Semente aleatória única para este processo (garante variação entre workers)
         np.random.seed(int(time.time()) + irun)
@@ -88,7 +90,7 @@ def GA_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script
     # ajuste do registro:
     log = "full" # tipo de registro (True: simplificado - melhor de cada iteração, "full": todos os indivíduos)
     log_dir = log_dir or os.path.join(base_dir, 'log', 'runs', 'GA')
-    log_title = f"GA_pop({population_size})_gen({generations})_elit({elitism_rate:.4f})_cross({crossover_rate:.4f})_mut({mutation_strength:.4f})_sel({selection_method})_{irun}_{datetime.now().strftime("%Y%m%d_%H%M%S")}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
+    log_title = f"GA_pop({population_size})_gen({generations})_{irun}_{datetime.now().strftime("%Y%m%d_%H%M%S")}" # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
 
     # log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
     rodada.set_log(log_title, log_dir, False)
