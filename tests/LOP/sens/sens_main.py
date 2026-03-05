@@ -1,12 +1,12 @@
 from optimization.sensitivity import SensitivityAnalyzer, ParamSpec, Sampler
 import pandas as pd
 import numpy as np
-from optimization.parameter import *
 from external.parser import Ansys
 from external.special_functions import SpecialFun
 
 import time
 import os
+import shutil
 
 
 def sensitivity_analysis(parameters, base_dir, ansys_exe_path=None):
@@ -15,9 +15,13 @@ def sensitivity_analysis(parameters, base_dir, ansys_exe_path=None):
     ansys_exe_path = ansys_exe_path or r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 
     # base_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 8"
-    ansys_working_dir = os.path.join(base_dir, '../ANSYS')
+    ansys_working_dir = os.path.join(base_dir, 'ANSYS')
     input_dir = base_dir
-    output_dir = os.path.join(os.getcwd(), '../output')
+    output_dir = os.path.join(os.getcwd(), 'output')
+
+    unique_ansys_dir = os.path.join(ansys_working_dir, f"worker_sensitivity")
+    os.makedirs(unique_ansys_dir, exist_ok=True)
+    shutil.copy(os.path.join(base_dir, "ModBase.db"), unique_ansys_dir)
 
     base_script_filename = "scriptLOP.mac"
     base_freq_filename = "out_freq.txt"
@@ -26,7 +30,7 @@ def sensitivity_analysis(parameters, base_dir, ansys_exe_path=None):
     out_freq_filename = "out_freq.txt"
     out_modes_filename = "out_modes.txt"
 
-    ansys = Ansys(ansys_exe_path, ansys_working_dir, input_dir, base_script_filename, base_freq_filename, base_modes_filename, output_dir)
+    ansys = Ansys(ansys_exe_path, unique_ansys_dir, input_dir, base_script_filename, base_freq_filename, base_modes_filename, output_dir)
     ansys.set_output_filenames(out_freq_filename, out_modes_filename)
     ansys.max_attempts = 6
 
@@ -72,6 +76,7 @@ def sensitivity_analysis(parameters, base_dir, ansys_exe_path=None):
 
     # Rodar análise de sensibilidade
     sa = SensitivityAnalyzer(minimize=True)
+    sa.logpath = os.path.join(base_dir, "sensitivity")
     selected = sa.workflow(df_eval, fitness_col="Fitness", interactive=False)
     print("Parâmetros escolhidos:", selected)
 

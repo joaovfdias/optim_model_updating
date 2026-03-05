@@ -84,7 +84,7 @@ def GA_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script
     # declaração do otimizador:
     rodada = GA(fitness_function, parameters, population_size, elitism_rate, crossover_rate, mutation_strength) # objeto otimizador
     rodada.set_selection_parents(selection_method)
-    rodada.set_tolerance(fit_rel = 1e-3, patience = 15) # critério de parada
+    rodada.set_tolerance(fit_rel = 1e-3, patience = round(0.25*generations)) # critério de parada
     rodada.sync_time(ansys.anstime) # sincroniza timestamp de optimizer e ansys para facilitar controle dos registros
 
     # ajuste do registro:

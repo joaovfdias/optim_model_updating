@@ -103,7 +103,7 @@ parameters = [# 10
             Continuous(1e6, 1e9, 'GYZ'),
             Continuous(1e6, 1e9, 'GXZ')
         ]
-params = [32.209e9, 0.2, 0.6, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8, 4.06e7]
-base_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Analise 10"
+params = [32.209e9, 0.2, 0.06, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8, 4.06e7]
+base_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Analise 10"
 
 avaliar_rodada(parameters, params, base_dir)

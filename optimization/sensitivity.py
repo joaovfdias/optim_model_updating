@@ -169,6 +169,7 @@ def plot_heatmap_corr(
     cmap: Optional[mcolors.Colormap] = None,
     show_values: bool = False,
     central_gray_range: Tuple[float, float] = (-0.10, 0.10),
+    logpath: str = None,
 ) -> Optional[str]:
     """
     Plota e (opcionalmente) salva o heatmap.
@@ -283,7 +284,7 @@ def plot_heatmap_corr(
 
     saved_path = None
     if auto_save:
-        out_dir = os.path.join(os.getcwd(), "plot")
+        out_dir = logpath or os.path.join(os.getcwd(), "plot")
         os.makedirs(out_dir, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         fname = f"heatmap_sensitivity_{ts}.png"
@@ -333,6 +334,7 @@ class SensitivityAnalyzer:
     def __init__(self, *, minimize: bool = True, is_metric_fn: Callable[[str], bool] = _default_metric_detector):
         self.minimize = minimize
         self.is_metric_fn = is_metric_fn
+        self.logpath = None
 
     def from_history(
         self,
@@ -426,7 +428,7 @@ class SensitivityAnalyzer:
         saved_path = None
         if show_plot:
             try:
-                saved_path = plot_heatmap_corr(corr_df, title="Spearman por métrica (parâmetros × métricas)")
+                saved_path = plot_heatmap_corr(corr_df, title="Spearman por métrica (parâmetros × métricas)", logpath=self.logpath)
             except Exception as e:
                 print(f"[Aviso] Falha ao exibir heatmap: {e}")
 
