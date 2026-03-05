@@ -18,14 +18,18 @@ def run_algorithm_worker(algo_name, irun, parameters, base_dir, local_dir, log_d
     start_time = time.time()
     try:
         if algo_name == "PSO":
-            best = PSO_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir, log_dir=log_dir,
-                           base_script_filename=base_script_filename, noise=noise, **hp_kwargs)
+            # Repare no "best, evals ="
+            best, iters = PSO_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir,
+                                  log_dir=log_dir,
+                                  base_script_filename=base_script_filename, noise=noise, **hp_kwargs)
         elif algo_name == "GA":
-            best = GA_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir, log_dir=log_dir,
-                          base_script_filename=base_script_filename, noise=noise, **hp_kwargs)
+            best, iters = GA_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir,
+                                 log_dir=log_dir,
+                                 base_script_filename=base_script_filename, noise=noise, **hp_kwargs)
         elif algo_name == "BO":
-            best = BO_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir, log_dir=log_dir,
-                          base_script_filename=base_script_filename, noise=noise, **hp_kwargs)
+            best, iters = BO_run(irun=irun, parameters=parameters, base_dir=base_dir, local_dir=local_dir,
+                                 log_dir=log_dir,
+                                 base_script_filename=base_script_filename, noise=noise, **hp_kwargs)
         else:
             raise ValueError("Algoritmo não reconhecido.")
 
@@ -37,7 +41,8 @@ def run_algorithm_worker(algo_name, irun, parameters, base_dir, local_dir, log_d
         # Isso garante que a variável p_name funcione perfeitamente depois
         params_dict = {p.key: valor for p, valor in zip(parameters, params)}
 
-        queue.put({'success': True, 'fitness': fit, 'time': elapsed, 'params': params_dict})
+        queue.put({'success': True, 'fitness': fit, 'time': elapsed, 'params': params_dict, 'iters': iters})
+
     except Exception as e:
         print(f"\n[ERRO WORKER] Falha no {algo_name} ({irun}): {e}")
         queue.put({'success': False})
@@ -52,6 +57,9 @@ def summarize_and_save(algo_name, conjunto_nome, results, expected_params, outpu
     fits = [r['fitness'] for r in valid_res]
     times = [r['time'] for r in valid_res]
 
+    # ADICIONADO: Extrai as iterações realmente executadas
+    iters = [r['iters'] for r in valid_res]
+
     mean_fit, std_fit = np.mean(fits), np.std(fits)
     cv_fit = std_fit / (abs(mean_fit) + 1e-12)
 
@@ -59,6 +67,8 @@ def summarize_and_save(algo_name, conjunto_nome, results, expected_params, outpu
         'Algoritmo': algo_name,
         'Hiperparâmetros': conjunto_nome,
         'Rodadas_Validas': len(valid_res),
+        'Media_Iteracoes': np.mean(iters),
+        'Desvio_Iteracoes': np.std(iters),
         'Media_Fit': mean_fit,
         'CV_Fit': cv_fit,
         'Media_Tempo_s': np.mean(times)
@@ -68,7 +78,7 @@ def summarize_and_save(algo_name, conjunto_nome, results, expected_params, outpu
         p_vals = [r['params'][p_name] for r in valid_res]
         mean_p = np.mean(p_vals)
         row_data[f'{p_name}_Media'] = mean_p
-        row_data[f'{p_name}_Erro_%'] = (abs(mean_p - expected_val) / abs(expected_val)) * 100
+        row_data[f'{p_name}_Erro_%'] = (abs(mean_p - expected_val) / abs(expected_val))
 
     df = pd.DataFrame([row_data])
     file_exists = os.path.isfile(output_csv)

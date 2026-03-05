@@ -8,7 +8,8 @@ from data.compile import compile_convergence_history
 ALGOS = ["GA", "PSO", "BO"]
 CONJUNTOS = 3
 
-global_log_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas\Problema 4\teste\log\rodada_20260304_182340"
+global_log_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas\Problema 4\log\rodada_20260304_194930"
+# pasta raiz da rodada com estrutura de LOP\auto_run.py
 problema = 4
 
 
@@ -68,7 +69,7 @@ for algo in ALGOS:
     algo_dir = os.path.join(global_log_dir, algo)
 
     for i in range(CONJUNTOS):
-        conjunto_nome = f"Conjunto {i + 1}"
-        conjunto_log_dir = os.path.join(algo_dir, conjunto_nome)
+        conjunto_nome = f"Conjunto {i + 1}_novo"
+        conjunto_log_dir = os.path.join(algo_dir, f"Conjunto {i + 1}")
 
         compile_convergence_history(algo, expected_values, conjunto_log_dir, conjunto_nome)

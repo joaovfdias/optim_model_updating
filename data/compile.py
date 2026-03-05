@@ -119,14 +119,19 @@ def compile_convergence_history(algo_name, expected_params, log_dir, file_id=Non
         if run_cols:
             consolidated[f'Media_{p}'] = consolidated[run_cols].mean(axis=1)
             consolidated[f'Desvio_{p}'] = consolidated[run_cols].std(axis=1)
+            # --- ADICIONADO: MÍNIMO E MÁXIMO ---
+            consolidated[f'Min_{p}'] = consolidated[run_cols].min(axis=1)
+            consolidated[f'Max_{p}'] = consolidated[run_cols].max(axis=1)
 
-    # Reordena colunas para a Média e Desvio ficarem na frente para facilitar sua vida
-    cols = ['Iteracao']
-    for p in params_to_track:
-        if f'Media_{p}' in consolidated.columns:
-            cols.extend([f'Media_{p}', f'Desvio_{p}'])
-            cols.extend([c for c in consolidated.columns if
-                         c.endswith(f"_{p}") and not c.startswith("Media") and not c.startswith("Desvio")])
+        # Reordena colunas para a Média, Desvio, Min e Max ficarem na frente para facilitar a vida
+        cols = ['Iteracao']
+        for p in params_to_track:
+            if f'Media_{p}' in consolidated.columns:
+                # --- ADICIONADO A ORDENAÇÃO DE MIN E MAX ---
+                cols.extend([f'Media_{p}', f'Desvio_{p}', f'Min_{p}', f'Max_{p}'])
+                cols.extend([c for c in consolidated.columns if
+                             c.endswith(f"_{p}") and not c.startswith("Media") and not c.startswith(
+                                 "Desvio") and not c.startswith("Min") and not c.startswith("Max")])
 
     consolidated = consolidated[cols]
 
