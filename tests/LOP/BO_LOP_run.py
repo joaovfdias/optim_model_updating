@@ -110,4 +110,4 @@ def BO_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script
     # Ansys.kill_ansys_process()
     time.sleep(1)
 
-    return best
+    return best, evaluations

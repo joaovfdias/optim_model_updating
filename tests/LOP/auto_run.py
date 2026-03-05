@@ -164,7 +164,7 @@ if __name__ == '__main__':
             Continuous(1e6, 1e9, 'GXZ')
         ]
 
-        target_params = [32.209e9, 0.2, 0.6, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8, 4.06e7]
+        target_params = [32.209e9, 0.2, 0.06, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8, 4.06e7]
 
     else:
         raise ValueError(f"Parâmetros e Gabarito não definidos para o problema: {problema}")
