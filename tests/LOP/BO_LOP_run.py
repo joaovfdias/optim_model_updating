@@ -21,7 +21,7 @@ def BO_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script
     ansys_working_dir = os.path.join(local_dir if local_dir else base_dir, 'ANSYS')
     os.makedirs(ansys_working_dir, exist_ok=True)
     input_dir = os.path.join(base_dir, 'input')
-    output_dir = os.path.join(local_dir if local_dir else base_dir, 'output')
+    output_dir = os.path.join(local_dir if local_dir else os.getcwd(), 'output')
     os.makedirs(output_dir, exist_ok=True)
 
     unique_ansys_dir = os.path.join(ansys_working_dir, f"worker_BO_{irun}_{os.getpid()}")

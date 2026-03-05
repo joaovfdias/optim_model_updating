@@ -22,17 +22,13 @@ parameters = [ # analise 12
 
     Continuous(200e9, 220e9, 'modulo_cordoalhas'),
 
-    Continuous(5e7, 5e8, 'kv'),
-    Continuous(5e7, 5e8, 'kh'),
-
     Continuous(1e8, 5e8, 'GXY'),
-    Continuous(1e8, 5e8, 'GYZ'),
     Continuous(1e7, 5e7, 'GXZ')
 ]
 
-target_params = [32.209e9, 0.06, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8, 4.06e7]
+target_params = [32.209e9, 0.06, 15e9, 210e9, 1.84e8, 4.06e7]
 
-base_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Analise 12"
+base_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Analise 13"
 
 script_name = "scriptLOP.mac"
 
