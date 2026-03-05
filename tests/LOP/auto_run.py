@@ -147,24 +147,23 @@ if __name__ == '__main__':
 
         script_name = "scriptLOP.mac"
 
-        parameters = [ # analise 10
-            Continuous(20e9, 35e9, 'modulo_concreto'),
-            Continuous(0.1, 0.49, 'poisson_concreto'),
-            Continuous(0.02, 0.06, 'h_concreto'),
+        parameters = [  # analise 12
+            Continuous(28e9, 34e9, 'modulo_concreto'),
+            Continuous(0.04, 0.06, 'h_concreto'),
 
-            Continuous(10e9, 20e9, 'modulo_madeira'),
+            Continuous(12e9, 18e9, 'modulo_madeira'),
 
-            Continuous(150e9, 250e9, 'modulo_cordoalhas'),
+            Continuous(200e9, 220e9, 'modulo_cordoalhas'),
 
-            Continuous(1e7, 1e9, 'kv'),
-            Continuous(1e7, 1e9, 'kh'),
+            Continuous(5e7, 5e8, 'kv'),
+            Continuous(5e7, 5e8, 'kh'),
 
-            Continuous(1e6, 1e9, 'GXY'),
-            Continuous(1e6, 1e9, 'GYZ'),
-            Continuous(1e6, 1e9, 'GXZ')
+            Continuous(1e8, 5e8, 'GXY'),
+            Continuous(1e8, 5e8, 'GYZ'),
+            Continuous(1e7, 5e7, 'GXZ')
         ]
 
-        target_params = [32.209e9, 0.2, 0.06, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8, 4.06e7]
+        target_params = [32.209e9, 0.06, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8, 4.06e7]
 
     else:
         raise ValueError(f"Parâmetros e Gabarito não definidos para o problema: {problema}")
