@@ -12,26 +12,51 @@ from PSO_LOP_run import PSO_run
 from optimization.parameter import Continuous
 from data.compile import compile_convergence_history
 
-irun = 12
+irun = 18
 
-parameters = [ # analise 12
-    Continuous(28e9, 34e9, 'modulo_concreto'),
-    Continuous(0.04, 0.06, 'h_concreto'),
+if irun == 14:
+    parameters = [ # analise 14
+        Continuous(0.04, 0.06, 'h_concreto'),
 
-    Continuous(12e9, 18e9, 'modulo_madeira'),
+        Continuous(1e7, 1e9, 'GXY'), # 600-900 MPa  6e8
+        Continuous(1e6, 1e8, 'GYZ') # 50-150 MPa  5e7
+    ]
 
-    Continuous(200e9, 220e9, 'modulo_cordoalhas'),
+elif irun == 15:
+    parameters = [  # analise 15
+        Continuous(0.04, 0.06, 'h_concreto'),
+        Continuous(1e6, 1e9, 'ey_wood')  # esperado 10 a 500 MPa
+    ]
 
-    Continuous(1e8, 5e8, 'GXY'),
-    Continuous(1e7, 5e7, 'GXZ')
-]
+elif irun == 16: # inutil
+    parameters = [  # analise 15
+        Continuous(0.04, 0.06, 'h_concreto'),
+        Continuous(10e3, 150e3, 'protensao'),
+        Continuous(1e6, 1e9, 'ey_wood')  # esperado 10 a 500 MPa
+    ]
 
-target_params = [32.209e9, 0.06, 15e9, 210e9, 1.84e8, 4.06e7]
+elif irun == 17:
+    parameters = [  # analise
+        Continuous(0.04, 0.06, 'h_concreto'),
+        Continuous(2000,3000,'dens_concreto'),
+        Continuous(1e6, 1e9, 'ey_wood')  # esperado 10 a 500 MPa
+    ]
 
-base_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Analise 13"
+elif irun == 18:
+    parameters = [  # analise 14
+        Continuous(0.04, 0.06, 'h_concreto'),
+        Continuous(1e6, 1e9, 'ey_wood'),  # esperado 10 a 500 MPa
+        Continuous(1e7, 1e9, 'GXY'),  # 600-900 MPa  6e8
+        Continuous(1e6, 1e8, 'GYZ')  # 50-150 MPa  5e7
+    ]
+
+else:
+    raise(ValueError(f"Problem {irun} not defined."))
+
+base_dir = os.path.join(r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input", f"Analise {irun}")
 
 script_name = "scriptLOP.mac"
 
-iter = None
+iter = 50
 
 PSO_run = PSO_run(irun, parameters, base_dir, base_script_filename=script_name, iterations=iter)

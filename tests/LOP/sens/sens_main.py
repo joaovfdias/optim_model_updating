@@ -16,7 +16,7 @@ def sensitivity_analysis(parameters, base_dir, ansys_exe_path=None):
 
     # base_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 8"
     ansys_working_dir = os.path.join(base_dir, 'ANSYS')
-    input_dir = base_dir
+    input_dir = os.path.join(base_dir, 'input')
     output_dir = os.path.join(os.getcwd(), 'output')
 
     unique_ansys_dir = os.path.join(ansys_working_dir, f"worker_sensitivity")
@@ -24,8 +24,8 @@ def sensitivity_analysis(parameters, base_dir, ansys_exe_path=None):
     shutil.copy(os.path.join(base_dir, "ModBase.db"), unique_ansys_dir)
 
     base_script_filename = "scriptLOP.mac"
-    base_freq_filename = "out_freq.txt"
-    base_modes_filename = "out_modos_y.txt"
+    base_freq_filename = "target_freq.txt"
+    base_modes_filename = "target_modes.txt"
 
     out_freq_filename = "out_freq.txt"
     out_modes_filename = "out_modes.txt"
