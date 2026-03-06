@@ -93,11 +93,12 @@ def summarize_and_save(algo_name, conjunto_nome, results, expected_params, outpu
 # --- 4. ORQUESTRADOR ---
 if __name__ == '__main__':
 
-    problema = 4
+    problema = 1
     teste = False
+    apenas_conjunto_medio = True
     num_runs = 4 if not teste else 2
 
-    computador = "LEST 2"
+    computador = "LEST 1"
 
     # diretórios
     if computador == "LEST 2":
@@ -122,6 +123,21 @@ if __name__ == '__main__':
     # definição dos parâmetros do problema
     script_name = None
     noise = None
+
+    if problema == 1:
+
+        script_name = scriptVIGA.mac
+        noise = 0.03
+
+        parameters = [
+            Continuous(20e9, 30e9, 'modulo'),
+            Continuous(0.1, 0.49, 'poisson'),
+            Continuous(2400, 2600, 'dens'),
+            Continuous(10e6, 10e8, 'rigidez1'),
+            Continuous(10e6, 10e8, 'rigidez2')
+        ]
+
+        target_params = [23e9, 0.2, 2500, 1e7, 1.5e7]
 
     if problema == 3:
 
@@ -228,6 +244,9 @@ if __name__ == '__main__':
             ]
         }
 
+    if apenas_conjunto_medio:
+        configs_do_meio = {algoritmo: [configs[1]] for algoritmo, configs in configs_algoritmos.items()}
+        configs_algoritmos = configs_do_meio
 
     print(f"{'=' * 60}\nINICIANDO AVALIAÇÃO DE ALGORITMOS (RODADA {initimestamp})\n{'=' * 60}")
 
