@@ -26,7 +26,10 @@ def PSO_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_scrip
 
     unique_ansys_dir = os.path.join(ansys_working_dir, f"worker_PSO_{irun}_{os.getpid()}")
     os.makedirs(unique_ansys_dir, exist_ok=True)
-    shutil.copy(os.path.join(base_dir, "ModBase.db"), unique_ansys_dir)
+    try:
+        shutil.copy(os.path.join(base_dir, "ModBase.db"), unique_ansys_dir)
+    except FileNotFoundError:
+        print("\nAviso: não existe ModBase.db na pasta base. Nenhuma cópia foi feita.")
 
     base_script_filename = base_script_filename or "script.mac"
     base_freq_filename = "target_freq.txt"
