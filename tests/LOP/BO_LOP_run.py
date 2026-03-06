@@ -80,7 +80,7 @@ def BO_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script
 
 
     initial_points = initial_points or 5 * len(parameters)
-    evaluations = evaluations or 40 * len(parameters)
+    evaluations = evaluations or 35 * len(parameters)
     sampling_method = 'lhs'
 
     rodada = BO(fitness_function, parameters, initial_points)

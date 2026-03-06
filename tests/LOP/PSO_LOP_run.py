@@ -83,7 +83,7 @@ def PSO_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_scrip
 
     # declaração do otimizador:
     rodada = PSO(fitness_function, parameters, population_size, w, w_rate, c1, c2, init_vel_ratio) # objeto otimizador
-    rodada.set_tolerance(fit_rel = 1e-3, patience = round(0.25*iterations)) # critério de parada
+    rodada.set_tolerance(fit_rel = 1e-3, patience = round(0.20*iterations)) # critério de parada
     rodada.sync_time(ansys.anstime) # sincroniza timestamp de optimizer e ansys para facilitar controle dos registros
 
     # ajuste do registro:

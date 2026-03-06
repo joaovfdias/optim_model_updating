@@ -93,8 +93,10 @@ def summarize_and_save(algo_name, conjunto_nome, results, expected_params, outpu
 # --- 4. ORQUESTRADOR ---
 if __name__ == '__main__':
 
-    problema = 4
+    problema = 3
     teste = False
+    num_runs = 3 if not teste else 2
+
     computador = "LEST 2"
 
     # diretórios
@@ -127,16 +129,16 @@ if __name__ == '__main__':
         noise = 0.03
 
         parameters = [
-            Continuous(150e9, 250e9, 'modulo_banz'),
+            Continuous(180e9, 220e9, 'modulo_banz'),
 
-            Continuous(150e9, 250e9, 'modulo_diag'),
+            Continuous(180e9, 220e9, 'modulo_diag'),
 
-            Continuous(150e9, 250e9, 'modulo_contrav'),
+            Continuous(180e9, 220e9, 'modulo_contrav'),
 
-            Continuous(1e5, 1e7, 'rigidez1'),
-            Continuous(1e5, 1e7, 'rigidez2'),
-            Continuous(1e5, 1e7, 'rigidez3'),
-            Continuous(1e5, 1e7, 'rigidez4'),
+            Continuous(1e7, 1e8, 'rigidez1'),
+            Continuous(1e7, 1e8, 'rigidez2'),
+            Continuous(1e7, 1e8, 'rigidez3'),
+            Continuous(1e7, 1e8, 'rigidez4'),
 
             Continuous(400, 800, 'massa')
         ]
@@ -148,7 +150,7 @@ if __name__ == '__main__':
         script_name = "scriptLOP.mac"
 
         parameters = [  # analise 12
-            Continuous(28e9, 34e9, 'modulo_concreto'),
+            Continuous(29.2e9, 33e9, 'modulo_concreto'),
             Continuous(0.04, 0.06, 'h_concreto'),
 
             Continuous(12e9, 18e9, 'modulo_madeira'),
@@ -158,8 +160,8 @@ if __name__ == '__main__':
             Continuous(5e7, 5e8, 'kv'),
             Continuous(5e7, 5e8, 'kh'),
 
-            Continuous(1e8, 5e8, 'GXY'),
-            Continuous(1e8, 5e8, 'GYZ'),
+            Continuous(1e8, 4e8, 'GXY'),
+            Continuous(1e8, 4e8, 'GYZ'),
             Continuous(1e7, 5e7, 'GXZ')
         ]
 
@@ -227,7 +229,6 @@ if __name__ == '__main__':
             ]
         }
 
-    num_runs = 4 if not teste else 3
 
     print(f"{'=' * 60}\nINICIANDO AVALIAÇÃO DE ALGORITMOS (RODADA {initimestamp})\n{'=' * 60}")
 
