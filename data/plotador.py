@@ -4,6 +4,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+# --- CONFIGURAÇÃO GLOBAL ACADÊMICA ---
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.size'] = 12
+
 
 # =============================================================================
 # PARTE 1: FUNÇÕES DE PLOTAGEM (TOTALMENTE DESACOPLADAS)
@@ -21,6 +25,8 @@ def plot_convergencia(series_dados, titulo="Histórico de Convergência", xlabel
     fig, ax = plt.subplots(figsize=(10, 6))
 
     max_x = 0
+    min_fitness_geral = float('inf')
+
     for serie in series_dados:
         x = np.array(serie['x'])
 
@@ -33,34 +39,43 @@ def plot_convergencia(series_dados, titulo="Histórico de Convergência", xlabel
         else:
             y_desvio = np.nan_to_num(np.array(y_desvio_bruto, dtype=float))
 
-        cor = serie.get('cor', None)  # Se None, o matplotlib escolhe automaticamente
+        cor = serie.get('cor', None)
         label = serie.get('label', 'Série')
 
         max_x = max(max_x, len(x))
+        if len(y_media[y_media > 0]) > 0:
+            min_fitness_geral = min(min_fitness_geral, np.min(y_media[y_media > 0]))
 
-        # Plota a linha principal (média)
-        linha, = ax.plot(x, y_media, label=label, color=cor, linewidth=2)
+        # Plota a linha principal (mais fina)
+        linha, = ax.plot(x, y_media, label=label, color=cor, linewidth=0.8)
 
         # Plota a área de sombra (Desvio Padrão)
         if np.any(y_desvio > 0):
+            # Protege a área de sombra para não ficar <= 0 em escala Log.
+            piso_seguro = 1e-10 if escala_log else 0
+            sombra_inferior = np.maximum(y_media - y_desvio, piso_seguro)
+
             ax.fill_between(x,
-                            y_media - y_desvio,
+                            sombra_inferior,
                             y_media + y_desvio,
                             color=linha.get_color(),
-                            alpha=0.2,  # Transparência da sombra
+                            alpha=0.15, # Transparência da sombra
                             edgecolor="none")
 
     if escala_log:
         ax.set_yscale('log')
 
     if limite_y is not None:
-        ax.set_ylim(limite_y)  # Essencial para comparar gráficos diferentes lado a lado
+        ax.set_ylim(limite_y) # Essencial para comparar gráficos diferentes lado a lado
+    elif escala_log and min_fitness_geral != float('inf'):
+        # Se não passar o limite, mas for log, protege o mínimo para não bugar o visual
+        ax.set_ylim(bottom=max(1e-8, min_fitness_geral / 5))
 
     ax.set_xlim(left=0, right=max_x)  # Ajusta o eixo X exatamente para o tamanho das iterações
 
-    ax.set_title(titulo, fontsize=14, fontweight='bold')
-    ax.set_xlabel(xlabel, fontsize=12)
-    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_title(titulo, fontweight='bold')
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax.legend(loc="upper right", fontsize=10)
     ax.grid(True, which="both", ls="--", alpha=0.5)
 
@@ -70,7 +85,7 @@ def plot_convergencia(series_dados, titulo="Histórico de Convergência", xlabel
         fig.savefig(salvar_como, dpi=300, bbox_inches='tight')
         print(f"Gráfico salvo em: {salvar_como}")
 
-    plt.show()
+    plt.close(fig)
 
 
 def plot_boxplot_parametros(nome_parametro, valor_esperado, grupos_dados, titulo=None, salvar_como=None):
@@ -86,22 +101,22 @@ def plot_boxplot_parametros(nome_parametro, valor_esperado, grupos_dados, titulo
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Criando o boxplot (showmeans=True plota um triângulo verde indicando a média)
-    ax.boxplot(valores, labels=labels, patch_artist=True,
+    # ATUALIZADO: tick_labels no lugar de labels para corrigir o warning
+    ax.boxplot(valores, tick_labels=labels, patch_artist=True,
                showmeans=True, meanline=False,
                boxprops=dict(facecolor='lightblue', color='black', alpha=0.7),
-               medianprops=dict(color='red', linewidth=2),
+               medianprops=dict(color='red', linewidth=1.5),
                meanprops=dict(marker='D', markeredgecolor='black', markerfacecolor='yellow'))
 
     # Traçando a linha do valor real/esperado
-    ax.axhline(valor_esperado, color='green', linestyle='--', linewidth=2, label=f'Gabarito: {valor_esperado:.2e}')
+    ax.axhline(valor_esperado, color='green', linestyle='--', linewidth=1.5, label=f'Gabarito: {valor_esperado:.2e}')
 
     titulo = titulo or f"Distribuição Final: {nome_parametro}"
-    ax.set_title(titulo, fontsize=14, fontweight='bold')
-    ax.set_ylabel(f"Valor de {nome_parametro}", fontsize=12)
+    ax.set_title(titulo, fontweight='bold')
+    ax.set_ylabel(f"Valor de {nome_parametro}")
 
     # Customizando a legenda para explicar o que é a caixa
-    ax.plot([], [], color='red', linewidth=2, label='Mediana')
+    ax.plot([], [], color='red', linewidth=1.5, label='Mediana')
     ax.plot([], [], marker='D', color='w', markerfacecolor='yellow', markeredgecolor='black', label='Média')
     ax.legend(loc='best', fontsize=10)
 
@@ -112,7 +127,7 @@ def plot_boxplot_parametros(nome_parametro, valor_esperado, grupos_dados, titulo
         fig.savefig(salvar_como, dpi=300, bbox_inches='tight')
         print(f"Gráfico salvo em: {salvar_como}")
 
-    plt.show()
+    plt.close(fig)
 
 
 def plot_boxplot_erros_conjunto(nome_conjunto, dados_parametros, gabarito_real, titulo=None, salvar_como=None):
@@ -125,27 +140,30 @@ def plot_boxplot_erros_conjunto(nome_conjunto, dados_parametros, gabarito_real, 
     for param, valores in dados_parametros.items():
         if param in gabarito_real:
             val_esperado = gabarito_real[param]
-            # Calcula o erro relativo de cada rodada: ((Val - Esp) / Esp) * 100
+            # Usa o valor absoluto para a porcentagem
             erros = [abs((v - val_esperado) / val_esperado) * 100 for v in valores]
             labels.append(param)
             erros_percentuais.append(erros)
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    ax.boxplot(erros_percentuais, labels=labels, patch_artist=True,
+    # ATUALIZADO: tick_labels
+    ax.boxplot(erros_percentuais, tick_labels=labels, patch_artist=True,
                showmeans=True,
                boxprops=dict(facecolor='lightcoral', color='black', alpha=0.7),
-               medianprops=dict(color='black', linewidth=2),
+               medianprops=dict(color='black', linewidth=1.5),
                meanprops=dict(marker='D', markeredgecolor='black', markerfacecolor='yellow'))
 
-    ax.axhline(0, color='green', linestyle='--', linewidth=2, label='Erro Zero (Gabarito)')
+    ax.axhline(0, color='green', linestyle='--', linewidth=1.5, label='Erro Zero (Gabarito)')
 
     titulo = titulo or f"Erro Relativo (%) dos Parâmetros - {nome_conjunto}"
-    ax.set_title(titulo, fontsize=14, fontweight='bold')
-    ax.set_ylabel("Erro Relativo (%)", fontsize=12)
-    ax.set_yscale('symlog', linthresh=1.0)  # Usa escala log, mas permite chegar ao zero
+    ax.set_title(titulo, fontweight='bold')
+    ax.set_ylabel("Erro Relativo Absoluto (%)")
 
-    # Rotaciona os nomes dos parâmetros se forem muito grandes
+    # ATUALIZADO: Escala logarítmica com piso em 10^-3 para o gráfico não quebrar
+    ax.set_yscale('log')
+    ax.set_ylim(bottom=1e-3)
+
     plt.xticks(rotation=45, ha='right')
     ax.legend(loc='best', fontsize=10)
     ax.grid(True, axis='y', ls="--", alpha=0.7)
@@ -153,7 +171,9 @@ def plot_boxplot_erros_conjunto(nome_conjunto, dados_parametros, gabarito_real, 
     fig.tight_layout()
     if salvar_como:
         fig.savefig(salvar_como, dpi=300, bbox_inches='tight')
-    plt.show()
+        print(f"Gráfico salvo em: {salvar_como}")
+
+    plt.close(fig)
 
 
 # =============================================================================
@@ -199,7 +219,7 @@ def carregar_dados_das_pastas(log_dir_global, cores_personalizadas:dict=None):
                     'x': df['Iteracao'].tolist(),
                     'y_media': df['Media_Fitness'].tolist(),
                     'y_desvio': df['Desvio_Fitness'].tolist() if 'Desvio_Fitness' in df.columns else None,
-                    'cor': cores_personalizadas.get(nome_algo, None)  # Usa a cor do algoritmo
+                    'cor': cores_personalizadas.get(nome_algo, None)
                 })
 
             # 2. Extraindo dados da ÚLTIMA LINHA para os Boxplots de Parâmetros
@@ -256,13 +276,20 @@ if __name__ == '__main__':
     print("Extraindo dados...")
     dados_conv, box_param, box_conjunto = carregar_dados_das_pastas(pasta_da_rodada)
 
-    # 1. CURVA DE CONVERGÊNCIA (Todos juntos, com escala Y travada para comparação justa)
+    # 1. CURVA DE CONVERGÊNCIA POR ALGORITMO (Apenas os conjuntos do mesmo algoritmo juntos)
     if dados_conv:
-        print("Plotando Convergência Geral...")
-        plot_convergencia(dados_conv,
-                          titulo="Convergência Global",
-                          limite_y=(1e-4, 1e2),  # <-- AJUSTE AQUI SUA TRAVA DE ESCALA!
-                          salvar_como=os.path.join(pasta_graficos, "Convergencia_Todos.png"))
+        print("Plotando Convergência por Algoritmo...")
+        # Identifica todos os algoritmos rodados (ex: 'GA', 'PSO', 'BO')
+        algoritmos_presentes = set([d['label'].split(' - ')[0] for d in dados_conv])
+
+        for algo in algoritmos_presentes:
+            # Filtra apenas os conjuntos correspondentes a este algoritmo
+            dados_algo = [d for d in dados_conv if d['label'].startswith(algo)]
+
+            plot_convergencia(dados_algo,
+                              titulo=f"Convergência Global - {algo}",
+                              limite_y=None,  # Deixa autoajustar para cada algoritmo
+                              salvar_como=os.path.join(pasta_graficos, f"Convergencia_{algo}.png"))
 
     # 2. BOXPLOT: 1 Parâmetro vs Todos os Algoritmos
     print("\nPlotando parâmetros individuais...")
