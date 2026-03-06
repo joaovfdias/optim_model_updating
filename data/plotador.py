@@ -23,8 +23,16 @@ def plot_convergencia(series_dados, titulo="Histórico de Convergência", xlabel
     max_x = 0
     for serie in series_dados:
         x = np.array(serie['x'])
-        y_media = np.array(serie['y_media'])
-        y_desvio = np.array(serie.get('y_desvio', np.zeros_like(y_media)))
+
+        # Converte para float e transforma qualquer NaN (vazio) em zero para não quebrar a matemática
+        y_media = np.nan_to_num(np.array(serie['y_media'], dtype=float))
+
+        y_desvio_bruto = serie.get('y_desvio')
+        if y_desvio_bruto is None:
+            y_desvio = np.zeros_like(y_media)
+        else:
+            y_desvio = np.nan_to_num(np.array(y_desvio_bruto, dtype=float))
+
         cor = serie.get('cor', None)  # Se None, o matplotlib escolhe automaticamente
         label = serie.get('label', 'Série')
 
@@ -177,6 +185,12 @@ def carregar_dados_das_pastas(log_dir_global, cores_personalizadas:dict=None):
 
         try:
             df = pd.read_csv(arquivo, sep=';', decimal=',')
+
+            # Garante que as colunas sejam convertidas para floats matemáticos
+            for col in df.columns:
+                if df[col].dtype == 'object':  # Se o Pandas interpretou como texto
+                    df[col] = df[col].astype(str).str.replace(',', '.')
+                df[col] = pd.to_numeric(df[col], errors='coerce')
 
             # 1. Extraindo dados para a Curva de Convergência
             if 'Media_Fitness' in df.columns:
