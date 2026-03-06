@@ -93,29 +93,22 @@ def summarize_and_save(algo_name, conjunto_nome, results, expected_params, outpu
 # --- 4. ORQUESTRADOR ---
 if __name__ == '__main__':
 
+    from tests.indexador_2026 import indexar_problema, indexar_device
+
     problema = 1
+    computador = "Notebook"
+
     teste = False
     apenas_conjunto_medio = True
     num_runs = 4 if not teste else 2
 
-    computador = "LEST 1"
 
     # diretórios
-    if computador == "LEST 2":
-        devicepath_base = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas"
-        devicepath_local = r"C:\Users\Thiago Artur\Documents\Rodadas"
+    dadospc = indexar_device(computador)
 
-    if computador == "LEST 1":
-        devicepath_base = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\Rodadas"
-        devicepath_local = r"C:\Users\Thiago\Documents\Rodadas"
+    base_dir = os.path.join(dadospc.base_path, f"Problema {problema}")
+    local_dir = os.path.join(dadospc.local_path, f"Problema {problema}") # copia ModBase.db pro diretório local
 
-    if computador == "NOTEBOOK":
-        devicepath_base = r"C:\Users\thiag\OneDrive\Documentos\2025.2\Pesquisa\Rodadas"
-        devicepath_local = r"C:\Users\thiag\Documentos (Local)\Rodadas"
-
-
-    base_dir = os.path.join(devicepath_base, f"Problema {problema}")
-    local_dir = os.path.join(devicepath_local, f"Problema {problema}") # copia ModBase.db pro diretório local
     if teste: local_dir = os.path.join(local_dir, "teste")
     os.makedirs(local_dir, exist_ok=True)
 
@@ -126,72 +119,14 @@ if __name__ == '__main__':
     csv_resultado_path = os.path.join(global_log_dir, f"Resumo Global - Problema {problema}.csv")
 
     # definição dos parâmetros do problema
-    script_name = None
-    noise = None
+    dadosprob = indexar_problema(problema)
 
-    if problema == 1:
-
-        script_name = 'scriptVIGA.mac'
-        noise = None
-
-        parameters = [
-            Continuous(20e9, 30e9, 'modulo'),
-            Continuous(0.1, 0.49, 'poisson'),
-            Continuous(2400, 2600, 'dens'),
-            Continuous(10e6, 10e8, 'rigidez1'),
-            Continuous(10e6, 10e8, 'rigidez2')
-        ]
-
-        target_params = [23e9, 0.2, 2500, 1e7, 1.5e7]
-
-    if problema == 3:
-
-        script_name = "scriptTREL.mac"
-        noise = 0.03
-
-        parameters = [
-            Continuous(180e9, 220e9, 'modulo_banz'),
-
-            Continuous(180e9, 220e9, 'modulo_diag'),
-
-            Continuous(180e9, 220e9, 'modulo_contrav'),
-
-            Continuous(1e7, 1e8, 'rigidez1'),
-            Continuous(1e7, 1e8, 'rigidez2'),
-            Continuous(1e7, 1e8, 'rigidez3'),
-            Continuous(1e7, 1e8, 'rigidez4'),
-
-            Continuous(400, 800, 'massa')
-        ]
-
-        target_params = [205e9, 215e9, 195e9, 8e7, 6.8e7, 7.6e7, 7.2e7, 600]
-
-    elif problema == 4:
-
-        script_name = "scriptLOP.mac"
-
-        parameters = [  # GXZ fixado em 1e8, Ey incluido
-            Continuous(29.2e9, 33e9, 'modulo_concreto'),
-            Continuous(12e9, 18e9, 'modulo_madeira'),
-            Continuous(200e9, 220e9, 'modulo_cordoalhas'),
-
-            Continuous(5e7, 5e8, 'kv'),
-            Continuous(5e7, 5e8, 'kh'),
-
-            Continuous(0.04, 0.06, 'h_concreto'),
-
-            Continuous(1e6, 1e9, 'ey_wood'),  # esperado 10 a 500 MPa
-            Continuous(1e7, 1e9, 'GXY'),  # 600-900 MPa  6e8
-            Continuous(1e6, 1e8, 'GYZ')  # 50-150 MPa  5e7
-        ]
-
-        target_params = [32.209e9, 0.0417, 15e9, 210e9, 1.1e8, 9.7e7, 8.51e+08, 2.07e+08, 2.15e+07] #, 4.06e7]
-
-    else:
-        raise ValueError(f"Parâmetros e Gabarito não definidos para o problema: {problema}")
-
-    keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
-    expected_values = dict(zip(keys, target_params))
+    script_name = dadosprob.script_filename
+    noise = dadosprob.noise
+    parameters = dadosprob.parameters
+    target_params = dadosprob.target_params
+    keys = dadosprob.keys
+    expected_values = dadosprob.expected_values
 
 
     # SEUS DOIS (agora três) CONJUNTOS DE HIPERPARÂMETROS
