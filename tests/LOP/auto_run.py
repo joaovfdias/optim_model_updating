@@ -109,6 +109,11 @@ if __name__ == '__main__':
         devicepath_base = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\Rodadas"
         devicepath_local = r"C:\Users\Thiago\Documents\Rodadas"
 
+    if computador == "NOTEBOOK":
+        devicepath_base = r"C:\Users\thiag\OneDrive\Documentos\2025.2\Pesquisa\Rodadas"
+        devicepath_local = r"C:\Users\thiag\Documentos (Local)\Rodadas"
+
+
     base_dir = os.path.join(devicepath_base, f"Problema {problema}")
     local_dir = os.path.join(devicepath_local, f"Problema {problema}") # copia ModBase.db pro diretório local
     if teste: local_dir = os.path.join(local_dir, "teste")

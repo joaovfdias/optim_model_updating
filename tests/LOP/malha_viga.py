@@ -9,17 +9,17 @@ malha = [100, 80, 50, 25, 20, 10] # trata-se da divisão
 key = 'malha'
 
 # Caminhos
-base_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas\Problema 1"
-local_dir = 'bota aqui'
+base_dir = r"C:\Users\thiag\OneDrive\Documentos\2025.2\Pesquisa\Rodadas\Problema 1"
+local_dir = r"C:\Users\thiag\Documentos (Local)\Problema 1 (2026)"
 
 ansys_working_dir = os.path.join(local_dir, 'ANSYS', 'malha')
-os.makedirs(ansys_working_dir)
+os.makedirs(ansys_working_dir, exist_ok=True)
 input_dir = os.path.join(base_dir, 'input')
 base_script_path = os.path.join(input_dir, 'script_malha.mac')
 output_dir = os.path.join(local_dir, 'output')
 
 # Arquivos que o ANSYS gera
-base_freq_path = os.path.join(ansys_working_dir, "out_freq.txt")
+base_freq_path = os.path.join(ansys_working_dir, "target_freq.txt")
 
 # Cria diretórios se não existirem
 if not os.path.exists(output_dir):
@@ -109,7 +109,7 @@ mapdl.exit()
 # Cria o DataFrame e Salva em CSV
 df_resultado = pd.DataFrame(dados_consolidados)
 csv_dir = os.path.join(base_dir, 'malha')
-os.makedirs(csv_dir)
+os.makedirs(csv_dir, exist_ok=True)
 csv_path = os.path.join(csv_dir, f'resultado_sensibilidade_malha_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv')
 
 # Organiza as colunas (Malha e Tempo primeiro)
