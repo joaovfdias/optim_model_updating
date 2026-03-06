@@ -149,23 +149,22 @@ if __name__ == '__main__':
 
         script_name = "scriptLOP.mac"
 
-        parameters = [  # analise 12
+        parameters = [  # GXZ fixado em 1e8, Ey incluido
             Continuous(29.2e9, 33e9, 'modulo_concreto'),
-            Continuous(0.04, 0.06, 'h_concreto'),
-
             Continuous(12e9, 18e9, 'modulo_madeira'),
-
             Continuous(200e9, 220e9, 'modulo_cordoalhas'),
 
             Continuous(5e7, 5e8, 'kv'),
             Continuous(5e7, 5e8, 'kh'),
 
-            Continuous(1e8, 4e8, 'GXY'),
-            Continuous(1e8, 4e8, 'GYZ')
-            # Continuous(1e7, 5e7, 'GXZ')
+            Continuous(0.04, 0.06, 'h_concreto'),
+
+            Continuous(1e6, 1e9, 'ey_wood'),  # esperado 10 a 500 MPa
+            Continuous(1e7, 1e9, 'GXY'),  # 600-900 MPa  6e8
+            Continuous(1e6, 1e8, 'GYZ')  # 50-150 MPa  5e7
         ]
 
-        target_params = [32.209e9, 0.06, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8] #, 4.06e7]
+        target_params = [32.209e9, 0.0417, 15e9, 210e9, 1.1e8, 9.7e7, 8.51e+08, 2.07e+08, 2.15e+07] #, 4.06e7]
 
     else:
         raise ValueError(f"Parâmetros e Gabarito não definidos para o problema: {problema}")

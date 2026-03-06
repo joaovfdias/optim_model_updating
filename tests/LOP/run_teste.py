@@ -12,7 +12,7 @@ from PSO_LOP_run import PSO_run
 from optimization.parameter import Continuous
 from data.compile import compile_convergence_history
 
-irun = 18
+irun = 19
 
 if irun == 14:
     parameters = [ # analise 14
@@ -48,6 +48,15 @@ elif irun == 18:
         Continuous(1e6, 1e9, 'ey_wood'),  # esperado 10 a 500 MPa
         Continuous(1e7, 1e9, 'GXY'),  # 600-900 MPa  6e8
         Continuous(1e6, 1e8, 'GYZ')  # 50-150 MPa  5e7
+    ]
+
+elif irun == 19:
+    parameters = [  # analise 14
+        Continuous(0.04, 0.06, 'h_concreto'), # FIXO EM 0.4
+        Continuous(1e6, 1e9, 'ey_wood'),  # esperado 10 a 500 MPa
+        Continuous(1e7, 1e9, 'GXY'),  # 600-900 MPa  6e8
+        Continuous(1e6, 1e8, 'GYZ'),  # 50-150 MPa  5e7
+        Continuous(1e8, 1e9, 'GXZ')  # 600-900 MPa  6e8
     ]
 
 else:
