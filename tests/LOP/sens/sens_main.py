@@ -9,21 +9,26 @@ import os
 import shutil
 
 
-def sensitivity_analysis(parameters, base_dir, ansys_exe_path=None):
+def sensitivity_analysis(parameters, base_dir, ansys_exe_path=None, local_dir=None, scriptfilename=None):
     keys = [p.key for p in parameters]
 
     ansys_exe_path = ansys_exe_path or r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 
-    # base_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Problema 3\Py\Input\Análise 8"
-    ansys_working_dir = os.path.join(base_dir, 'ANSYS')
+    # caminhos
+    ansys_working_dir = os.path.join(local_dir if local_dir else base_dir, 'ANSYS')
+    os.makedirs(ansys_working_dir, exist_ok=True)
     input_dir = os.path.join(base_dir, 'input')
-    output_dir = os.path.join(os.getcwd(), 'output')
+    output_dir = os.path.join(local_dir if local_dir else os.getcwd(), 'output')
+    os.makedirs(output_dir, exist_ok=True)
 
     unique_ansys_dir = os.path.join(ansys_working_dir, f"worker_sensitivity")
     os.makedirs(unique_ansys_dir, exist_ok=True)
-    shutil.copy(os.path.join(base_dir, "ModBase.db"), unique_ansys_dir)
+    try:
+        shutil.copy(os.path.join(base_dir, "ModBase.db"), unique_ansys_dir)
+    except FileNotFoundError:
+        print("\nAviso: não existe ModBase.db na pasta base. Nenhuma cópia foi feita.")
 
-    base_script_filename = "scriptLOP.mac"
+    base_script_filename = scriptfilename or "scriptLOP.mac"
     base_freq_filename = "target_freq.txt"
     base_modes_filename = "target_modes.txt"
 

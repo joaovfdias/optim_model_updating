@@ -25,6 +25,7 @@ parameters = [  # analise 12
             # Continuous(1e7, 5e7, 'GXZ')
         ]
 
-base_dir = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas\Problema 4\input\antigo (15 GERAL +EY -GXZ)"
+base_dir = r"C:\Users\thiag\OneDrive\Documentos\2025.2\Pesquisa\Rodadas\Problema 4\input\antigo (15 GERAL +EY -GXZ)"
+local_dir = r"C:\Users\thiag\Documentos (Local)\Problema 4 (2026)"
 
-sensitivity_analysis(parameters, base_dir)
+sensitivity_analysis(parameters, base_dir, local_dir=local_dir)
