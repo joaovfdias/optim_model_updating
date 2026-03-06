@@ -126,8 +126,8 @@ if __name__ == '__main__':
 
     if problema == 1:
 
-        script_name = scriptVIGA.mac
-        noise = 0.03
+        script_name = 'scriptVIGA.mac'
+        noise = None
 
         parameters = [
             Continuous(20e9, 30e9, 'modulo'),
