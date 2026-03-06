@@ -93,9 +93,9 @@ def summarize_and_save(algo_name, conjunto_nome, results, expected_params, outpu
 # --- 4. ORQUESTRADOR ---
 if __name__ == '__main__':
 
-    problema = 3
+    problema = 4
     teste = False
-    num_runs = 3 if not teste else 2
+    num_runs = 4 if not teste else 2
 
     computador = "LEST 2"
 
@@ -105,8 +105,8 @@ if __name__ == '__main__':
         devicepath_local = r"C:\Users\Thiago Artur\Documents\Rodadas"
 
     if computador == "LEST 1":
-        devicepath_base = None
-        devicepath_local = None
+        devicepath_base = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\Rodadas"
+        devicepath_local = r"C:\Users\Thiago\Documents\Rodadas"
 
     base_dir = os.path.join(devicepath_base, f"Problema {problema}")
     local_dir = os.path.join(devicepath_local, f"Problema {problema}") # copia ModBase.db pro diretório local
@@ -161,11 +161,11 @@ if __name__ == '__main__':
             Continuous(5e7, 5e8, 'kh'),
 
             Continuous(1e8, 4e8, 'GXY'),
-            Continuous(1e8, 4e8, 'GYZ'),
-            Continuous(1e7, 5e7, 'GXZ')
+            Continuous(1e8, 4e8, 'GYZ')
+            # Continuous(1e7, 5e7, 'GXZ')
         ]
 
-        target_params = [32.209e9, 0.06, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8, 4.06e7]
+        target_params = [32.209e9, 0.06, 15e9, 210e9, 1.1e8, 9.7e7, 1.84e8, 2.07e8] #, 4.06e7]
 
     else:
         raise ValueError(f"Parâmetros e Gabarito não definidos para o problema: {problema}")
