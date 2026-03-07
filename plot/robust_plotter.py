@@ -55,10 +55,11 @@ from datetime import datetime
 PLOT_STYLE = {
     "font.family": "Times New Roman",
     "font.size": 14,
-    "figure.figsize": (8, 5),
+    "figure.figsize": (16, 6),
     "axes.grid": True,
     "grid.linestyle": "--",
     "grid.alpha": 0.4,
+    "axes.linewidth": 0.8,
 }
 
 ALGO_COLORS = {
@@ -67,7 +68,18 @@ ALGO_COLORS = {
     "BO": "#d62728"
 }
 
+ALGO_AXES = {
+    "GA": ["Generations", "Gerações"],
+    "PSO": ["Iterations", "Iterações"],
+    "BO": ["Evaluations", "Avaliações"]
+}
+
 plt.rcParams.update(PLOT_STYLE)
+
+labelpad = 8
+titlepad = 20
+
+figsize_menor = (8, 5)
 
 
 def load_experiment_dataset(log_dir):
@@ -125,7 +137,7 @@ def _compute_best_so_far_stats(df):
     return mean, std
 
 
-def plot_convergence_algorithm(dataset, algo, salvar_em=False):
+def plot_convergence_algorithm(dataset, algo, salvar_em=False, portuguese:bool=True):
 
     if algo not in dataset:
         print(f"{algo} not found in dataset")
@@ -152,9 +164,9 @@ def plot_convergence_algorithm(dataset, algo, salvar_em=False):
 
     ax.set_yscale("log")
 
-    ax.set_xlabel("Iteration")
-    ax.set_ylabel("Fitness")
-    ax.set_title(f"Convergence: {algo}", pad=20)
+    ax.set_xlabel(ALGO_AXES[algo][portuguese], labelpad=labelpad)
+    ax.set_ylabel("Fitness", labelpad=labelpad)
+    ax.set_title(f"{'Convergence' if not portuguese else 'Convergência'}: {algo}", pad=titlepad)
 
     ax.legend()
 
@@ -184,7 +196,8 @@ def plot_parameter_boxplot(
     expected_value=None,
     search_space=None,
     algo=None,
-    salvar_em=False
+    salvar_em=False,
+    portuguese=True
 ):
 
     labels = []
@@ -217,7 +230,7 @@ def plot_parameter_boxplot(
     if len(values) == 0:
         return
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=figsize_menor if len(values)<=3 else None)
 
     ax.spines["top"].set_visible(True)
     ax.spines["right"].set_visible(True)
@@ -243,7 +256,7 @@ def plot_parameter_boxplot(
 
     paramname = param if not key_to_name else key_to_name[param]
 
-    ax.set_title(f"Parameter distribution: {param}", pad=20)
+    ax.set_title(f"{"Parameter distribution" if not portuguese else "Distribuição do Parâmetro"}: {param}", pad=20)
     ax.set_ylabel(paramname)
 
     plt.xticks(rotation=0 if len(values)<=3 else 45)
@@ -257,7 +270,8 @@ def plot_parameter_error_boxplot(
     dataset,
     expected_params,
     algo=None,
-    salvar_em=False
+    salvar_em=False,
+    portuguese=True
 ):
 
     for a in dataset:
@@ -288,8 +302,8 @@ def plot_parameter_error_boxplot(
 
             ax.set_yscale("log")
 
-            ax.set_ylabel("Relative error (%)")
-            ax.set_title(f"Parameter error – {a} {set_name}", pad=20)
+            ax.set_ylabel("Relative error (%)" if not portuguese else "Erro Relativo (%)")
+            ax.set_title(f"{"Parameter error" if not portuguese else "Erro de parâmetros"}: {a} ({set_name})", pad=20)
 
             plt.xticks(rotation=45)
 
@@ -336,7 +350,7 @@ def plot_set_ranking(dataset, salvar_em=False):
     _save_or_show(fig, path)
 
 
-def plot_all_results(
+def plot_all_results( # melhorar
     log_dir,
     expected_params=None,
     search_space=None,
