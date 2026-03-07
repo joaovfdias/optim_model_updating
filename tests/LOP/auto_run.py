@@ -96,10 +96,11 @@ if __name__ == '__main__':
     from tests.indexador_2026 import indexar_problema, indexar_device
 
     problema = 1
-    computador = "Notebook"
+    computador = "LEST 1"
 
     teste = False
     apenas_conjunto_medio = True
+    filtrar_algoritmo = ["GA"] # False para todos
     num_runs = 4 if not teste else 2
 
 
@@ -187,6 +188,20 @@ if __name__ == '__main__':
     if apenas_conjunto_medio:
         configs_do_meio = {algoritmo: [configs[1]] for algoritmo, configs in configs_algoritmos.items()}
         configs_algoritmos = configs_do_meio
+
+    if filtrar_algoritmo:
+        # 1. Descobre quais algoritmos pedidos NÃO estão no dicionário
+        faltantes = [algo for algo in filtrar_algoritmo if algo not in configs_algoritmos]
+
+        # 2. Se a lista de faltantes não estiver vazia, para tudo e avisa
+        if faltantes:
+            raise ValueError(
+                f"\n[ERRO CRÍTICO] Execução interrompida."
+                f"\nOs seguintes algoritmos não possuem configuração definida: {', '.join(faltantes)}"
+            )
+
+        # 3. Se chegou até aqui, é porque todos existem. Filtra com segurança em uma linha!
+        configs_algoritmos = {algo: configs_algoritmos[algo] for algo in filtrar_algoritmo}
 
     print(f"{'=' * 60}\nINICIANDO AVALIAÇÃO DE ALGORITMOS (RODADA {initimestamp})\n{'=' * 60}")
 
