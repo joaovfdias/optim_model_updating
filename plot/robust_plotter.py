@@ -33,7 +33,15 @@ log_dir/
     PSO/
     BO/
 
-Author: Auto-generated research plotting toolkit
+Improvements added
+------------------
+- Convergence computed using BEST-SO-FAR (cumulative minimum) per run
+- Statistics recomputed from individual runs (mean ± std)
+- Log-scale convergence plots
+- Parameter boxplots centered around expected value
+- Optional filtering using parameter search space
+- Cleaner visual style
+- Ranking uses best-so-far fitness
 """
 
 import os
@@ -42,10 +50,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
-# ============================================================
-# VISUAL STYLE CONFIGURATION (EDIT HERE)
-# ============================================================
 
 PLOT_STYLE = {
     "font.family": "Times New Roman",
@@ -62,19 +66,17 @@ ALGO_COLORS = {
     "BO": "#d62728"
 }
 
-
 plt.rcParams.update(PLOT_STYLE)
 
-
-# ============================================================
-# DATA LOADER
-# ============================================================
 
 def load_experiment_dataset(log_dir):
 
     dataset = {}
 
-    csv_files = glob.glob(os.path.join(log_dir, "**", "Convergencia_*.csv"), recursive=True)
+    csv_files = glob.glob(
+        os.path.join(log_dir, "**", "Convergencia_*.csv"),
+        recursive=True
+    )
 
     for f in csv_files:
 
@@ -94,10 +96,6 @@ def load_experiment_dataset(log_dir):
     return dataset
 
 
-# ============================================================
-# INTERNAL UTILITIES
-# ============================================================
-
 def _save_or_show(fig, path=None, save=True):
 
     if save and path:
@@ -108,9 +106,23 @@ def _save_or_show(fig, path=None, save=True):
         plt.show()
 
 
-# ============================================================
-# CONVERGENCE PLOTS
-# ============================================================
+def _compute_best_so_far_stats(df):
+
+    run_cols = [c for c in df.columns if "Run" in c and "Fitness" in c]
+
+    if len(run_cols) == 0:
+        mean = df["Media_Fitness"].cummin().values
+        std = df["Desvio_Fitness"].values
+        return mean, std
+
+    runs = df[run_cols].values
+    runs_best = np.minimum.accumulate(runs, axis=0)
+
+    mean = runs_best.mean(axis=1)
+    std = runs_best.std(axis=1)
+
+    return mean, std
+
 
 def plot_convergence_algorithm(dataset, algo, save=True, outdir="plots"):
 
@@ -120,11 +132,13 @@ def plot_convergence_algorithm(dataset, algo, save=True, outdir="plots"):
 
     fig, ax = plt.subplots()
 
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
     for set_name, df in dataset[algo].items():
 
         x = df["Iteracao"].values
-        mean = df["Media_Fitness"].values
-        std = df["Desvio_Fitness"].values
+        mean, std = _compute_best_so_far_stats(df)
 
         ax.plot(x, mean, label=set_name)
 
@@ -136,9 +150,11 @@ def plot_convergence_algorithm(dataset, algo, save=True, outdir="plots"):
         )
 
     ax.set_yscale("log")
+
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Fitness")
     ax.set_title(f"Convergence – {algo}")
+
     ax.legend()
 
     path = os.path.join(outdir, f"convergence_{algo}.png")
@@ -152,10 +168,6 @@ def plot_all_convergences(dataset, save=True, outdir="plots"):
         plot_convergence_algorithm(dataset, algo, save, outdir)
 
 
-# ============================================================
-# PARAMETER DISTRIBUTION BOXPLOTS
-# ============================================================
-
 def _extract_parameter_values(df, param):
 
     cols = [c for c in df.columns if c.endswith("_" + param)]
@@ -164,8 +176,15 @@ def _extract_parameter_values(df, param):
     return values
 
 
-def plot_parameter_boxplot(dataset, param, expected_value=None,
-                           algo=None, save=True, outdir="plots"):
+def plot_parameter_boxplot(
+    dataset,
+    param,
+    expected_value=None,
+    search_space=None,
+    algo=None,
+    save=True,
+    outdir="plots"
+):
 
     labels = []
     values = []
@@ -179,19 +198,47 @@ def plot_parameter_boxplot(dataset, param, expected_value=None,
 
             vals = _extract_parameter_values(df, param)
 
+            if search_space and param in search_space:
+
+                lo, hi = search_space[param]
+
+                vals = vals[(vals >= lo) & (vals <= hi)]
+
+            if len(vals) == 0:
+                continue
+
             labels.append(f"{a}-{set_name}")
             values.append(vals)
 
+    if len(values) == 0:
+        return
+
     fig, ax = plt.subplots()
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
     ax.boxplot(values, tick_labels=labels, showmeans=True)
 
     if expected_value is not None:
+
         ax.axhline(expected_value, linestyle="--", color="red", label="Expected")
+
+        all_vals = np.concatenate(values)
+
+        max_dev = np.max(np.abs(all_vals - expected_value))
+
+        margin = max_dev * 1.2 if max_dev > 0 else abs(expected_value) * 0.05
+
+        ax.set_ylim(
+            expected_value - margin,
+            expected_value + margin
+        )
+
+        ax.legend()
 
     ax.set_title(f"Parameter distribution – {param}")
     ax.set_ylabel(param)
-    ax.legend()
 
     plt.xticks(rotation=45)
 
@@ -200,12 +247,13 @@ def plot_parameter_boxplot(dataset, param, expected_value=None,
     _save_or_show(fig, path, save)
 
 
-# ============================================================
-# PARAMETER ERROR BOXPLOTS (%)
-# ============================================================
-
-def plot_parameter_error_boxplot(dataset, expected_params,
-                                 algo=None, save=True, outdir="plots"):
+def plot_parameter_error_boxplot(
+    dataset,
+    expected_params,
+    algo=None,
+    save=True,
+    outdir="plots"
+):
 
     for a in dataset:
 
@@ -221,12 +269,15 @@ def plot_parameter_error_boxplot(dataset, expected_params,
 
                 vals = _extract_parameter_values(df, param)
 
-                err = np.abs((vals - expected) / expected) * 100
+                err = np.abs(vals - expected) / np.abs(expected) * 100
 
                 labels.append(param)
                 errors.append(err)
 
             fig, ax = plt.subplots()
+
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
 
             ax.boxplot(errors, tick_labels=labels, showmeans=True)
 
@@ -242,10 +293,6 @@ def plot_parameter_error_boxplot(dataset, expected_params,
             _save_or_show(fig, path, save)
 
 
-# ============================================================
-# HYPERPARAMETER SET RANKING
-# ============================================================
-
 def plot_set_ranking(dataset, save=True, outdir="plots"):
 
     labels = []
@@ -255,12 +302,15 @@ def plot_set_ranking(dataset, save=True, outdir="plots"):
 
         for set_name, df in dataset[algo].items():
 
-            final = df["Media_Fitness"].iloc[-1]
+            final = df["Media_Fitness"].cummin().iloc[-1]
 
             labels.append(f"{algo}-{set_name}")
             fitness.append(final)
 
     fig, ax = plt.subplots()
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
     idx = np.argsort(fitness)
 
@@ -281,12 +331,13 @@ def plot_set_ranking(dataset, save=True, outdir="plots"):
     _save_or_show(fig, path, save)
 
 
-# ============================================================
-# MASTER FUNCTION
-# ============================================================
-
-def plot_all_results(log_dir, expected_params=None,
-                     save=True, outdir="plots"):
+def plot_all_results(
+    log_dir,
+    expected_params=None,
+    search_space=None,
+    save=True,
+    outdir="plots"
+):
 
     dataset = load_experiment_dataset(log_dir)
 
@@ -295,12 +346,21 @@ def plot_all_results(log_dir, expected_params=None,
     if expected_params:
 
         for param in expected_params:
-            plot_parameter_boxplot(dataset, param,
-                                   expected_params[param],
-                                   save=save, outdir=outdir)
+            plot_parameter_boxplot(
+                dataset,
+                param,
+                expected_params[param],
+                search_space=search_space,
+                save=save,
+                outdir=outdir
+            )
 
-        plot_parameter_error_boxplot(dataset, expected_params,
-                                     save=save, outdir=outdir)
+        plot_parameter_error_boxplot(
+            dataset,
+            expected_params,
+            save=save,
+            outdir=outdir
+        )
 
     plot_set_ranking(dataset, save, outdir)
 

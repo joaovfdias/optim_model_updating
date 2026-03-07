@@ -9,6 +9,7 @@ class Problema:
     target_params: list
     keys: list
     expected_values: dict
+    search_spaces: dict
 
 @dataclass
 class Device:
@@ -76,8 +77,9 @@ def indexar_problema(problema):
 
     keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
     expected_values = dict(zip(keys, target_params))
+    search_spaces = {param.key: [param.lower_bound, param.upper_bound] for param in parameters}
 
-    return Problema(script_filename=script_name, noise=noise, parameters=parameters, target_params=target_params, keys=keys, expected_values=expected_values)
+    return Problema(script_filename=script_name, noise=noise, parameters=parameters, target_params=target_params, keys=keys, expected_values=expected_values, search_spaces=search_spaces)
 
 def indexar_device(computador):
     # diretórios
