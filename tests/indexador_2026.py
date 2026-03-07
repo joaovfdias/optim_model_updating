@@ -69,7 +69,7 @@ def indexar_problema(problema):
             Continuous(1e7, 1e9, 'GXY'),  # 600-900 MPa  6e8
             Continuous(1e6, 1e8, 'GYZ')  # 50-150 MPa  5e7
         ]
-        target_params = [32.209e9, 0.0417, 15e9, 210e9, 1.1e8, 9.7e7, 8.51e+08, 2.07e+08, 2.15e+07]  # , 4.06e7]
+        target_params = [32.209e9, 15e9, 210e9, 1.1e8, 9.7e7, 0.0417, 8.51e+08, 2.07e+08, 2.15e+07]  # , 4.06e7]
 
     else:
         raise ValueError(f"Dados não definidos para o problema: {problema}")
