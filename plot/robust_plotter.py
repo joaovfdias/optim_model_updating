@@ -132,8 +132,8 @@ def plot_convergence_algorithm(dataset, algo, save=True, outdir="plots"):
 
     fig, ax = plt.subplots()
 
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(True)
+    ax.spines["right"].set_visible(True)
 
     for set_name, df in dataset[algo].items():
 
@@ -215,10 +215,10 @@ def plot_parameter_boxplot(
 
     fig, ax = plt.subplots()
 
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(True)
+    ax.spines["right"].set_visible(True)
 
-    ax.boxplot(values, tick_labels=labels, showmeans=True)
+    ax.boxplot(values, tick_labels=labels, showmeans=False, showfliers=False)
 
     if expected_value is not None:
 
@@ -276,10 +276,10 @@ def plot_parameter_error_boxplot(
 
             fig, ax = plt.subplots()
 
-            ax.spines["top"].set_visible(False)
-            ax.spines["right"].set_visible(False)
+            ax.spines["top"].set_visible(True)
+            ax.spines["right"].set_visible(True)
 
-            ax.boxplot(errors, tick_labels=labels, showmeans=True)
+            ax.boxplot(errors, tick_labels=labels, showmeans=False, showfliers=False)
 
             ax.set_yscale("log")
 
