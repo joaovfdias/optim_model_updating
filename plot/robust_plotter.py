@@ -54,7 +54,7 @@ from datetime import datetime
 
 PLOT_STYLE = {
     "font.family": "Times New Roman",
-    "font.size": 12,
+    "font.size": 14,
     "figure.figsize": (8, 5),
     "axes.grid": True,
     "grid.linestyle": "--",
@@ -154,7 +154,7 @@ def plot_convergence_algorithm(dataset, algo, salvar_em=False):
 
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Fitness")
-    ax.set_title(f"Convergence – {algo}")
+    ax.set_title(f"Convergence: {algo}", pad=20)
 
     ax.legend()
 
@@ -180,6 +180,7 @@ def _extract_parameter_values(df, param):
 def plot_parameter_boxplot(
     dataset,
     param,
+    key_to_name: dict = None, # dicionário que relaciona key com o nome completo do parâmetro para legenda
     expected_value=None,
     search_space=None,
     algo=None,
@@ -207,7 +208,10 @@ def plot_parameter_boxplot(
             if len(vals) == 0:
                 continue
 
-            labels.append(f"{a}-{set_name}")
+            if algo:
+                labels.append(f"{set_name}") # não repete o nome do algoritmo várias vezes caso seja vários conjuntos dele
+            else:
+                labels.append(f"{a} ({set_name})")
             values.append(vals)
 
     if len(values) == 0:
@@ -222,7 +226,7 @@ def plot_parameter_boxplot(
 
     if expected_value is not None:
 
-        ax.axhline(expected_value, linestyle="--", color="red", label="Expected")
+        ax.axhline(expected_value, linestyle="--", color="blue", label="Expected")
 
         all_vals = np.concatenate(values)
 
@@ -235,12 +239,14 @@ def plot_parameter_boxplot(
             expected_value + margin
         )
 
-        ax.legend()
+        # ax.legend() # não é necessária legenda
 
-    ax.set_title(f"Parameter distribution – {param}")
-    ax.set_ylabel(param)
+    paramname = param if not key_to_name else key_to_name[param]
 
-    plt.xticks(rotation=45)
+    ax.set_title(f"Parameter distribution: {param}", pad=20)
+    ax.set_ylabel(paramname)
+
+    plt.xticks(rotation=0 if len(values)<=3 else 45)
 
     path = None if not salvar_em else os.path.join(salvar_em, f"boxplot_param_{param}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
 
@@ -283,7 +289,7 @@ def plot_parameter_error_boxplot(
             ax.set_yscale("log")
 
             ax.set_ylabel("Relative error (%)")
-            ax.set_title(f"Parameter error – {a} {set_name}")
+            ax.set_title(f"Parameter error – {a} {set_name}", pad=20)
 
             plt.xticks(rotation=45)
 
@@ -321,7 +327,7 @@ def plot_set_ranking(dataset, salvar_em=False):
     ax.set_yscale("log")
 
     ax.set_ylabel("Final fitness")
-    ax.set_title("Hyperparameter set ranking")
+    ax.set_title("Hyperparameter set ranking", pad=20)
 
     plt.xticks(rotation=45)
 

@@ -10,6 +10,7 @@ class Problema:
     keys: list
     expected_values: dict
     search_spaces: dict
+    key_to_name: dict
 
 @dataclass
 class Device:
@@ -21,6 +22,7 @@ def indexar_problema(problema):
 
     script_name = None # script.mac
     noise = None
+    key_to_name = {}
 
     if problema == 1:
         script_name = 'scriptVIGA.mac'
@@ -71,6 +73,17 @@ def indexar_problema(problema):
             Continuous(1e6, 1e8, 'GYZ')  # 50-150 MPa  5e7
         ]
         target_params = [32.209e9, 15e9, 210e9, 1.1e8, 9.7e7, 0.0417, 8.51e+08, 2.07e+08, 2.15e+07]  # , 4.06e7]
+        key_to_name = {
+            "modulo_concreto": "Módulo de Elasticidade do Concreto",
+            "modulo_madeira": "Módulo de Elasticidade da Madeira",
+            "modulo_cordoalhas": "Módulo de Elasticidade do Aço (cordoalhas)",
+            "kv": "Rigidez Vertical dos Apoios",
+            "kh": "Rigidez Horizontal dos Apoios",
+            "h_concreto": "Espessura de Concreto",
+            "ey_wood": "Módulo de Elasticidade Transversal da Madeira",
+            "GXY": "GXY (madeira)",
+            "GYZ": "GYZ (madeira)"
+        }
 
     else:
         raise ValueError(f"Dados não definidos para o problema: {problema}")
@@ -79,7 +92,7 @@ def indexar_problema(problema):
     expected_values = dict(zip(keys, target_params))
     search_spaces = {param.key: [param.lower_bound, param.upper_bound] for param in parameters}
 
-    return Problema(script_filename=script_name, noise=noise, parameters=parameters, target_params=target_params, keys=keys, expected_values=expected_values, search_spaces=search_spaces)
+    return Problema(script_filename=script_name, noise=noise, parameters=parameters, target_params=target_params, keys=keys, expected_values=expected_values, search_spaces=search_spaces, key_to_name=key_to_name)
 
 def indexar_device(computador):
     # diretórios
