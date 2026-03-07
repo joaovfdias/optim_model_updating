@@ -49,6 +49,7 @@ import glob
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 
 PLOT_STYLE = {
@@ -96,9 +97,9 @@ def load_experiment_dataset(log_dir):
     return dataset
 
 
-def _save_or_show(fig, path=None, save=True):
+def _save_or_show(fig, path=False):
 
-    if save and path:
+    if path:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         fig.savefig(path, dpi=300, bbox_inches="tight")
         plt.close(fig)
@@ -124,7 +125,7 @@ def _compute_best_so_far_stats(df):
     return mean, std
 
 
-def plot_convergence_algorithm(dataset, algo, save=True, outdir="plots"):
+def plot_convergence_algorithm(dataset, algo, salvar_em=False):
 
     if algo not in dataset:
         print(f"{algo} not found in dataset")
@@ -157,15 +158,15 @@ def plot_convergence_algorithm(dataset, algo, save=True, outdir="plots"):
 
     ax.legend()
 
-    path = os.path.join(outdir, f"convergence_{algo}.png")
+    path = None if not salvar_em else os.path.join(salvar_em, f"convergence_{algo}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
 
-    _save_or_show(fig, path, save)
+    _save_or_show(fig, path)
 
 
-def plot_all_convergences(dataset, save=True, outdir="plots"):
+def plot_all_convergences(dataset, salvar_em=False):
 
     for algo in dataset:
-        plot_convergence_algorithm(dataset, algo, save, outdir)
+        plot_convergence_algorithm(dataset, algo, salvar_em)
 
 
 def _extract_parameter_values(df, param):
@@ -182,8 +183,7 @@ def plot_parameter_boxplot(
     expected_value=None,
     search_space=None,
     algo=None,
-    save=True,
-    outdir="plots"
+    salvar_em=False
 ):
 
     labels = []
@@ -242,17 +242,16 @@ def plot_parameter_boxplot(
 
     plt.xticks(rotation=45)
 
-    path = os.path.join(outdir, f"boxplot_param_{param}.png")
+    path = None if not salvar_em else os.path.join(salvar_em, f"boxplot_param_{param}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
 
-    _save_or_show(fig, path, save)
+    _save_or_show(fig, path)
 
 
 def plot_parameter_error_boxplot(
     dataset,
     expected_params,
     algo=None,
-    save=True,
-    outdir="plots"
+    salvar_em=False
 ):
 
     for a in dataset:
@@ -288,12 +287,12 @@ def plot_parameter_error_boxplot(
 
             plt.xticks(rotation=45)
 
-            path = os.path.join(outdir, f"error_{a}_{set_name}.png")
+            path = None if not salvar_em else os.path.join(salvar_em, f"error_{a}_{set_name}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
 
-            _save_or_show(fig, path, save)
+            _save_or_show(fig, path)
 
 
-def plot_set_ranking(dataset, save=True, outdir="plots"):
+def plot_set_ranking(dataset, salvar_em=False):
 
     labels = []
     fitness = []
@@ -326,22 +325,21 @@ def plot_set_ranking(dataset, save=True, outdir="plots"):
 
     plt.xticks(rotation=45)
 
-    path = os.path.join(outdir, "ranking_sets.png")
+    path = None if not salvar_em else os.path.join(salvar_em, f"ranking_sets_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
 
-    _save_or_show(fig, path, save)
+    _save_or_show(fig, path)
 
 
 def plot_all_results(
     log_dir,
     expected_params=None,
     search_space=None,
-    save=True,
-    outdir="plots"
+    salvar_em=False
 ):
 
     dataset = load_experiment_dataset(log_dir)
 
-    plot_all_convergences(dataset, save, outdir)
+    plot_all_convergences(dataset, salvar_em)
 
     if expected_params:
 
@@ -351,17 +349,15 @@ def plot_all_results(
                 param,
                 expected_params[param],
                 search_space=search_space,
-                save=save,
-                outdir=outdir
+                salvar_em=salvar_em
             )
 
         plot_parameter_error_boxplot(
             dataset,
             expected_params,
-            save=save,
-            outdir=outdir
+            salvar_em=salvar_em
         )
 
-    plot_set_ranking(dataset, save, outdir)
+    plot_set_ranking(dataset, salvar_em)
 
     return dataset
