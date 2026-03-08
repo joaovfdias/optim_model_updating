@@ -141,7 +141,7 @@ def _compute_best_so_far_stats(df):
     return mean, std
 
 
-def plot_convergence_algorithm(dataset, algo, salvar_em=False, portuguese:bool=True):
+def plot_convergence_algorithm(dataset, algo, filter_sets:dict= {}, legenda=True, salvar_em=False, portuguese:bool=True):
     """
     Gráfico de convergência em escala logarítmica
     """
@@ -158,7 +158,10 @@ def plot_convergence_algorithm(dataset, algo, salvar_em=False, portuguese:bool=T
     ylim = 0
     ymin = 0
 
-    for set_name, df in dataset[algo].items():
+    for i, (set_name, df) in enumerate(dataset[algo].items(), start=1):
+
+        if algo in filter_sets and i not in filter_sets[algo]:
+            continue
 
         x = df["Iteracao"].values
         mean, std = _compute_best_so_far_stats(df)
@@ -249,7 +252,7 @@ def plot_convergence_algorithm(dataset, algo, salvar_em=False, portuguese:bool=T
     ax.set_ylabel("Fitness", labelpad=labelpad)
     ax.set_title(f"{'Convergence' if not portuguese else 'Convergência'}: {algo}", pad=titlepad)
 
-    ax.legend()
+    if legenda: ax.legend()
 
     path = None if not salvar_em else os.path.join(salvar_em, f"convergence_{algo}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
 
