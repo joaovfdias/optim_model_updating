@@ -48,8 +48,10 @@ import os
 import glob
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from datetime import datetime
+
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 
 PLOT_STYLE = {
@@ -163,6 +165,26 @@ def plot_convergence_algorithm(dataset, algo, salvar_em=False, portuguese:bool=T
         )
 
     ax.set_yscale("log")
+
+    # melhoria no eixo y
+
+    # 1. Forçar a exibição de mais "Major Ticks" (as potências de 10 completas)
+    ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=15))
+
+    # 2. Adicionar "Minor Ticks" (as linhas intermediárias 2, 3, 4... entre as potências de 10)
+    # O np.arange(2.0, 10.0) * 0.1 cria os submúltiplos da escala log
+    ax.yaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs=np.arange(2.0, 10.0) * 0.1, numticks=10))
+    ax.yaxis.set_minor_formatter(ticker.NullFormatter())  # Esconde os números dos minor ticks para não poluir
+
+    # 3. Melhorar a formatação do texto (Ex: mostra 0.1 ou 0.01 em vez de 1e-1 ou 1e-2)
+    formatter = ticker.ScalarFormatter()
+    formatter.set_scientific(False)  # Desativa notação científica caso o range seja curto
+    ax.yaxis.set_major_formatter(formatter)
+
+    # 4. Ativar as linhas de grade (grid) para os Minor Ticks também!
+    # Isso é o que mais ajuda a ler gráficos logarítmicos
+    ax.grid(True, which="major", linestyle="-", alpha=0.6)
+    ax.grid(True, which="minor", linestyle="--", alpha=0.3)
 
     ax.set_xlabel(ALGO_AXES[algo][portuguese], labelpad=labelpad)
     ax.set_ylabel("Fitness", labelpad=labelpad)
