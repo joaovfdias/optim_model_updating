@@ -276,7 +276,7 @@ def plot_parameter_boxplot(
     key_to_name: dict = None, # dicionário que relaciona key com o nome completo do parâmetro para legenda
     expected_value=None,
     search_space=None,
-    algo=None,
+    algo:list[str]=None,
     filter_sets:dict={},
     salvar_em=False,
     portuguese=True
@@ -287,7 +287,7 @@ def plot_parameter_boxplot(
 
     for a in dataset:
 
-        if algo and a != algo:
+        if algo and a not in algo:
             continue
 
         for i, (set_name, df) in enumerate(dataset[a].items(), start=1):
@@ -306,8 +306,10 @@ def plot_parameter_boxplot(
             if len(vals) == 0:
                 continue
 
-            if algo:
+            if len(algo) == 1:
                 labels.append(f"{set_name}") # não repete o nome do algoritmo várias vezes caso seja vários conjuntos dele
+            elif len(filter_sets[a]) == 1:
+                labels.append(f"{a}")
             else:
                 labels.append(f"{a} ({set_name})")
             values.append(vals)
