@@ -142,6 +142,9 @@ def _compute_best_so_far_stats(df):
 
 
 def plot_convergence_algorithm(dataset, algo, salvar_em=False, portuguese:bool=True):
+    """
+    Gráfico de convergência em escala logarítmica
+    """
 
     if algo not in dataset:
         print(f"{algo} not found in dataset")
@@ -274,6 +277,7 @@ def plot_parameter_boxplot(
     expected_value=None,
     search_space=None,
     algo=None,
+    filter_sets:dict=None,
     salvar_em=False,
     portuguese=True
 ):
@@ -286,7 +290,14 @@ def plot_parameter_boxplot(
         if algo and a != algo:
             continue
 
+        all_sets = list(dataset[algo].keys())
+
         for set_name, df in dataset[a].items():
+
+            if a in filter_sets:
+                filtered_sets = [all_sets[i-1] for i in filter_sets[algo]]
+                if set_name not in filtered_sets:
+                    continue
 
             vals = _extract_parameter_values(df, param)
 
