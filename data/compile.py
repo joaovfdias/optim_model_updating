@@ -1,6 +1,7 @@
 import os
 import glob
 import pandas as pd
+import numpy as np
 from datetime import datetime
 
 
@@ -48,7 +49,8 @@ def compile_convergence_history(algo_name, expected_params, log_dir, file_id=Non
 
         # 3. Força a conversão para numérico DE TODAS AS COLUNAS MONITORADAS
         # (Obrigatório porque os textos no final transformaram as colunas em formato 'object'/texto)
-        cols_to_convert = ['Fitness'] + list(expected_params.keys())
+        # ADICIONADO: 'Time (s)' na lista de conversão
+        cols_to_convert = ['Fitness', 'Time (s)'] + list(expected_params.keys())
         if step_col:
             cols_to_convert.append(step_col)
 
@@ -72,9 +74,16 @@ def compile_convergence_history(algo_name, expected_params, log_dir, file_id=Non
             current_best_fit = float('inf')
             current_best_row = None
             for _, row in df.iterrows():
+                # ADICIONADO: Pega o tempo da avaliação ATUAL
+                current_time = row.get('Time (s)', np.nan)
+
                 if row['Fitness'] < current_best_fit:
                     current_best_fit = row['Fitness']
                     current_best_row = row.copy()
+
+                # ADICIONADO: Salva os melhores parâmetros, mas atualiza com o tempo mais recente
+                row_to_save = current_best_row.copy() if current_best_row is not None else row.copy()
+                row_to_save['Tempo'] = current_time
                 best_so_far.append(current_best_row)
             df_best = pd.DataFrame(best_so_far)
             df_best['Step'] = range(1, len(df_best) + 1)
@@ -85,9 +94,18 @@ def compile_convergence_history(algo_name, expected_params, log_dir, file_id=Non
                 idx = df.groupby(step_col)['Fitness'].idxmin()
                 df_best = df.loc[idx].sort_values(step_col).copy()
                 df_best['Step'] = df_best[step_col].values
+
+                # ADICIONADO: Pega o maior 'Time (s)' de todos os indivíduos daquela iteração
+                if 'Time (s)' in df.columns:
+                    max_times = df.groupby(step_col)['Time (s)'].max()
+                    df_best['Tempo'] = df_best[step_col].map(max_times)
+                else:
+                    df_best['Tempo'] = np.nan
+
             else:
                 df_best = df.copy()
                 df_best['Step'] = range(1, len(df_best) + 1)
+                df_best['Tempo'] = df_best['Time (s)'] if 'Time (s)' in df_best.columns else np.nan
 
         all_runs_data.append(df_best)
 
@@ -99,7 +117,7 @@ def compile_convergence_history(algo_name, expected_params, log_dir, file_id=Non
     consolidated = pd.DataFrame({'Iteracao': range(1, max_steps + 1)})
 
     # Parâmetros que queremos monitorar na convergência
-    params_to_track = ['Fitness'] + list(expected_params.keys())
+    params_to_track = ['Fitness', 'Tempo'] + list(expected_params.keys())
 
     for p in params_to_track:
         run_cols = []

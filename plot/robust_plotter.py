@@ -112,8 +112,8 @@ class Plotter:
             parts = f.split(os.sep)
 
             try:
-                set_name = parts[-2]
-                algo = parts[-3]
+                algo = os.path.basename(os.path.dirname(os.path.dirname(f)))
+                set_name = os.path.basename(os.path.dirname(f))
             except:
                 continue
 
@@ -137,7 +137,7 @@ class Plotter:
     @staticmethod
     def _compute_best_so_far_stats(df):
 
-        run_cols = [c for c in df.columns if "Run" in c and "Fitness" in c]
+        run_cols = [c for c in df.columns if c.startswith("Run") and c.endswith("Fitness")]
 
         if len(run_cols) == 0:
             mean = df["Media_Fitness"].cummin().values
@@ -409,6 +409,39 @@ class Plotter:
                 self._save_or_show(fig, path)
 
 
+    def plot_fitness_vs_time(self, filter_sets:dict, subname=False):
+
+        fig, ax = plt.subplots()
+
+        ax.spines["top"].set_visible(True)
+        ax.spines["right"].set_visible(True)
+
+        for algo in list(self.dataset.keys()):
+            for i in filter_sets[algo]:
+
+                set_name = list(self.dataset[algo].keys())[i-1]
+
+                df = self.dataset[algo][set_name]
+
+                tempo = df["Tempo"].values
+                mean, _ = self._compute_best_so_far_stats(df)
+
+                ax.plot(tempo, mean, label=f"{algo} ({set_name})" if subname else algo)
+
+        ax.set_yscale("log")
+
+        ax.set_xlabel("Tempo de processamento (s)", labelpad=self.labelpad)
+        ax.set_ylabel("Fitness", labelpad=self.labelpad)
+        ax.set_title("Convergência: Fitness × Tempo", pad=self.titlepad)
+
+        ax.legend()
+
+        path = None if not self.salvar_em else os.path.join(self.salvar_em, f"fitness_vs_time_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        )
+
+        self._save_or_show(fig, path)
+
+
     def plot_all_results(self, param_keys, key_to_name=None, param_expected_values=None, param_search_space=None, filter_sets={}):
 
         salvamento_padrao = self.salvar_em
@@ -435,6 +468,8 @@ class Plotter:
         print(f"\nPlotando gráficos conjuntos: . . .")
         if filter_sets:
             print (f"{algo} ({filter_sets[algo]})" for algo in self.dataset)
+
+        self.plot_fitness_vs_time(filter_sets=filter_sets)
 
         for param in param_keys:
             self.plot_parameter_boxplot(param, algo=None, filter_sets=filter_sets, key_to_name=key_to_name, expected_value=param_expected_values[param] if param_expected_values else None, search_space=param_search_space)
