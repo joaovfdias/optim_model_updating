@@ -152,6 +152,27 @@ class Plotter:
 
         return mean, std
 
+    @staticmethod
+    def format_function(ymin, casas_decimais):
+        # Cria uma função que decide como escrever cada número no eixo
+        def formatar_marcadores(valor, posicao):
+
+            # se ymin (fit) retorna com mais precisão
+            if abs(valor - ymin) < 1e-8:
+                return f"{valor:.2e}" if casas_decimais >= 3 else f"{valor:.{casas_decimais + 1}f}"
+
+            # se 0 retorna 0
+            if abs(valor) < 1e-8:
+                return "0"
+
+            if casas_decimais > 2:
+                # O ".1e" formata como "5.0e-03". Se quiser mais precisão, mude para ".2e"
+                return f"{valor:.1e}"
+
+            # Condição Padrão: Passo normal (1 ou 2 casas) -> Usa decimal comum
+            return f"{valor:.{casas_decimais}f}"
+
+        return formatar_marcadores
 
     def plot_convergence_algorithm(self, algo, filter_sets:dict= {}, legenda=True):
         """
@@ -232,24 +253,7 @@ class Plotter:
         else:
             casas_decimais = 2  # Segurança caso dê zero
 
-        # Cria uma função que decide como escrever cada número no eixo
-        def formatar_marcadores(valor, posicao):
-
-            # se ymin (fit) retorna com mais precisão
-            if abs(valor - ymin) < 1e-8:
-                return f"{valor:.2e}" if casas_decimais >= 3 else f"{valor:.3f}"
-
-            # se 0 retorna 0
-            if abs(valor) < 1e-8:
-                return "0"
-
-            if casas_decimais > 2:
-                # O ".1e" formata como "5.0e-03". Se quiser mais precisão, mude para ".2e"
-                return f"{valor:.1e}"
-
-                # Condição Padrão: Passo normal (1 ou 2 casas) -> Usa decimal comum
-            else:
-                return f"{valor:.{casas_decimais}f}"
+        formatar_marcadores = self.format_function(ymin, casas_decimais)
 
         # Aplica a sua função como o formatador oficial do eixo Y
         ax.yaxis.set_major_formatter(FuncFormatter(formatar_marcadores))
@@ -570,9 +574,12 @@ class Plotter:
         # --------------------------------------------------
 
         if ymax_percentile is not None:
-            ymax = np.percentile(all_means, ymax_percentile)
+            ymax_auto = np.percentile(all_means, ymax_percentile)
+        else:
+            ymax_auto = ylim * 1.05
 
-        ymax = ymax or ylim * 1.05
+        if ymax is None:
+            ymax = ymax_auto
 
         ax.set_ylim(bottom=ymin, top=ymax)
 
@@ -605,18 +612,7 @@ class Plotter:
         else:
             casas_decimais = 2
 
-        def formatar_marcadores(valor, posicao):
-
-            if abs(valor - ymin) < 1e-8:
-                return f"{valor:.2e}" if casas_decimais >= 3 else f"{valor:.3f}"
-
-            if abs(valor) < 1e-8:
-                return "0"
-
-            if casas_decimais > 2:
-                return f"{valor:.1e}"
-
-            return f"{valor:.{casas_decimais}f}"
+        formatar_marcadores = self.format_function(ymin, casas_decimais)
 
         ax.yaxis.set_major_formatter(FuncFormatter(formatar_marcadores))
         ax.yaxis.set_minor_locator(ticker.NullLocator())
