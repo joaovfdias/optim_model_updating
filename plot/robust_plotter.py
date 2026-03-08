@@ -451,6 +451,7 @@ class Plotter:
                 pattern = os.path.join(logs_dir[algo], f"{algo}_*.csv")
             else:
                 pattern = os.path.join(logs_dir, f"{algo}_*.csv")
+
             files = sorted(glob.glob(pattern))
 
             if not files:
@@ -511,8 +512,10 @@ class Plotter:
         ylim = 0
         ymin = None
 
+        curves = []
+
         # -----------------------------
-        # 3) plotar cada algoritmo
+        # 3) processar cada algoritmo
         # -----------------------------
 
         for algo, runs in algo_runs.items():
@@ -551,6 +554,39 @@ class Plotter:
 
             all_means.extend(mean)
 
+            curves.append((algo, common_time, mean, std))
+
+            ylim = max(ylim, np.max(mean))
+
+            if ymin is None:
+                ymin = np.min(mean)
+            else:
+                ymin = min(ymin, np.min(mean))
+
+        # --------------------------------------------------
+        # ajuste do ymax
+        # --------------------------------------------------
+
+        if ymax_percentile is not None and len(all_means) > 0:
+            ymax_auto = np.percentile(all_means, ymax_percentile)
+        else:
+            ymax_auto = ylim * 1.05
+
+        if ymax is None:
+            ymax = ymax_auto
+
+        # log não aceita zero
+        ymin = max(ymin, 1e-12)
+
+        # -----------------------------
+        # 4) plotar curvas (com clipping)
+        # -----------------------------
+
+        for algo, common_time, mean, std in curves:
+            mean = np.clip(mean, ymin, ymax)
+            upper = np.clip(mean + std, ymin, ymax)
+            lower = np.clip(mean - std, ymin, ymax)
+
             ax.plot(
                 common_time,
                 mean,
@@ -560,33 +596,18 @@ class Plotter:
 
             ax.fill_between(
                 common_time,
-                mean - std,
-                mean + std,
+                lower,
+                upper,
                 alpha=0.2,
                 color=ALGO_COLORS.get(algo, None)
             )
-
-            ylim = max(ylim, np.max(mean))
-            ymin = min(ymin or np.min(mean), np.min(mean))
-
-        # --------------------------------------------------
-        # ajuste do ymax
-        # --------------------------------------------------
-
-        if ymax_percentile is not None:
-            ymax_auto = np.percentile(all_means, ymax_percentile)
-        else:
-            ymax_auto = ylim * 1.05
-
-        if ymax is None:
-            ymax = ymax_auto
 
         ax.set_ylim(bottom=ymin, top=ymax)
 
         ax.set_yscale("log")
 
         # --------------------------------------------------
-        # 4) configuração eixo Y (igual seu padrão)
+        # 5) configuração eixo Y
         # --------------------------------------------------
 
         ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=6))
@@ -618,7 +639,7 @@ class Plotter:
         ax.yaxis.set_minor_locator(ticker.NullLocator())
 
         # -----------------------------
-        # 5) eixo X
+        # 6) eixo X
         # -----------------------------
 
         ax.set_xlim(left=0, right=t_max_common)
