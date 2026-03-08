@@ -423,7 +423,7 @@ class Plotter:
 
                 df = self.dataset[algo][set_name]
 
-                tempo = df["Tempo"].values
+                tempo = df["Media_Tempo"].values
                 mean, _ = self._compute_best_so_far_stats(df)
 
                 ax.plot(tempo, mean, label=f"{algo} ({set_name})" if subname else algo)

@@ -84,7 +84,7 @@ def compile_convergence_history(algo_name, expected_params, log_dir, file_id=Non
                 # ADICIONADO: Salva os melhores parâmetros, mas atualiza com o tempo mais recente
                 row_to_save = current_best_row.copy() if current_best_row is not None else row.copy()
                 row_to_save['Tempo'] = current_time
-                best_so_far.append(current_best_row)
+                best_so_far.append(row_to_save)
             df_best = pd.DataFrame(best_so_far)
             df_best['Step'] = range(1, len(df_best) + 1)
 
