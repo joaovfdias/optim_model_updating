@@ -610,32 +610,25 @@ class Plotter:
         # 5) configuração eixo Y
         # --------------------------------------------------
 
-        ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=6))
+        # --------------------------------------------------
+        # eixo Y para escala log
+        # --------------------------------------------------
 
-        ticks_atuais = ax.get_yticks()
+        # --------------------------------------------------
+        # eixo Y para escala log (ticks robustos)
+        # --------------------------------------------------
 
-        tolerancia = (ymax - ymin) * 0.05
+        ax.set_yscale("log")
 
-        ticks_limpos = [
-            t for t in ticks_atuais
-            if abs(t - ymin) > tolerancia and abs(t - ymax) > tolerancia
-        ]
+        # gerar ticks log distribuídos no intervalo real
+        ticks = np.geomspace(ymin, ymax, 6)
 
-        ticks_limpos.append(ymin)
-        ticks_limpos.sort()
+        ax.set_yticks(ticks)
 
-        ax.set_yticks(ticks_limpos)
+        ax.yaxis.set_major_formatter(
+            FuncFormatter(lambda y, _: f"{y:.2g}")
+        )
 
-        passo = ticks_atuais[1] - ticks_atuais[0] if len(ticks_atuais) > 1 else 0
-
-        if passo > 0:
-            casas_decimais = max(0, -math.floor(math.log10(passo)))
-        else:
-            casas_decimais = 2
-
-        formatar_marcadores = self.format_function(ymin, casas_decimais)
-
-        ax.yaxis.set_major_formatter(FuncFormatter(formatar_marcadores))
         ax.yaxis.set_minor_locator(ticker.NullLocator())
 
         # -----------------------------
