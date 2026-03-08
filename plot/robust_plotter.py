@@ -408,12 +408,14 @@ class Plotter:
 
                 self._save_or_show(fig, path)
 
-
     def plot_convergence_vs_time_logs(
             self,
             algos: list,
-            logs_dir: str,
-            legenda: bool = True
+            logs_dir: str | dict,
+            legenda: bool = True,
+            tmax: float | None = None,
+            ymax: float | None = None,
+            ymax_percentile: float | None = None
     ):
         """
         Convergência (best-so-far) × Tempo usando logs originais {algo}_*.csv.
@@ -433,6 +435,7 @@ class Plotter:
 
         algo_runs = {}
         algo_max_times = []
+        all_means = []
 
         # -----------------------------
         # 1) carregar logs
@@ -446,7 +449,7 @@ class Plotter:
                 pattern = os.path.join(logs_dir, f"{algo}_*.csv")
             files = sorted(glob.glob(pattern))
 
-            if len(files) == 0:
+            if not files:
                 print(f"[AVISO] Nenhum log encontrado para {algo}")
                 continue
 
@@ -474,6 +477,7 @@ class Plotter:
                 tempo = tempo[mask]
 
                 order = np.argsort(tempo)
+
                 tempo = tempo[order]
                 fitness = fitness[order]
 
@@ -481,13 +485,13 @@ class Plotter:
 
                 runs.append((tempo, best))
 
-            if len(runs) == 0:
+            if not runs:
                 continue
 
             algo_runs[algo] = runs
             algo_max_times.append(max(r[0][-1] for r in runs))
 
-        if len(algo_runs) == 0:
+        if not algo_runs:
             print("Nenhum dado válido encontrado.")
             return
 
@@ -497,8 +501,11 @@ class Plotter:
 
         t_max_common = min(algo_max_times)
 
+        if tmax is not None:
+            t_max_common = min(t_max_common, tmax)
+
         ylim = 0
-        ymin = 0
+        ymin = None
 
         # -----------------------------
         # 3) plotar cada algoritmo
@@ -530,13 +537,15 @@ class Plotter:
 
                 interpolated.append(interp)
 
-            if len(interpolated) == 0:
+            if not interpolated:
                 continue
 
             interpolated = np.array(interpolated)
 
             mean = interpolated.mean(axis=0)
             std = interpolated.std(axis=0)
+
+            all_means.extend(mean)
 
             ax.plot(
                 common_time,
@@ -556,13 +565,22 @@ class Plotter:
             ylim = max(ylim, np.max(mean))
             ymin = min(ymin or np.min(mean), np.min(mean))
 
-        # -----------------------------
-        # 4) configuração eixo Y (igual ao seu metodo)
-        # -----------------------------
+        # --------------------------------------------------
+        # ajuste do ymax
+        # --------------------------------------------------
 
-        ymax = ylim * 1.05
+        if ymax_percentile is not None:
+            ymax = np.percentile(all_means, ymax_percentile)
+
+        ymax = ymax or ylim * 1.05
+
         ax.set_ylim(bottom=ymin, top=ymax)
+
         ax.set_yscale("log")
+
+        # --------------------------------------------------
+        # 4) configuração eixo Y (igual seu padrão)
+        # --------------------------------------------------
 
         ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=6))
 
@@ -597,11 +615,10 @@ class Plotter:
 
             if casas_decimais > 2:
                 return f"{valor:.1e}"
-            else:
-                return f"{valor:.{casas_decimais}f}"
+
+            return f"{valor:.{casas_decimais}f}"
 
         ax.yaxis.set_major_formatter(FuncFormatter(formatar_marcadores))
-
         ax.yaxis.set_minor_locator(ticker.NullLocator())
 
         # -----------------------------
@@ -610,20 +627,10 @@ class Plotter:
 
         ax.set_xlim(left=0, right=t_max_common)
 
-        ax.set_xlabel(
-            "Tempo de processamento (s)",
-            labelpad=self.labelpad
-        )
+        ax.set_xlabel("Tempo de processamento (s)", labelpad=self.labelpad)
+        ax.set_ylabel("Fitness", labelpad=self.labelpad)
 
-        ax.set_ylabel(
-            "Fitness",
-            labelpad=self.labelpad
-        )
-
-        ax.set_title(
-            "Convergência: Fitness × Tempo",
-            pad=self.titlepad
-        )
+        ax.set_title("Convergência: Fitness × Tempo", pad=self.titlepad)
 
         if legenda:
             ax.legend()
