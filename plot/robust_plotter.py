@@ -409,24 +409,105 @@ class Plotter:
                 self._save_or_show(fig, path)
 
 
-    def plot_fitness_vs_time(self, filter_sets:dict, subname=False):
+    def plot_fitness_vs_time(self, filter_sets: dict, subname=False):
 
         fig, ax = plt.subplots()
 
         ax.spines["top"].set_visible(True)
         ax.spines["right"].set_visible(True)
 
-        for algo in list(self.dataset.keys()):
-            for i in filter_sets[algo]:
+        for algo, set_indices in filter_sets.items():
 
-                set_name = list(self.dataset[algo].keys())[i-1]
+            if algo not in self.dataset:
+                continue
 
+            for idx in set_indices:
+
+                set_name = list(self.dataset[algo].keys())[idx - 1]
                 df = self.dataset[algo][set_name]
 
-                tempo = df["Media_Tempo"].values
-                mean, _ = self._compute_best_so_far_stats(df)
+                # identifica runs disponíveis
+                run_fit_cols = [c for c in df.columns if c.startswith("Run") and c.endswith("_Fitness")]
 
-                ax.plot(tempo, mean, label=f"{algo} ({set_name})" if subname else algo)
+                if len(run_fit_cols) == 0:
+                    continue
+
+                run_time_cols = [c.replace("_Fitness", "_Tempo") for c in run_fit_cols]
+
+                runs_time = []
+                runs_fit = []
+
+                # coleta dados de cada run
+                for fit_col, time_col in zip(run_fit_cols, run_time_cols):
+
+                    if time_col not in df.columns:
+                        continue
+
+                    fit = df[fit_col].values
+                    time = df[time_col].values
+
+                    mask = (~np.isnan(fit)) & (~np.isnan(time))
+
+                    if mask.sum() < 2:
+                        continue
+
+                    fit = fit[mask]
+                    time = time[mask]
+
+                    # best-so-far
+                    fit = np.minimum.accumulate(fit)
+
+                    runs_fit.append(fit)
+                    runs_time.append(time)
+
+                if len(runs_fit) == 0:
+                    continue
+
+                # determina domínio temporal comum
+                t_min = min(t[0] for t in runs_time)
+                t_max = max(t[-1] for t in runs_time)
+
+                common_time = np.linspace(t_min, t_max, 300)
+
+                interpolated = []
+
+                for fit, time in zip(runs_fit, runs_time):
+                    order = np.argsort(time)
+
+                    time = time[order]
+                    fit = fit[order]
+
+                    interp_fit = np.interp(
+                        common_time,
+                        time,
+                        fit,
+                        left=fit[0],
+                        right=fit[-1]
+                    )
+
+                    interpolated.append(interp_fit)
+
+                interpolated = np.array(interpolated)
+
+                mean_fit = interpolated.mean(axis=0)
+                std_fit = interpolated.std(axis=0)
+
+                label = f"{algo} ({set_name})" if subname else algo
+
+                ax.plot(
+                    common_time,
+                    mean_fit,
+                    label=label,
+                    color=ALGO_COLORS.get(algo, None)
+                )
+
+                ax.fill_between(
+                    common_time,
+                    mean_fit - std_fit,
+                    mean_fit + std_fit,
+                    alpha=0.15,
+                    color=ALGO_COLORS.get(algo, None)
+                )
 
         ax.set_yscale("log")
 
@@ -436,7 +517,9 @@ class Plotter:
 
         ax.legend()
 
-        path = None if not self.salvar_em else os.path.join(self.salvar_em, f"fitness_vs_time_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        path = None if not self.salvar_em else os.path.join(
+            self.salvar_em,
+            f"fitness_vs_time_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         )
 
         self._save_or_show(fig, path)
