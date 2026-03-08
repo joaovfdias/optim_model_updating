@@ -49,9 +49,11 @@ import glob
 import numpy as np
 import pandas as pd
 from datetime import datetime
+import math
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from matplotlib.ticker import FuncFormatter
 
 
 PLOT_STYLE = {
@@ -150,6 +152,9 @@ def plot_convergence_algorithm(dataset, algo, salvar_em=False, portuguese:bool=T
     ax.spines["top"].set_visible(True)
     ax.spines["right"].set_visible(True)
 
+    ylim = 0
+    ymin = 0
+
     for set_name, df in dataset[algo].items():
 
         x = df["Iteracao"].values
@@ -164,27 +169,78 @@ def plot_convergence_algorithm(dataset, algo, salvar_em=False, portuguese:bool=T
             alpha=0.2
         )
 
+        ylim = max(ylim, np.max(mean))
+
+        ymin = min(ymin or np.min(mean), np.min(mean))
+
+    ymax = ylim * 1.05
+    ax.set_ylim(bottom=ymin,top=ymax)
     ax.set_yscale("log")
 
     # melhoria no eixo y
 
-    # 1. Forçar a exibição de mais "Major Ticks" (as potências de 10 completas)
-    ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=15))
+    # 1. Pede para o Matplotlib dividir o espaço em aproximadamente 6 "pedaços" bonitos
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=6))
 
-    # 2. Adicionar "Minor Ticks" (as linhas intermediárias 2, 3, 4... entre as potências de 10)
-    # O np.arange(2.0, 10.0) * 0.1 cria os submúltiplos da escala log
-    ax.yaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs=np.arange(2.0, 10.0) * 0.1, numticks=10))
-    ax.yaxis.set_minor_formatter(ticker.NullFormatter())  # Esconde os números dos minor ticks para não poluir
+    #####
 
-    # 3. Melhorar a formatação do texto (Ex: mostra 0.1 ou 0.01 em vez de 1e-1 ou 1e-2)
-    formatter = ticker.ScalarFormatter()
-    formatter.set_scientific(False)  # Desativa notação científica caso o range seja curto
-    ax.yaxis.set_major_formatter(formatter)
+    # 2. Pega a lista de marcadores automáticos gerados pelo MaxNLocator
+    ticks_atuais = ax.get_yticks()
 
-    # 4. Ativar as linhas de grade (grid) para os Minor Ticks também!
-    # Isso é o que mais ajuda a ler gráficos logarítmicos
-    ax.grid(True, which="major", linestyle="-", alpha=0.6)
-    ax.grid(True, which="minor", linestyle="--", alpha=0.3)
+    # 3. Define uma tolerância visual (ex: 5% da diferença entre max e min)
+    # para apagar ticks automáticos que estejam muito colados nos seus limites
+    tolerancia = (ymax- ymin) * 0.05
+
+    # 4. Mantém apenas os ticks que estão longe o suficiente do ymin e do ymax
+    ticks_limpos = [t for t in ticks_atuais if abs(t - ymin) > tolerancia and abs(t - ymax) > tolerancia]
+
+    # 5. Insere os seus marcadores exatos na lista e ordena
+    ticks_limpos.append(ymin)  # Se quiser marcar o topo exato do gráfico, use ymax * 1.05
+    ticks_limpos.sort()
+
+    # 6. Aplica a nova lista definitiva no eixo
+    ax.set_yticks(ticks_limpos)
+
+    ax.set_ylim(bottom=ymin,top=ymax)
+
+    # Formata para não usar notação científica (opcional, para ficar como 0.05, 0.10, etc.)
+    # formatter = ticker.ScalarFormatter()
+    # formatter.set_scientific(False)
+    # ax.yaxis.set_major_formatter(formatter)
+
+    passo = ticks_atuais[1] - ticks_atuais[0]
+    if passo > 0:
+        casas_decimais = max(0, -math.floor(math.log10(passo)))
+    else:
+        casas_decimais = 2  # Segurança caso dê zero
+
+    # Cria uma função que decide como escrever cada número no eixo
+    def formatar_marcadores(valor, posicao):
+
+        # se ymin (fit) retorna com mais precisão
+        if abs(valor - ymin) < 1e-8:
+            return f"{valor:.2e}" if casas_decimais >= 3 else f"{valor:.3f}"
+
+        # se 0 retorna 0
+        if abs(valor) < 1e-8:
+            return "0"
+
+        if casas_decimais > 2:
+            # O ".1e" formata como "5.0e-03". Se quiser mais precisão, mude para ".2e"
+            return f"{valor:.1e}"
+
+            # Condição Padrão: Passo normal (1 ou 2 casas) -> Usa decimal comum
+        else:
+            return f"{valor:.{casas_decimais}f}"
+
+    # Aplica a sua função como o formatador oficial do eixo Y
+    ax.yaxis.set_major_formatter(FuncFormatter(formatar_marcadores))
+
+    #####
+
+    ax.yaxis.set_minor_locator(ticker.NullLocator())
+
+    #####
 
     ax.set_xlabel(ALGO_AXES[algo][portuguese], labelpad=labelpad)
     ax.set_ylabel("Fitness", labelpad=labelpad)
