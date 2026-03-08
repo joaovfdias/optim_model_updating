@@ -277,7 +277,7 @@ def plot_parameter_boxplot(
     expected_value=None,
     search_space=None,
     algo=None,
-    filter_sets:dict=None,
+    filter_sets:dict={},
     salvar_em=False,
     portuguese=True
 ):
@@ -290,14 +290,10 @@ def plot_parameter_boxplot(
         if algo and a != algo:
             continue
 
-        all_sets = list(dataset[algo].keys())
+        for i, (set_name, df) in enumerate(dataset[a].items(), start=1):
 
-        for set_name, df in dataset[a].items():
-
-            if a in filter_sets:
-                filtered_sets = [all_sets[i-1] for i in filter_sets[algo]]
-                if set_name not in filtered_sets:
-                    continue
+            if a in filter_sets and i not in filter_sets[a]:
+                continue
 
             vals = _extract_parameter_values(df, param)
 
