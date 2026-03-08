@@ -411,8 +411,8 @@ class Plotter:
 
     def plot_convergence_vs_time_logs(
             self,
-            logs_dir: str,
             algos: list,
+            logs_dir: str,
             legenda: bool = True
     ):
         """
@@ -422,17 +422,9 @@ class Plotter:
         - Calcula mínimo cumulativo de fitness por avaliação
         - Interpola runs para obter média ± desvio
         - Limita o eixo de tempo ao menor tempo máximo entre algoritmos
-        """
 
-        import glob
-        import numpy as np
-        import pandas as pd
-        import os
-        import math
-        import matplotlib.pyplot as plt
-        import matplotlib.ticker as ticker
-        from matplotlib.ticker import FuncFormatter
-        from datetime import datetime
+        :param logs_dir: pode passar um diretório comum ou dicionário relacionando algoritmo
+        """
 
         fig, ax = plt.subplots()
 
@@ -448,7 +440,10 @@ class Plotter:
 
         for algo in algos:
 
-            pattern = os.path.join(logs_dir, f"{algo}_*.csv")
+            if isinstance(logs_dir, dict):
+                pattern = os.path.join(logs_dir[algo], f"{algo}_*.csv")
+            else:
+                pattern = os.path.join(logs_dir, f"{algo}_*.csv")
             files = sorted(glob.glob(pattern))
 
             if len(files) == 0:
@@ -562,7 +557,7 @@ class Plotter:
             ymin = min(ymin or np.min(mean), np.min(mean))
 
         # -----------------------------
-        # 4) configuração eixo Y (igual ao seu método)
+        # 4) configuração eixo Y (igual ao seu metodo)
         # -----------------------------
 
         ymax = ylim * 1.05
