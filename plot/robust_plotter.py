@@ -78,396 +78,363 @@ ALGO_AXES = {
     "BO": ["Evaluations", "Avaliações"]
 }
 
-plt.rcParams.update(PLOT_STYLE)
-
-labelpad = 8
-titlepad = 20
-
-figsize_menor = (8, 5)
 
 
-def load_experiment_dataset(log_dir):
+class Plotter:
+    def __init__(self, log_dir, save_dir=None, portuguese=True):
+        self.dataset = self.load_experiment_dataset(log_dir)
+        self.salvar_em = None if not save_dir else os.path.join(save_dir, f"Plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        self.portuguese = portuguese
 
-    dataset = {}
+        self.ALGO_AXES = ALGO_AXES
+        self.update_plot_style(PLOT_STYLE)
 
-    csv_files = glob.glob(
-        os.path.join(log_dir, "**", "Convergencia_*.csv"),
-        recursive=True
-    )
+        self.labelpad = 8
+        self.titlepad = 20
+        self.minorfigsize = (8, 5)
 
-    for f in csv_files:
+    @staticmethod
+    def update_plot_style(plot_style:dict):
+        plt.rcParams.update(plot_style)
 
-        parts = f.split(os.sep)
+    @staticmethod
+    def load_experiment_dataset(log_dir):
 
-        try:
-            set_name = parts[-2]
-            algo = parts[-3]
-        except:
-            continue
+        dataset = {}
 
-        df = pd.read_csv(f, sep=';', decimal='.', engine="python")
+        csv_files = glob.glob(
+            os.path.join(log_dir, "**", "Convergencia_*.csv"),
+            recursive=True
+        )
 
-        dataset.setdefault(algo, {})
-        dataset[algo][set_name] = df
+        for f in csv_files:
 
-    return dataset
+            parts = f.split(os.sep)
 
+            try:
+                set_name = parts[-2]
+                algo = parts[-3]
+            except:
+                continue
 
-def _save_or_show(fig, path=False):
+            df = pd.read_csv(f, sep=';', decimal='.', engine="python")
 
-    if path:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        fig.savefig(path, dpi=300, bbox_inches="tight")
-        plt.close(fig)
-    else:
-        plt.show()
+            dataset.setdefault(algo, {})
+            dataset[algo][set_name] = df
 
+        return dataset
 
-def _compute_best_so_far_stats(df):
+    @staticmethod
+    def _save_or_show(fig, path=False):
 
-    run_cols = [c for c in df.columns if "Run" in c and "Fitness" in c]
+        if path:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            fig.savefig(path, dpi=300, bbox_inches="tight")
+            plt.close(fig)
+        else:
+            plt.show()
 
-    if len(run_cols) == 0:
-        mean = df["Media_Fitness"].cummin().values
-        std = df["Desvio_Fitness"].values
+    @staticmethod
+    def _compute_best_so_far_stats(df):
+
+        run_cols = [c for c in df.columns if "Run" in c and "Fitness" in c]
+
+        if len(run_cols) == 0:
+            mean = df["Media_Fitness"].cummin().values
+            std = df["Desvio_Fitness"].values
+            return mean, std
+
+        runs = df[run_cols].values
+        runs_best = np.minimum.accumulate(runs, axis=0)
+
+        mean = runs_best.mean(axis=1)
+        std = runs_best.std(axis=1)
+
         return mean, std
 
-    runs = df[run_cols].values
-    runs_best = np.minimum.accumulate(runs, axis=0)
 
-    mean = runs_best.mean(axis=1)
-    std = runs_best.std(axis=1)
+    def plot_convergence_algorithm(self, algo, filter_sets:dict= {}, legenda=True):
+        """
+        Gráfico de convergência em escala logarítmica
+        """
 
-    return mean, std
+        if algo not in self.dataset:
+            print(f"{algo} not found in dataset")
+            return
 
+        fig, ax = plt.subplots()
 
-def plot_convergence_algorithm(dataset, algo, filter_sets:dict= {}, legenda=True, salvar_em=False, portuguese:bool=True):
-    """
-    Gráfico de convergência em escala logarítmica
-    """
+        ax.spines["top"].set_visible(True)
+        ax.spines["right"].set_visible(True)
 
-    if algo not in dataset:
-        print(f"{algo} not found in dataset")
-        return
+        ylim = 0
+        ymin = 0
 
-    fig, ax = plt.subplots()
+        for i, (set_name, df) in enumerate(self.dataset[algo].items(), start=1):
 
-    ax.spines["top"].set_visible(True)
-    ax.spines["right"].set_visible(True)
-
-    ylim = 0
-    ymin = 0
-
-    for i, (set_name, df) in enumerate(dataset[algo].items(), start=1):
-
-        if algo in filter_sets and i not in filter_sets[algo]:
-            continue
-
-        x = df["Iteracao"].values
-        mean, std = _compute_best_so_far_stats(df)
-
-        ax.plot(x, mean, label=set_name)
-
-        ax.fill_between(
-            x,
-            mean - std,
-            mean + std,
-            alpha=0.2
-        )
-
-        ylim = max(ylim, np.max(mean))
-
-        ymin = min(ymin or np.min(mean), np.min(mean))
-
-    ymax = ylim * 1.05
-    ax.set_ylim(bottom=ymin,top=ymax)
-    ax.set_yscale("log")
-
-    # melhoria no eixo y
-
-    # 1. Pede para o Matplotlib dividir o espaço em aproximadamente 6 "pedaços" bonitos
-    ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=6))
-
-    #####
-
-    # 2. Pega a lista de marcadores automáticos gerados pelo MaxNLocator
-    ticks_atuais = ax.get_yticks()
-
-    # 3. Define uma tolerância visual (ex: 5% da diferença entre max e min)
-    # para apagar ticks automáticos que estejam muito colados nos seus limites
-    tolerancia = (ymax- ymin) * 0.05
-
-    # 4. Mantém apenas os ticks que estão longe o suficiente do ymin e do ymax
-    ticks_limpos = [t for t in ticks_atuais if abs(t - ymin) > tolerancia and abs(t - ymax) > tolerancia]
-
-    # 5. Insere os seus marcadores exatos na lista e ordena
-    ticks_limpos.append(ymin)  # Se quiser marcar o topo exato do gráfico, use ymax * 1.05
-    ticks_limpos.sort()
-
-    # 6. Aplica a nova lista definitiva no eixo
-    ax.set_yticks(ticks_limpos)
-
-    ax.set_ylim(bottom=ymin,top=ymax)
-
-    # Formata para não usar notação científica (opcional, para ficar como 0.05, 0.10, etc.)
-    # formatter = ticker.ScalarFormatter()
-    # formatter.set_scientific(False)
-    # ax.yaxis.set_major_formatter(formatter)
-
-    passo = ticks_atuais[1] - ticks_atuais[0]
-    if passo > 0:
-        casas_decimais = max(0, -math.floor(math.log10(passo)))
-    else:
-        casas_decimais = 2  # Segurança caso dê zero
-
-    # Cria uma função que decide como escrever cada número no eixo
-    def formatar_marcadores(valor, posicao):
-
-        # se ymin (fit) retorna com mais precisão
-        if abs(valor - ymin) < 1e-8:
-            return f"{valor:.2e}" if casas_decimais >= 3 else f"{valor:.3f}"
-
-        # se 0 retorna 0
-        if abs(valor) < 1e-8:
-            return "0"
-
-        if casas_decimais > 2:
-            # O ".1e" formata como "5.0e-03". Se quiser mais precisão, mude para ".2e"
-            return f"{valor:.1e}"
-
-            # Condição Padrão: Passo normal (1 ou 2 casas) -> Usa decimal comum
-        else:
-            return f"{valor:.{casas_decimais}f}"
-
-    # Aplica a sua função como o formatador oficial do eixo Y
-    ax.yaxis.set_major_formatter(FuncFormatter(formatar_marcadores))
-
-    #####
-
-    ax.yaxis.set_minor_locator(ticker.NullLocator())
-
-    #####
-
-    ax.set_xlabel(ALGO_AXES[algo][portuguese], labelpad=labelpad)
-    ax.set_ylabel("Fitness", labelpad=labelpad)
-    ax.set_title(f"{'Convergence' if not portuguese else 'Convergência'}: {algo}", pad=titlepad)
-
-    if legenda: ax.legend()
-
-    path = None if not salvar_em else os.path.join(salvar_em, f"convergence_{algo}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
-
-    _save_or_show(fig, path)
-
-
-def plot_all_convergences(dataset, salvar_em=False):
-
-    for algo in dataset:
-        plot_convergence_algorithm(dataset, algo, salvar_em)
-
-
-def _extract_parameter_values(df, param):
-
-    cols = [c for c in df.columns if c.endswith("_" + param)]
-    values = df.iloc[-1][cols].dropna().values
-
-    return values
-
-
-def plot_parameter_boxplot(
-    dataset,
-    param,
-    key_to_name: dict = None, # dicionário que relaciona key com o nome completo do parâmetro para legenda
-    expected_value=None,
-    search_space=None,
-    algo:list[str]=None,
-    filter_sets:dict={},
-    salvar_em=False,
-    portuguese=True
-):
-
-    labels = []
-    values = []
-
-    for a in dataset:
-
-        if algo and a not in algo:
-            continue
-
-        for i, (set_name, df) in enumerate(dataset[a].items(), start=1):
-
-            if a in filter_sets and i not in filter_sets[a]:
+            if algo in filter_sets and i not in filter_sets[algo]:
                 continue
 
-            vals = _extract_parameter_values(df, param)
+            x = df["Iteracao"].values
+            mean, std = self._compute_best_so_far_stats(df)
 
-            if search_space and param in search_space:
+            ax.plot(x, mean, label=set_name)
 
-                lo, hi = search_space[param]
-
-                vals = vals[(vals >= lo) & (vals <= hi)]
-
-            if len(vals) == 0:
-                continue
-
-            if len(algo) == 1:
-                labels.append(f"{set_name}") # não repete o nome do algoritmo várias vezes caso seja vários conjuntos dele
-            elif len(filter_sets[a]) == 1:
-                labels.append(f"{a}")
-            else:
-                labels.append(f"{a} ({set_name})")
-            values.append(vals)
-
-    if len(values) == 0:
-        return
-
-    fig, ax = plt.subplots(figsize=figsize_menor if len(values)<=3 else None)
-
-    ax.spines["top"].set_visible(True)
-    ax.spines["right"].set_visible(True)
-
-    ax.boxplot(values, tick_labels=labels, showmeans=False, showfliers=False)
-
-    if expected_value is not None:
-
-        ax.axhline(expected_value, linestyle="--", color="blue", label="Expected")
-
-        all_vals = np.concatenate(values)
-
-        max_dev = np.max(np.abs(all_vals - expected_value))
-
-        margin = max_dev * 1.2 if max_dev > 0 else abs(expected_value) * 0.05
-
-        ax.set_ylim(
-            expected_value - margin,
-            expected_value + margin
-        )
-
-        # ax.legend() # não é necessária legenda
-
-    paramname = param if not key_to_name else key_to_name[param]
-
-    ax.set_title(f"{"Parameter distribution" if not portuguese else "Distribuição do Parâmetro"}: {param}", pad=20)
-    ax.set_ylabel(paramname)
-
-    plt.xticks(rotation=0 if len(values)<=3 else 45)
-
-    path = None if not salvar_em else os.path.join(salvar_em, f"boxplot_param_{param}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
-
-    _save_or_show(fig, path)
-
-
-def plot_parameter_error_boxplot(
-    dataset,
-    expected_params,
-    algo=None,
-    salvar_em=False,
-    portuguese=True
-):
-
-    for a in dataset:
-
-        if algo and a != algo:
-            continue
-
-        for set_name, df in dataset[a].items():
-
-            labels = []
-            errors = []
-
-            for param, expected in expected_params.items():
-
-                vals = _extract_parameter_values(df, param)
-
-                err = np.abs(vals - expected) / np.abs(expected) * 100
-
-                labels.append(param)
-                errors.append(err)
-
-            fig, ax = plt.subplots()
-
-            ax.spines["top"].set_visible(True)
-            ax.spines["right"].set_visible(True)
-
-            ax.boxplot(errors, tick_labels=labels, showmeans=False, showfliers=False)
-
-            ax.set_yscale("log")
-
-            ax.set_ylabel("Relative error (%)" if not portuguese else "Erro Relativo (%)")
-            ax.set_title(f"{"Parameter error" if not portuguese else "Erro de parâmetros"}: {a} ({set_name})", pad=20)
-
-            plt.xticks(rotation=45)
-
-            path = None if not salvar_em else os.path.join(salvar_em, f"error_{a}_{set_name}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
-
-            _save_or_show(fig, path)
-
-
-def plot_set_ranking(dataset, salvar_em=False):
-
-    labels = []
-    fitness = []
-
-    for algo in dataset:
-
-        for set_name, df in dataset[algo].items():
-
-            final = df["Media_Fitness"].cummin().iloc[-1]
-
-            labels.append(f"{algo}-{set_name}")
-            fitness.append(final)
-
-    fig, ax = plt.subplots()
-
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    idx = np.argsort(fitness)
-
-    labels = np.array(labels)[idx]
-    fitness = np.array(fitness)[idx]
-
-    ax.bar(labels, fitness)
-
-    ax.set_yscale("log")
-
-    ax.set_ylabel("Final fitness")
-    ax.set_title("Hyperparameter set ranking", pad=20)
-
-    plt.xticks(rotation=45)
-
-    path = None if not salvar_em else os.path.join(salvar_em, f"ranking_sets_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
-
-    _save_or_show(fig, path)
-
-
-def plot_all_results( # melhorar
-    log_dir,
-    expected_params=None,
-    search_space=None,
-    salvar_em=False
-):
-
-    dataset = load_experiment_dataset(log_dir)
-
-    plot_all_convergences(dataset, salvar_em)
-
-    if expected_params:
-
-        for param in expected_params:
-            plot_parameter_boxplot(
-                dataset,
-                param,
-                expected_params[param],
-                search_space=search_space,
-                salvar_em=salvar_em
+            ax.fill_between(
+                x,
+                mean - std,
+                mean + std,
+                alpha=0.2
             )
 
-        plot_parameter_error_boxplot(
-            dataset,
-            expected_params,
-            salvar_em=salvar_em
-        )
+            ylim = max(ylim, np.max(mean))
 
-    plot_set_ranking(dataset, salvar_em)
+            ymin = min(ymin or np.min(mean), np.min(mean))
 
-    return dataset
+        ymax = ylim * 1.05
+        ax.set_ylim(bottom=ymin,top=ymax)
+        ax.set_yscale("log")
+
+        # melhoria no eixo y
+
+        # 1. Pede para o Matplotlib dividir o espaço em aproximadamente 6 "pedaços" bonitos
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=6))
+
+        #####
+
+        # 2. Pega a lista de marcadores automáticos gerados pelo MaxNLocator
+        ticks_atuais = ax.get_yticks()
+
+        # 3. Define uma tolerância visual (ex: 5% da diferença entre max e min)
+        # para apagar ticks automáticos que estejam muito colados nos seus limites
+        tolerancia = (ymax- ymin) * 0.05
+
+        # 4. Mantém apenas os ticks que estão longe o suficiente do ymin e do ymax
+        ticks_limpos = [t for t in ticks_atuais if abs(t - ymin) > tolerancia and abs(t - ymax) > tolerancia]
+
+        # 5. Insere os seus marcadores exatos na lista e ordena
+        ticks_limpos.append(ymin)  # Se quiser marcar o topo exato do gráfico, use ymax * 1.05
+        ticks_limpos.sort()
+
+        # 6. Aplica a nova lista definitiva no eixo
+        ax.set_yticks(ticks_limpos)
+
+        ax.set_ylim(bottom=ymin,top=ymax)
+
+        # Formata para não usar notação científica (opcional, para ficar como 0.05, 0.10, etc.)
+        # formatter = ticker.ScalarFormatter()
+        # formatter.set_scientific(False)
+        # ax.yaxis.set_major_formatter(formatter)
+
+        passo = ticks_atuais[1] - ticks_atuais[0]
+        if passo > 0:
+            casas_decimais = max(0, -math.floor(math.log10(passo)))
+        else:
+            casas_decimais = 2  # Segurança caso dê zero
+
+        # Cria uma função que decide como escrever cada número no eixo
+        def formatar_marcadores(valor, posicao):
+
+            # se ymin (fit) retorna com mais precisão
+            if abs(valor - ymin) < 1e-8:
+                return f"{valor:.2e}" if casas_decimais >= 3 else f"{valor:.3f}"
+
+            # se 0 retorna 0
+            if abs(valor) < 1e-8:
+                return "0"
+
+            if casas_decimais > 2:
+                # O ".1e" formata como "5.0e-03". Se quiser mais precisão, mude para ".2e"
+                return f"{valor:.1e}"
+
+                # Condição Padrão: Passo normal (1 ou 2 casas) -> Usa decimal comum
+            else:
+                return f"{valor:.{casas_decimais}f}"
+
+        # Aplica a sua função como o formatador oficial do eixo Y
+        ax.yaxis.set_major_formatter(FuncFormatter(formatar_marcadores))
+
+        #####
+
+        ax.yaxis.set_minor_locator(ticker.NullLocator())
+
+        #####
+
+        ax.set_xlabel(self.ALGO_AXES[algo][self.portuguese], labelpad=self.labelpad)
+        ax.set_ylabel("Fitness", labelpad=self.labelpad)
+        ax.set_title(f"{'Convergence' if not self.portuguese else 'Convergência'}: {algo}", pad=self.titlepad)
+
+        if legenda: ax.legend()
+
+        path = None if not self.salvar_em else os.path.join(self.salvar_em, f"convergence_{algo}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
+
+        self._save_or_show(fig, path)
+
+
+    def plot_all_convergences(self, filter_sets:dict= {}, legenda=True):
+
+        for algo in self.dataset:
+            self.plot_convergence_algorithm(algo, filter_sets, legenda)
+
+
+    @staticmethod
+    def _extract_parameter_values(df, param):
+
+        cols = [c for c in df.columns if c.endswith("_" + param)]
+        values = df.iloc[-1][cols].dropna().values
+
+        return values
+
+
+    def plot_parameter_boxplot(self,
+        param,
+        key_to_name: dict = None, # dicionário que relaciona key com o nome completo do parâmetro para legenda
+        expected_value: dict=None,
+        search_space: dict=None,
+        algo:list[str]=None,
+        filter_sets:dict={}
+    ):
+
+        labels = []
+        values = []
+
+        for a in self.dataset:
+
+            if algo and a not in algo:
+                continue
+
+            for i, (set_name, df) in enumerate(self.dataset[a].items(), start=1):
+
+                if a in filter_sets and i not in filter_sets[a]:
+                    continue
+
+                vals = self._extract_parameter_values(df, param)
+
+                if search_space and param in search_space:
+
+                    lo, hi = search_space[param]
+
+                    vals = vals[(vals >= lo) & (vals <= hi)]
+
+                if len(vals) == 0:
+                    continue
+
+                if algo and len(algo) == 1:
+                    labels.append(f"{set_name}") # não repete o nome do algoritmo várias vezes caso seja vários conjuntos dele
+                elif filter_sets and len(filter_sets[a]) == 1:
+                    labels.append(f"{a}")
+                else:
+                    labels.append(f"{a} ({set_name})")
+                values.append(vals)
+
+        if len(values) == 0:
+            return
+
+        fig, ax = plt.subplots(figsize=self.minorfigsize if len(values)<=3 else None)
+
+        ax.spines["top"].set_visible(True)
+        ax.spines["right"].set_visible(True)
+
+        ax.boxplot(values, tick_labels=labels, showmeans=False, showfliers=False)
+
+        if expected_value is not None:
+
+            ax.axhline(expected_value, linestyle="--", color="blue", label="Expected")
+
+            all_vals = np.concatenate(values)
+
+            max_dev = np.max(np.abs(all_vals - expected_value))
+
+            margin = max_dev * 1.2 if max_dev > 0 else abs(expected_value) * 0.05
+
+            ax.set_ylim(
+                expected_value - margin,
+                expected_value + margin
+            )
+
+            # ax.legend() # não é necessária legenda
+
+        paramname = param if not key_to_name else key_to_name[param]
+
+        ax.set_title(f"{"Parameter distribution" if not self.portuguese else "Distribuição do Parâmetro"}: {param}", pad=20)
+        ax.set_ylabel(paramname)
+
+        plt.xticks(rotation=0 if len(values)<=3 else 45)
+
+        path = None if not self.salvar_em else os.path.join(self.salvar_em, f"boxplot_param_{param}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
+
+        self._save_or_show(fig, path)
+
+
+    def plot_parameter_error_boxplot(self,
+        expected_params,
+        algo=None
+    ):
+
+        for a in self.dataset:
+
+            if algo and a not in algo:
+                continue
+
+            for set_name, df in self.dataset[a].items():
+
+                labels = []
+                errors = []
+
+                for param, expected in expected_params.items():
+
+                    vals = self._extract_parameter_values(df, param)
+
+                    err = np.abs(vals - expected) / np.abs(expected) * 100
+
+                    labels.append(param)
+                    errors.append(err)
+
+                fig, ax = plt.subplots()
+
+                ax.spines["top"].set_visible(True)
+                ax.spines["right"].set_visible(True)
+
+                ax.boxplot(errors, tick_labels=labels, showmeans=False, showfliers=False)
+
+                ax.set_yscale("log")
+
+                ax.set_ylabel("Relative error (%)" if not self.portuguese else "Erro Relativo (%)")
+                ax.set_title(f"{"Parameter error" if not self.portuguese else "Erro de parâmetros"}: {a} ({set_name})", pad=20)
+
+                plt.xticks(rotation=45)
+
+                path = None if not self.salvar_em else os.path.join(self.salvar_em, f"error_{a}_{set_name}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
+
+                self._save_or_show(fig, path)
+
+
+    def plot_all_results(self, param_keys, key_to_name=None, param_expected_values=None, param_search_space=None, filter_sets={}):
+
+        salvamento_padrao = self.salvar_em
+
+        # plots por algoritmo
+        for algo in self.dataset:
+
+            self.salvar_em = None if not self.salvar_em else os.path.join(salvamento_padrao, algo)
+
+            print(f"\nPlotando gráficos para {algo} . . .\n")
+
+            self.plot_convergence_algorithm(algo)
+
+            for param in param_keys:
+                self.plot_parameter_boxplot(param, algo=algo, key_to_name=key_to_name, expected_value=param_expected_values[param] if param_expected_values else None, search_space=param_search_space)
+
+            if param_expected_values:
+                self.plot_parameter_error_boxplot(param_expected_values, algo=algo)
+
+        # plots conjuntos
+
+        self.salvar_em = salvamento_padrao
+
+        print(f"\nPlotando gráficos conjuntos: . . .")
+        if filter_sets:
+            print (f"{algo} ({filter_sets[algo]})" for algo in self.dataset)
+
+        for param in param_keys:
+            self.plot_parameter_boxplot(param, algo=None, filter_sets=filter_sets, key_to_name=key_to_name, expected_value=param_expected_values[param] if param_expected_values else None, search_space=param_search_space)
