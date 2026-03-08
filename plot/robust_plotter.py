@@ -409,117 +409,233 @@ class Plotter:
                 self._save_or_show(fig, path)
 
 
-    def plot_fitness_vs_time(self, filter_sets: dict, subname=False):
+    def plot_convergence_vs_time_logs(
+            self,
+            logs_dir: str,
+            algos: list,
+            legenda: bool = True
+    ):
+        """
+        Convergência (best-so-far) × Tempo usando logs originais {algo}_*.csv.
+
+        - Lê todos os logs do diretório com padrão {algo}_*.csv
+        - Calcula mínimo cumulativo de fitness por avaliação
+        - Interpola runs para obter média ± desvio
+        - Limita o eixo de tempo ao menor tempo máximo entre algoritmos
+        """
+
+        import glob
+        import numpy as np
+        import pandas as pd
+        import os
+        import math
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as ticker
+        from matplotlib.ticker import FuncFormatter
+        from datetime import datetime
 
         fig, ax = plt.subplots()
 
         ax.spines["top"].set_visible(True)
         ax.spines["right"].set_visible(True)
 
-        for algo, set_indices in filter_sets.items():
+        algo_runs = {}
+        algo_max_times = []
 
-            if algo not in self.dataset:
+        # -----------------------------
+        # 1) carregar logs
+        # -----------------------------
+
+        for algo in algos:
+
+            pattern = os.path.join(logs_dir, f"{algo}_*.csv")
+            files = sorted(glob.glob(pattern))
+
+            if len(files) == 0:
+                print(f"[AVISO] Nenhum log encontrado para {algo}")
                 continue
 
-            for idx in set_indices:
+            runs = []
 
-                set_name = list(self.dataset[algo].keys())[idx - 1]
-                df = self.dataset[algo][set_name]
+            for f in files:
 
-                # identifica runs disponíveis
-                run_fit_cols = [c for c in df.columns if c.startswith("Run") and c.endswith("_Fitness")]
-
-                if len(run_fit_cols) == 0:
+                try:
+                    df = pd.read_csv(f, sep=None, engine="python")
+                except:
                     continue
 
-                run_time_cols = [c.replace("_Fitness", "_Tempo") for c in run_fit_cols]
-
-                runs_time = []
-                runs_fit = []
-
-                # coleta dados de cada run
-                for fit_col, time_col in zip(run_fit_cols, run_time_cols):
-
-                    if time_col not in df.columns:
-                        continue
-
-                    fit = df[fit_col].values
-                    time = df[time_col].values
-
-                    mask = (~np.isnan(fit)) & (~np.isnan(time))
-
-                    if mask.sum() < 2:
-                        continue
-
-                    fit = fit[mask]
-                    time = time[mask]
-
-                    # best-so-far
-                    fit = np.minimum.accumulate(fit)
-
-                    runs_fit.append(fit)
-                    runs_time.append(time)
-
-                if len(runs_fit) == 0:
+                if "Fitness" not in df.columns or "Time (s)" not in df.columns:
                     continue
 
-                # determina domínio temporal comum
-                t_min = min(t[0] for t in runs_time)
-                t_max = max(t[-1] for t in runs_time)
+                fitness = pd.to_numeric(df["Fitness"], errors="coerce").values
+                tempo = pd.to_numeric(df["Time (s)"], errors="coerce").values
 
-                common_time = np.linspace(t_min, t_max, 300)
+                mask = (~np.isnan(fitness)) & (~np.isnan(tempo))
 
-                interpolated = []
+                if mask.sum() < 2:
+                    continue
 
-                for fit, time in zip(runs_fit, runs_time):
-                    order = np.argsort(time)
+                fitness = fitness[mask]
+                tempo = tempo[mask]
 
-                    time = time[order]
-                    fit = fit[order]
+                order = np.argsort(tempo)
+                tempo = tempo[order]
+                fitness = fitness[order]
 
-                    interp_fit = np.interp(
-                        common_time,
-                        time,
-                        fit,
-                        left=fit[0],
-                        right=fit[-1]
-                    )
+                best = np.minimum.accumulate(fitness)
 
-                    interpolated.append(interp_fit)
+                runs.append((tempo, best))
 
-                interpolated = np.array(interpolated)
+            if len(runs) == 0:
+                continue
 
-                mean_fit = interpolated.mean(axis=0)
-                std_fit = interpolated.std(axis=0)
+            algo_runs[algo] = runs
+            algo_max_times.append(max(r[0][-1] for r in runs))
 
-                label = f"{algo} ({set_name})" if subname else algo
+        if len(algo_runs) == 0:
+            print("Nenhum dado válido encontrado.")
+            return
 
-                ax.plot(
+        # -----------------------------
+        # 2) definir limite temporal
+        # -----------------------------
+
+        t_max_common = min(algo_max_times)
+
+        ylim = 0
+        ymin = 0
+
+        # -----------------------------
+        # 3) plotar cada algoritmo
+        # -----------------------------
+
+        for algo, runs in algo_runs.items():
+
+            common_time = np.linspace(0, t_max_common, 400)
+
+            interpolated = []
+
+            for tempo, best in runs:
+
+                mask = tempo <= t_max_common
+
+                tempo = tempo[mask]
+                best = best[mask]
+
+                if len(tempo) < 2:
+                    continue
+
+                interp = np.interp(
                     common_time,
-                    mean_fit,
-                    label=label,
-                    color=ALGO_COLORS.get(algo, None)
+                    tempo,
+                    best,
+                    left=best[0],
+                    right=best[-1]
                 )
 
-                ax.fill_between(
-                    common_time,
-                    mean_fit - std_fit,
-                    mean_fit + std_fit,
-                    alpha=0.15,
-                    color=ALGO_COLORS.get(algo, None)
-                )
+                interpolated.append(interp)
 
+            if len(interpolated) == 0:
+                continue
+
+            interpolated = np.array(interpolated)
+
+            mean = interpolated.mean(axis=0)
+            std = interpolated.std(axis=0)
+
+            ax.plot(
+                common_time,
+                mean,
+                label=algo,
+                color=ALGO_COLORS.get(algo, None)
+            )
+
+            ax.fill_between(
+                common_time,
+                mean - std,
+                mean + std,
+                alpha=0.2,
+                color=ALGO_COLORS.get(algo, None)
+            )
+
+            ylim = max(ylim, np.max(mean))
+            ymin = min(ymin or np.min(mean), np.min(mean))
+
+        # -----------------------------
+        # 4) configuração eixo Y (igual ao seu método)
+        # -----------------------------
+
+        ymax = ylim * 1.05
+        ax.set_ylim(bottom=ymin, top=ymax)
         ax.set_yscale("log")
 
-        ax.set_xlabel("Tempo de processamento (s)", labelpad=self.labelpad)
-        ax.set_ylabel("Fitness", labelpad=self.labelpad)
-        ax.set_title("Convergência: Fitness × Tempo", pad=self.titlepad)
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=6))
 
-        ax.legend()
+        ticks_atuais = ax.get_yticks()
+
+        tolerancia = (ymax - ymin) * 0.05
+
+        ticks_limpos = [
+            t for t in ticks_atuais
+            if abs(t - ymin) > tolerancia and abs(t - ymax) > tolerancia
+        ]
+
+        ticks_limpos.append(ymin)
+        ticks_limpos.sort()
+
+        ax.set_yticks(ticks_limpos)
+
+        passo = ticks_atuais[1] - ticks_atuais[0] if len(ticks_atuais) > 1 else 0
+
+        if passo > 0:
+            casas_decimais = max(0, -math.floor(math.log10(passo)))
+        else:
+            casas_decimais = 2
+
+        def formatar_marcadores(valor, posicao):
+
+            if abs(valor - ymin) < 1e-8:
+                return f"{valor:.2e}" if casas_decimais >= 3 else f"{valor:.3f}"
+
+            if abs(valor) < 1e-8:
+                return "0"
+
+            if casas_decimais > 2:
+                return f"{valor:.1e}"
+            else:
+                return f"{valor:.{casas_decimais}f}"
+
+        ax.yaxis.set_major_formatter(FuncFormatter(formatar_marcadores))
+
+        ax.yaxis.set_minor_locator(ticker.NullLocator())
+
+        # -----------------------------
+        # 5) eixo X
+        # -----------------------------
+
+        ax.set_xlim(left=0, right=t_max_common)
+
+        ax.set_xlabel(
+            "Tempo de processamento (s)",
+            labelpad=self.labelpad
+        )
+
+        ax.set_ylabel(
+            "Fitness",
+            labelpad=self.labelpad
+        )
+
+        ax.set_title(
+            "Convergência: Fitness × Tempo",
+            pad=self.titlepad
+        )
+
+        if legenda:
+            ax.legend()
 
         path = None if not self.salvar_em else os.path.join(
             self.salvar_em,
-            f"fitness_vs_time_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            f"convergence_time_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         )
 
         self._save_or_show(fig, path)
