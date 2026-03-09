@@ -434,7 +434,8 @@ class Plotter:
             legenda: bool = True,
             tmax: float | None = None,
             ymax: float | None = None,
-            ymax_percentile: float | None = None
+            ymax_percentile: float | None = None,
+            cut_ini_pop: bool = False
     ):
         """
         Convergência (best-so-far) × Tempo usando logs originais {algo}_*.csv.
@@ -485,8 +486,33 @@ class Plotter:
                 if "Fitness" not in df.columns or "Time (s)" not in df.columns:
                     continue
 
+                # --------------------------------------------------
+                # remover população inicial
+                # --------------------------------------------------
+
+                time_offset = 0.0
+
+                if cut_ini_pop:
+
+                    if "Iteration" in df.columns:
+
+                        iter_col = pd.to_numeric(df["Iteration"], errors="coerce")
+
+                        # tempo do final da população inicial
+                        init_mask = iter_col == 0
+
+                        if init_mask.any():
+                            time_offset = pd.to_numeric(
+                                df.loc[init_mask, "Time (s)"], errors="coerce"
+                            ).max()
+
+                        df = df[iter_col > 0]
+
+                    if df.empty:
+                        continue
+
                 fitness = pd.to_numeric(df["Fitness"], errors="coerce").values
-                tempo = pd.to_numeric(df["Time (s)"], errors="coerce").values
+                tempo = pd.to_numeric(df["Time (s)"], errors="coerce").values - time_offset
 
                 mask = (~np.isnan(fitness)) & (~np.isnan(tempo))
 
