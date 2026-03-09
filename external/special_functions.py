@@ -71,4 +71,4 @@ class SpecialFun:
         paired_comp_freq = comp_freq[comp_index]
         mac_paired = mac[base_index, comp_index]
 
-        return [paired_comp_freq, paired_comp_modes, (1 - mac_paired).sum()]
+        return [paired_comp_freq, paired_comp_modes, (1 - mac_paired).sum(), mac_paired]
