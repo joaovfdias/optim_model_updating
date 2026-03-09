@@ -174,7 +174,7 @@ class Plotter:
 
         return formatar_marcadores
 
-    def plot_convergence_algorithm(self, algo, filter_sets:dict= {}, legenda=True):
+    def plot_convergence_algorithm(self, algo, filter_sets:dict= {}, legenda=True, save:str|None=None):
         """
         Gráfico de convergência em escala logarítmica
         """
@@ -270,7 +270,10 @@ class Plotter:
 
         if legenda: ax.legend()
 
-        path = None if not self.salvar_em else os.path.join(self.salvar_em, f"convergence_{algo}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
+        if not save:
+            path = None if not self.salvar_em else os.path.join(self.salvar_em, f"convergence_{algo}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
+        else:
+            path = os.path.join(save, f"convergence_{algo}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
 
         self._save_or_show(fig, path)
 
@@ -296,7 +299,8 @@ class Plotter:
         expected_value: dict=None,
         search_space: dict=None,
         algo:list[str]=None,
-        filter_sets:dict={}
+        filter_sets:dict={},
+        save: str | None = None
     ):
 
         labels = []
@@ -365,14 +369,18 @@ class Plotter:
 
         plt.xticks(rotation=0 if len(values)<=3 else 45)
 
-        path = None if not self.salvar_em else os.path.join(self.salvar_em, f"boxplot_param_{param}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
+        if not save:
+            path = None if not self.salvar_em else os.path.join(self.salvar_em, f"boxplot_param_{param}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
+        else:
+            path = os.path.join(save, f"boxplot_param_{param}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
 
         self._save_or_show(fig, path)
 
 
     def plot_parameter_error_boxplot(self,
         expected_params,
-        algo=None
+        algo=None,
+        save: str | None = None
     ):
 
         for a in self.dataset:
@@ -408,7 +416,10 @@ class Plotter:
 
                 plt.xticks(rotation=45)
 
-                path = None if not self.salvar_em else os.path.join(self.salvar_em, f"error_{a}_{set_name}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
+                if not save:
+                    path = None if not self.salvar_em else os.path.join(self.salvar_em, f"error_{a}_{set_name}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
+                else:
+                    path = os.path.join(save, f"error_{a}_{set_name}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")
 
                 self._save_or_show(fig, path)
 
@@ -680,7 +691,5 @@ class Plotter:
         if filter_sets:
             print (f"{algo} ({filter_sets[algo]})" for algo in self.dataset)
 
-        self.plot_fitness_vs_time(filter_sets=filter_sets)
-
-        for param in param_keys:
-            self.plot_parameter_boxplot(param, algo=None, filter_sets=filter_sets, key_to_name=key_to_name, expected_value=param_expected_values[param] if param_expected_values else None, search_space=param_search_space)
+            for param in param_keys:
+                self.plot_parameter_boxplot(param, algo=None, filter_sets=filter_sets, key_to_name=key_to_name, expected_value=param_expected_values[param] if param_expected_values else None, search_space=param_search_space)

@@ -96,15 +96,19 @@ def indexar_problema(problema):
 
 def indexar_device(computador):
     # diretórios
-    if computador == "LEST 2":
+    if computador.upper() == "DESKTOP":
+        devicepath_base = r"D:\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas"
+        devicepath_local = r"C:\Users\Thiago Artur\Documents\.Mestrado (Local)\Rodadas"
+
+    elif computador.upper() == "LEST 2":
         devicepath_base = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas"
         devicepath_local = r"C:\Users\Thiago Artur\Documents\Rodadas"
 
-    elif computador == "LEST 1":
+    elif computador.upper() == "LEST 1":
         devicepath_base = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\Rodadas"
         devicepath_local = r"C:\Users\Thiago\Documents\Rodadas"
 
-    elif computador == "NOTEBOOK":
+    elif computador.upper() == "NOTEBOOK":
         devicepath_base = r"C:\Users\thiag\OneDrive\Documentos\2025.2\Pesquisa\Rodadas"
         devicepath_local = r"C:\Users\thiag\Documentos (Local)\Rodadas"
 
