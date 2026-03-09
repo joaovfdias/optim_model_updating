@@ -94,7 +94,7 @@ def avaliar_rodada(parameters, base_dir, csv_convergencia, local_dir=None, base_
         base_freqs = ansys.base_freq
 
         # Cálculo de erro relativo das frequências (em %) frente a frequência de referência
-        erro_freqs = [abs(f - bf) / bf * 100 for f, bf in zip(freqs, base_freqs)]
+        erro_freqs = [abs(f - bf) / bf for f, bf in zip(freqs, base_freqs)]
 
         # Monta o dicionário com resultados que será uma linha no CSV final
         res_dict = {"Run": run}
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     computador = "DESKTOP"
     pc = indexar_device(computador)
 
-    for problema in [1,3]:
+    for problema in [1,3,4]:
         dadosp = indexar_problema(problema)
 
         base_dir = os.path.join(pc.base_path, f"Problema {problema}")
