@@ -83,7 +83,8 @@ ALGO_AXES = {
 class Plotter:
     def __init__(self, log_dir, save_dir=None, portuguese=True):
         self.dataset = self.load_experiment_dataset(log_dir)
-        self.salvar_em = None if not save_dir else os.path.join(save_dir, f"Plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        self.salvar_em = None
+        self.save_path(save_dir) # configura self.salvar_em
         self.portuguese = portuguese
 
         self.ALGO_AXES = ALGO_AXES
@@ -92,6 +93,9 @@ class Plotter:
         self.labelpad = 8
         self.titlepad = 20
         self.minorfigsize = (8, 5)
+
+    def save_path(self, save_dir):
+        self.salvar_em = None if not save_dir else os.path.join(save_dir, f"Plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
     @staticmethod
     def update_plot_style(plot_style:dict):

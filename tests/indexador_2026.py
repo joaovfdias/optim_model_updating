@@ -35,6 +35,13 @@ def indexar_problema(problema):
             Continuous(10e6, 10e8, 'rigidez2')
         ]
         target_params = [23e9, 0.2, 2500, 1e7, 1.5e7]
+        key_to_name = {
+            'modulo': 'Módulo de Elasticidade',
+            'poisson': 'Coeficiente de Poisson',
+            'dens': 'Densidade',
+            'rigidez1': 'Rigidez do Apoio 1',
+            'rigidez2': 'Rigidez do Apoio 2'
+        }
 
     elif problema == 3:
         script_name = "scriptTREL.mac"
@@ -54,6 +61,16 @@ def indexar_problema(problema):
             Continuous(400, 800, 'massa')
         ]
         target_params = [205e9, 215e9, 195e9, 8e7, 6.8e7, 7.6e7, 7.2e7, 600]
+        key_to_name = {
+            'modulo_banz': 'Módulo de Elasticidade (Grupo 1)',
+            'modulo_diag': 'Módulo Elasticidade (Grupo 2)',
+            'modulo_contrav': 'Módulo de Elasticidade (Grupo 3)',
+            'rigidez1': 'Rigidez do Apoio 1',
+            'rigidez2': 'Rigidez do Apoio 2',
+            'rigidez3': 'Rigidez do Apoio 3',
+            'rigidez4': 'Rigidez do Apoio 4',
+            'massa': 'Massa'
+        }
 
     elif problema == 4:
         script_name = "scriptLOP.mac"
