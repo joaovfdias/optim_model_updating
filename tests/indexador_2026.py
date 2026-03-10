@@ -18,7 +18,7 @@ class Device:
     local_path: str
 
 
-def indexar_problema(problema):
+def indexar_problema(problema, full=False):
 
     script_name = None # script.mac
     noise = None
@@ -42,6 +42,68 @@ def indexar_problema(problema):
             'rigidez1': 'Rigidez do Apoio 1',
             'rigidez2': 'Rigidez do Apoio 2'
         }
+
+    elif problema == 2:
+        if full:
+            script_name = 'script problema 2 (9 param).mac'
+            noise = 0.03
+            parameters = [
+                Continuous(20e9, 35e9, 'modulo_viga_1'),
+                Continuous(20e9, 35e9, 'modulo_viga_2'),
+                Continuous(20e9, 35e9, 'modulo_centro'),
+
+                Continuous(0.1, 0.40, 'poisson'),
+                Continuous(2400, 2600, 'dens'),
+
+                Continuous(50e6, 50e8, 'rigidez1'),
+                Continuous(50e6, 50e8, 'rigidez2'),
+                Continuous(50e6, 50e8, 'rigidez3'),
+                Continuous(50e6, 50e8, 'rigidez4')
+            ]
+
+            # target_params = [32e9, 28e9, 30e9, 0.2, 50e7, 60e7]  # 6
+            target_params = [32e9,28e9,30e9,0.2,2500,50e7,40e7,55e7,60e7] # 9
+            key_to_name = {
+                'modulo_viga_1': 'Módulo de Elasticidade (Viga 1)',
+                'modulo_viga_2': 'Módulo de Elasticidade (Viga 2)',
+                'modulo_centro': 'Módulo de Elasticidade (Laje)',
+                'poisson': 'Coeficiente de Poisson',
+                'dens': 'Densidade',
+                'rigidez1': 'Rigidez do Apoio 1',
+                'rigidez2': 'Rigidez do Apoio 2',
+                'rigidez3': 'Rigidez do Apoio 3',
+                'rigidez4': 'Rigidez do Apoio 4'
+            }
+        else:
+            script_name = 'script problema 2 (6 param).mac'
+            noise = 0.03
+            parameters = [
+                Continuous(20e9, 35e9, 'modulo_viga_1'),
+                Continuous(20e9, 35e9, 'modulo_viga_2'),
+                Continuous(20e9, 35e9, 'modulo_centro'),
+
+                Continuous(0.1, 0.40, 'poisson'),
+                # Continuous(2400, 2600, 'dens'),
+
+                Continuous(50e6, 50e8, 'rigidez1'),
+                # Continuous(50e6, 50e8, 'rigidez2'),
+                # Continuous(50e6, 50e8, 'rigidez3'),
+                Continuous(50e6, 50e8, 'rigidez4')
+            ]
+
+            target_params = [32e9,28e9,30e9,0.2,50e7,60e7] # 6
+            # target_params = [32e9,28e9,30e9,0.2,2500,50e7,40e7,55e7,60e7] # 9
+            key_to_name = {
+                'modulo_viga_1': 'Módulo de Elasticidade (Viga 1)',
+                'modulo_viga_2': 'Módulo de Elasticidade (Viga 2)',
+                'modulo_centro': 'Módulo de Elasticidade (Laje)',
+                'poisson': 'Coeficiente de Poisson',
+                # 'dens': 'Densidade',
+                'rigidez1': 'Rigidez do Apoio 1',
+                # 'rigidez2': 'Rigidez do Apoio 2',
+                # 'rigidez3': 'Rigidez do Apoio 3',
+                'rigidez4': 'Rigidez do Apoio 4'
+            }
 
     elif problema == 3:
         script_name = "scriptTREL.mac"

@@ -5,6 +5,8 @@ import pandas as pd
 from datetime import datetime
 from multiprocessing import Process, Queue
 
+from ansys.fluent.core.generated.solver.settings_232 import conjugate_heat_transfer
+
 from BO_LOP_run import BO_run
 from GA_LOP_run import GA_run
 from PSO_LOP_run import PSO_run
@@ -95,12 +97,19 @@ if __name__ == '__main__':
 
     from tests.indexador_2026 import indexar_problema, indexar_device
 
-    problema = 1
-    computador = "LEST 1"
+    problema = 2
+    prob_2_params = 6 # mudar
+    computador = "LEST 2" # mudar
 
     teste = False
-    apenas_conjunto_medio = True
-    filtrar_algoritmo = ["GA"] # False para todos
+    apenas_conjunto_medio = False
+    filtrar_algoritmo = False #["GA"] # False para todos
+    conjuntos_metaop = [2,3] if prob_2_params == 6 else [1,2]
+    filtrar_config = {
+        "GA": conjuntos_metaop,
+        "PSO": conjuntos_metaop,
+        "BO": conjuntos_metaop
+    }
     num_runs = 4 if not teste else 2
 
 
@@ -120,7 +129,7 @@ if __name__ == '__main__':
     csv_resultado_path = os.path.join(global_log_dir, f"Resumo Global - Problema {problema}.csv")
 
     # definição dos parâmetros do problema
-    dadosprob = indexar_problema(problema)
+    dadosprob = indexar_problema(problema, full=prob_2_params==9)
 
     script_name = dadosprob.script_filename
     noise = dadosprob.noise
@@ -202,6 +211,11 @@ if __name__ == '__main__':
 
         # 3. Se chegou até aqui, é porque todos existem. Filtra com segurança em uma linha!
         configs_algoritmos = {algo: configs_algoritmos[algo] for algo in filtrar_algoritmo}
+
+    if filtrar_config:
+        for algo in filtrar_config:
+            if algo in configs_algoritmos:
+                configs_algoritmos[algo] = [configs_algoritmos[algo][i-1] for i in filtrar_config[algo]]
 
     print(f"{'=' * 60}\nINICIANDO AVALIAÇÃO DE ALGORITMOS (RODADA {initimestamp})\n{'=' * 60}")
 
