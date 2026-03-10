@@ -163,7 +163,7 @@ if __name__ == "__main__":
     computador = "DESKTOP"
     pc = indexar_device(computador)
 
-    for problema in [1,3,4]:
+    for problema in [1]:
         dadosp = indexar_problema(problema)
 
         base_dir = os.path.join(pc.base_path, f"Problema {problema}")
