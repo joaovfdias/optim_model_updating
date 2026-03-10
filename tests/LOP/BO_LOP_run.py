@@ -70,7 +70,7 @@ def BO_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script
         comp_freq = ansys.read_frequencies()
         comp_modes = ansys.read_modes()
 
-        paired_comp_freq, paired_comp_modes, mac_error_sum = SpecialFun.pair_modes_mac(
+        paired_comp_freq, paired_comp_modes, mac_error_sum, macs = SpecialFun.pair_modes_mac(
             comp_freq, comp_modes, ansys.base_modes
         )
         freq_error_sum = SpecialFun.norm_freq_errors(ansys.base_freq, paired_comp_freq)
@@ -79,7 +79,7 @@ def BO_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script
         peso_mac = 1
         fitness = peso_freq * freq_error_sum + peso_mac * mac_error_sum
 
-        return fitness, {"freq error": freq_error_sum, "mac error": mac_error_sum, "Freq.": paired_comp_freq, "Mode": paired_comp_modes}
+        return fitness, {"freq error": freq_error_sum, "mac error": mac_error_sum, "Freq.": paired_comp_freq, "Freq. Error": [abs((bf-nf)/bf) for bf, nf in zip(ansys.base_freq, paired_comp_freq)], "Mode": paired_comp_modes, "MAC": macs}
 
 
     initial_points = initial_points or 5 * len(parameters)
