@@ -79,7 +79,7 @@ def plotar_sensibilidade_bo(df_bo, legenda=False, salvar_em=None):
                         color='red', marker='*', s=200, edgecolors='black', label='Melhor Global', zorder=5)
 
         axes[i].set_title(f"{fam}", fontweight='bold', fontsize=16)
-        if i == 1: axes[i].set_xlabel("Erro Estrutural (Fitness)", fontsize=16, labelpad=10)
+        if i == 1: axes[i].set_xlabel("Fitness", fontsize=16, labelpad=10)
         axes[i].set_ylabel(f"Valor de $\\{val_col.lower()}$")
 
         # Inverte o eixo Y conforme sua sugestão (do maior pro menor)
@@ -110,15 +110,88 @@ def plotar_sensibilidade_bo(df_bo, legenda=False, salvar_em=None):
     plt.close()
 
 
+def plotar_sensibilidade_bo_unificado(df_bo, salvar_em=None):
+    """
+    Gera o Gráfico de Sensibilidade Unificado para todas as funções de aquisição.
+    Eixo Y Esq: Kappa (Linear) | Eixo Y Dir: Xi (Logarítmico)
+    """
+    fig, ax1 = plt.subplots(figsize=(14, 5))
 
-def plotar_aprendizado_pop(df_ga, algo="GA", xticks:list=None, salvar_em=None):
+    # Eixo Y secundário para o Xi (que divide o mesmo Eixo X)
+    ax2 = ax1.twinx()
+
+    # Separa os DataFrames
+    df_ei = df_bo[df_bo['Family'] == 'EI'].copy()
+    df_pi = df_bo[df_bo['Family'] == 'PI'].copy()
+    df_lcb = df_bo[df_bo['Family'] == 'LCB'].copy()
+
+    # 1. Plota LCB no eixo esquerdo (ax1) - Kappa (Vermelho)
+    ax1.scatter(df_lcb['Avg_Fit'], df_lcb['Kappa'], color='red', alpha=0.6, edgecolors='black', s=60,
+                label='LCB ($\kappa$)')
+    best_lcb = df_lcb.loc[df_lcb['Avg_Fit'].idxmin()]
+    ax1.scatter(best_lcb['Avg_Fit'], best_lcb['Kappa'], color='darkred', marker='*', s=400, edgecolors='black',
+                zorder=5)
+
+    # 2. Plota EI e PI no eixo direito (ax2) - Xi (Azul e Verde)
+    ax2.scatter(df_ei['Avg_Fit'], df_ei['Xi'], color='royalblue', alpha=0.6, edgecolors='black', s=60,
+                label='EI ($\\xi$)')
+    best_ei = df_ei.loc[df_ei['Avg_Fit'].idxmin()]
+    ax2.scatter(best_ei['Avg_Fit'], best_ei['Xi'], color='blue', marker='*', s=400, edgecolors='black', zorder=5)
+
+    ax2.scatter(df_pi['Avg_Fit'], df_pi['Xi'], color='limegreen', alpha=0.6, edgecolors='black', s=60,
+                label='PI ($\\xi$)')
+    best_pi = df_pi.loc[df_pi['Avg_Fit'].idxmin()]
+    ax2.scatter(best_pi['Avg_Fit'], best_pi['Xi'], color='green', marker='*', s=400, edgecolors='black', zorder=5)
+
+    # --- FORMATAÇÃO DOS EIXOS ---
+
+    # Eixo X (Fitness)
+    ax1.set_xlabel("Fitness", fontweight='bold', fontsize=14, labelpad=15)
+    ax1.invert_xaxis()  # DECRESCENTE: Ponto cego na esquerda, precisão na direita
+
+    # Eixo Y Esquerdo (Kappa)
+    ax1.set_ylabel("Valor de $\kappa$ (LCB)", fontweight='bold', fontsize=12)
+    ax1.tick_params(axis='y', labelcolor='black')
+
+    # Eixo Y Direito (Xi)
+    ax2.set_ylabel("Valor de $\\xi$ (EI e PI)", fontweight='bold', fontsize=12)
+    ax2.tick_params(axis='y', labelcolor='black')
+    ax2.set_yscale('log')  # Escala Logarítmica para o Xi
+
+    # Opcional: Se quiser inverter também os eixos Y (deixar os maiores valores para baixo)
+    # basta descomentar as duas linhas abaixo:
+    # ax1.invert_yaxis()
+    # ax2.invert_yaxis()
+
+    # Adiciona o grid tracejado no eixo principal
+    ax1.grid(True, which='both', ls='--', alpha=0.5)
+
+    # Junta as legendas dos dois eixos para ficar num quadro só
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    # A legenda fica na esquerda (onde o erro é alto) para não cobrir as estrelas (onde o erro é baixo)
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=11, framealpha=0.9)
+
+    plt.title("Desempenho das Funções de Aquisição", fontweight='bold', fontsize=16, pad=10)
+
+    # Ajusta as margens para que os dois eixos Y apareçam perfeitamente
+    plt.tight_layout()
+    salvar_como = f"Grafico_BO_3_Sensibilidade_Unificado_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png"
+    if salvar_em:
+        fig.savefig(os.path.join(salvar_em, salvar_como), dpi=300, bbox_inches='tight')
+        print(f"[OK] Salvo: {salvar_em}")
+    plt.show()
+    plt.close()
+
+
+def plotar_aprendizado_pop(df_pop, algo="GA", xticks:list=None, salvar_em=None):
     """
     Gera o Gráfico 2: Curva de aprendizado do BO otimizando o GA
     """
     fig, ax = plt.subplots(figsize=(8, 5))
 
     # Cria a coluna de Iteração (sequencial, assumindo que o log está em ordem)
-    df_ga = df_ga.sort_values('Timestamp').reset_index(drop=True)
+    df_ga = df_pop.sort_values('Timestamp').reset_index(drop=True)
     df_ga['Iteracao'] = df_ga.index + 1
 
     # Calcula a "Melhor Pontuação Encontrada Até o Momento" (CumMin)
