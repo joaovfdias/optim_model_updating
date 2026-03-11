@@ -46,14 +46,72 @@ def plotar_convergencia_bo(df_bo, ylim:dict={}, log:bool=False, salvar_em=None):
     axes[-1].set_xlabel("Ciclo de Refinamento (Iteração)")
 
     fig.tight_layout()
-    salvar_como = f"Grafico1_BO_Convergencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png"
-    if salvar_em: fig.savefig(os.path.join(salvar_em, salvar_como), dpi=300, bbox_inches='tight')
-    print(f"[OK] Salvo: {salvar_em}")
+    salvar_como = f"Grafico_BO_1_Convergencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png"
+    if salvar_em:
+        fig.savefig(os.path.join(salvar_em, salvar_como), dpi=300, bbox_inches='tight')
+        print(f"[OK] Salvo: {salvar_em}")
     plt.show()
     plt.close()
 
 
-def plotar_aprendizado_ga(df_ga, salvar_em=None):
+def plotar_sensibilidade_bo(df_bo, legenda=False, salvar_em=None):
+    """
+    Gera o Gráfico de Sensibilidade: Fitness vs Hiperparâmetro (O Efeito Funil)
+    """
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    familias = ['EI', 'PI', 'LCB']
+
+    for i, fam in enumerate(familias):
+        df_fam = df_bo[df_bo['Family'] == fam].copy()
+
+        # O eixo Y será Xi para EI/PI, e Kappa para LCB
+        val_col = 'Xi' if fam in ['EI', 'PI'] else 'Kappa'
+
+        # Plota os pontos: Eixo X = Fitness, Eixo Y = Hiperparâmetro
+        # A cor (c) mostra em qual ciclo de refinamento o ponto foi testado
+        scatter = axes[i].scatter(df_fam['Avg_Fit'], df_fam[val_col],
+                                  c=df_fam['Iteration'], cmap='viridis',
+                                  alpha=0.8, edgecolors='black', s=50)
+
+        # Destaca o melhor ponto de todos com uma estrela vermelha
+        vencedor = df_fam.loc[df_fam['Avg_Fit'].idxmin()]
+        axes[i].scatter(vencedor['Avg_Fit'], vencedor[val_col],
+                        color='red', marker='*', s=200, edgecolors='black', label='Melhor Global', zorder=5)
+
+        axes[i].set_title(f"{fam}", fontweight='bold', fontsize=16)
+        if i == 1: axes[i].set_xlabel("Erro Estrutural (Fitness)", fontsize=16, labelpad=10)
+        axes[i].set_ylabel(f"Valor de $\\{val_col.lower()}$")
+
+        # Inverte o eixo Y conforme sua sugestão (do maior pro menor)
+        axes[i].invert_yaxis()
+
+        # Aplica escala logarítmica apenas para o Xi (que varia em casas decimais)
+        if val_col == 'Xi':
+            axes[i].set_yscale('log')
+
+        axes[i].grid(True, which="both", ls="--", alpha=0.5)
+        if legenda and i == 1:
+            axes[i].legend(loc='upper right')
+
+    # # Adiciona a barra de cores geral da figura
+    # cbar = fig.colorbar(scatter, ax=axes.ravel().tolist(), pad=0.02)
+    # cbar.set_label('Ciclo de Refinamento (Iteração)')
+
+    fig.suptitle("Efeito do Hiperparâmetro na Convergência", fontsize=18, fontweight='bold',
+                 y=0.99)
+
+    # Ajusta o layout para não encavalar
+    plt.tight_layout()
+    salvar_como = f"Grafico_BO_2_Sensibilidade_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png"
+    if salvar_em:
+        fig.savefig(os.path.join(salvar_em, salvar_como), dpi=300, bbox_inches='tight')
+        print(f"[OK] Salvo: {salvar_em}")
+    plt.show()
+    plt.close()
+
+
+
+def plotar_aprendizado_pop(df_ga, algo="GA", xticks:list=None, salvar_em=None):
     """
     Gera o Gráfico 2: Curva de aprendizado do BO otimizando o GA
     """
@@ -67,28 +125,46 @@ def plotar_aprendizado_ga(df_ga, salvar_em=None):
     df_ga['Melhor_Score_Acumulado'] = df_ga['Score'].cummin()
 
     ax.plot(df_ga['Iteracao'], df_ga['Melhor_Score_Acumulado'],
-            color='purple', linewidth=2.5, label='Melhor Pontuação (Acumulada)')
+            color='purple', linewidth=2.5, label='Melhor cumulativo')
 
     ax.scatter(df_ga['Iteracao'], df_ga['Score'],
-               color='gray', alpha=0.6, label='Tentativas do Meta-BO')
+               color='gray', alpha=0.6, label='Amostragem')
 
-    ax.set_title("Evolução da Meta-Otimização do Algoritmo Genético", fontweight='bold')
-    ax.set_xlabel("Avaliações (Chamadas do BO)")
-    ax.set_ylabel("Pontuação Multicritério ($J$)")
+    ax.set_title(f"Evolução da Meta-Otimização do {algo}", fontweight='bold')
+    ax.set_xlabel("Avaliações (chamadas do BO)")
+    ax.set_ylabel("Pontuação $J$")
 
     # Ajusta o eixo X para mostrar números inteiros
-    ax.set_xticks(range(1, len(df_ga) + 1, max(1, len(df_ga) // 10)))
+    if xticks:
+        ax.set_xticks(range(xticks[0], len(df_ga) + 1, xticks[1]))
+    else:
+        ax.set_xticks(range(1, len(df_ga) + 1, max(1, len(df_ga) // 10)))
 
     ax.legend(loc="upper right")
     ax.grid(True, ls="--", alpha=0.5)
 
     fig.tight_layout()
-    # fig.savefig(salvar_como, dpi=300, bbox_inches='tight')
-    # print(f"[OK] Salvo: {salvar_como}")
-    # plt.close()
+    salvar_como = f"Grafico_{algo}_1_Aprendizado_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png"
+    if salvar_em:
+        fig.savefig(os.path.join(salvar_em, salvar_como), dpi=300, bbox_inches='tight')
+        print(f"[OK] Salvo: {salvar_em}")
     plt.show()
+    plt.close()
 
-def plotar_mapa_calor_ga(df_ga, salvar_como="Grafico3_GA_MapaCalor.png"):
+
+def plotar_sensibilidade_pop(df_pop, algo="GA", salvar_em=None):
+    pass
+
+
+    salvar_como = f"Grafico_{algo}_2_Sensibilidade_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png"
+    if salvar_em:
+        fig.savefig(os.path.join(salvar_em, salvar_como), dpi=300, bbox_inches='tight')
+        print(f"[OK] Salvo: {salvar_em}")
+    plt.show()
+    plt.close()
+
+
+def plotar_mapa_calor_ga(df_ga, salvar_em=None):
     """
     Gera o Gráfico 3: Mapa de Dispersão Crossover vs Mutação (Onde o GA é melhor?)
     """
@@ -104,22 +180,24 @@ def plotar_mapa_calor_ga(df_ga, salvar_como="Grafico3_GA_MapaCalor.png"):
 
     # Adiciona a barra de cores
     cbar = fig.colorbar(scatter, ax=ax)
-    cbar.set_label('Pontuação Final $J$ (Menor é Melhor)')
+    cbar.set_label('Pontuação $J$ (Menor é Melhor)')
 
     # Destaca o vencedor global com uma estrela vermelha
     vencedor = df_ga.loc[df_ga['Score'].idxmin()]
     ax.scatter(vencedor['crossover_rate'], vencedor['mutation_strength'],
-               color='red', marker='*', s=300, label='Configuração Ótima', edgecolors='black')
+               color='red', marker='*', s=300, label='Configuração ótima', edgecolors='black')
 
-    ax.set_title("Espaço de Hiperparâmetros Ótimos do GA", fontweight='bold')
+    ax.set_title("Espaço de Hiperparâmetros do GA", fontweight='bold')
     ax.set_xlabel("Taxa de Crossover")
     ax.set_ylabel("Força de Mutação")
     ax.grid(True, ls="--", alpha=0.5)
     ax.legend(loc='lower left')
 
-    fig.tight_layout()
-    fig.savefig(salvar_como, dpi=300, bbox_inches='tight')
-    print(f"[OK] Salvo: {salvar_como}")
+    salvar_como = f"Grafico_GA_3_MapaCalor.png_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png"
+    if salvar_em:
+        fig.savefig(os.path.join(salvar_em, salvar_como), dpi=300, bbox_inches='tight')
+        print(f"[OK] Salvo: {salvar_em}")
+    plt.show()
     plt.close()
 
 
