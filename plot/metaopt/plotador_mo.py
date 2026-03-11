@@ -225,14 +225,53 @@ def plotar_aprendizado_pop(df_pop, algo="GA", xticks:list=None, salvar_em=None):
     plt.close()
 
 
-def plotar_sensibilidade_pop(df_pop, algo="GA", salvar_em=None):
-    pass
+def plotar_correlacao_pop(df_pop, algo="GA", salvar_em=None):
 
+    df = df_pop.copy()
 
-    salvar_como = f"Grafico_{algo}_2_Sensibilidade_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png"
+    # Converter fitness real (opcional)
+    df["Avg_Fit"] = np.exp(df["Avg_LogFit"])
+
+    # Seleção automática dos hiperparâmetros
+    if algo.upper() == "GA":
+        rows = ["elitism_rate", "crossover_rate", "mutation_strength"]
+    elif algo.upper() == "PSO":
+        rows = ["w", "w_rate", "c1", "c2", "init_vel_ratio"]
+    else:
+        raise ValueError("Algoritmo deve ser 'GA' ou 'PSO'")
+
+    cols = ["Avg_Fit"]
+
+    corr = df[rows + cols].corr().loc[rows, cols]
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    im = ax.imshow(corr, cmap="coolwarm", vmin=-1, vmax=1)
+
+    ax.set_xticks(range(len(corr.columns)))
+    ax.set_yticks(range(len(corr.index)))
+
+    ax.set_xticklabels(corr.columns, rotation=45, ha="right")
+    ax.set_yticklabels(corr.index)
+
+    # valores numéricos
+    for i in range(len(corr.index)):
+        for j in range(len(corr.columns)):
+            ax.text(j, i, f"{corr.iloc[i, j]:.2f}",
+                    ha="center", va="center", fontsize=9)
+
+    fig.colorbar(im, ax=ax, label="Correlation")
+
+    plt.title(f"Correlation of {algo} Hyperparameters with Fitness")
+
+    plt.tight_layout()
+
+    salvar_como = f"Grafico_{algo}_2_Correlacao_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+
     if salvar_em:
         fig.savefig(os.path.join(salvar_em, salvar_como), dpi=300, bbox_inches='tight')
-        print(f"[OK] Salvo: {salvar_em}")
+        print(f"[OK] Salvo: {os.path.join(salvar_em, salvar_como)}")
+
     plt.show()
     plt.close()
 
@@ -358,22 +397,3 @@ def plotar_mapa_calor_pso_inercia_atracao(df_pso, salvar_em=None):
     plt.tight_layout()
     plt.show()
     plt.close()
-
-if __name__ == '__main__':
-
-    BO_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas\Problema 2\META-OPT\6 PARAM\BO"
-
-    GA_dir = r""
-    PSO_dir = r""
-
-    save_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas\Problema 2\Plotagens"
-
-    # Carrega os Logs
-    df_bo = pd.read_csv(os.path.join(BO_dir, "meta_opt_BO.csv"))
-    # df_ga = pd.read_csv("meta_opt_GA.csv")
-
-    print("Gerando os gráficos para a Dissertação...")
-    plotar_convergencia_bo(df_bo, save_dir)
-    # plotar_aprendizado_ga(df_ga)
-    # plotar_mapa_calor_ga(df_ga)
-    print("Concluído!")
