@@ -27,6 +27,14 @@ def plotar_convergencia_bo(df_bo, ylim:dict={}, log:bool=False, salvar_em=None):
         val_col = 'Xi' if fam in ['EI', 'PI'] else 'Kappa'
         cor = 'blue' if fam == 'EI' else ('green' if fam == 'PI' else 'red')
 
+        # --- ADIÇÃO: Definindo o valor padrão da biblioteca ---
+        valor_padrao = 0.01 if fam in ['EI', 'PI'] else 1.96
+
+        # Traça a linha tracejada fina no valor padrão
+        axes[i].axhline(y=valor_padrao, color='grey', linestyle='--', linewidth=1.2, alpha=0.7,
+                        label='Valor padrão')
+        # ------------------------------------------------------
+
         # Plota a trajetória do Hiperparâmetro Ótimo
         axes[i].plot(best_path['Iteration'], best_path[val_col], marker='o',
                      linestyle='-', linewidth=2, color=cor, label=f'Trajetória ótima')
@@ -34,16 +42,19 @@ def plotar_convergencia_bo(df_bo, ylim:dict={}, log:bool=False, salvar_em=None):
         # Plota todos os pontos testados no fundo para mostrar o "Grid Search" encolhendo
         axes[i].scatter(df_fam['Iteration'], df_fam[val_col], color='gray', alpha=0.3, s=20, label='Pontos avaliados')
 
-        axes[i].set_title(f"Refinamento: Função {fam}", fontweight='bold', pad=10)
+        axes[i].set_title(f"Função {fam}", fontweight='bold', pad=10)
         axes[i].set_ylabel(f"Valor de $\\{val_col.lower()}$")
         if log: axes[i].set_yscale('log')
         if fam in list(ylim.keys()):
-            axes[i].set_ylim(None, ylim[fam])
+            axes[i].set_ylim(0, ylim[fam])
 
         axes[i].grid(True, which="both", ls="--", alpha=0.5)
         axes[i].legend(loc='best', fontsize=10)
 
     axes[-1].set_xlabel("Ciclo de amostragem (Iteração)", labelpad=10)
+
+    fig.suptitle("Refinamento do hiperparâmetro", fontsize=18, fontweight='bold',
+                 y=0.99)
 
     fig.tight_layout()
     salvar_como = f"Grafico_BO_1_Convergencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png"
@@ -146,7 +157,7 @@ def plotar_sensibilidade_bo_unificado(df_bo, salvar_em=None):
     # --- FORMATAÇÃO DOS EIXOS ---
 
     # Eixo X (Fitness)
-    ax1.set_xlabel("Fitness", fontweight='bold', fontsize=14, labelpad=15)
+    ax1.set_xlabel("Fitness", fontweight='bold', fontsize=14, labelpad=10)
     ax1.invert_xaxis()  # DECRESCENTE: Ponto cego na esquerda, precisão na direita
 
     # Eixo Y Esquerdo (Kappa)
@@ -203,7 +214,7 @@ def plotar_aprendizado_pop(df_pop, algo="GA", xticks:list=None, salvar_em=None):
     ax.scatter(df_ga['Iteracao'], df_ga['Score'],
                color='gray', alpha=0.6, label='Amostragem')
 
-    ax.set_title(f"Evolução da Meta-Otimização do {algo}", fontweight='bold')
+    ax.set_title(f"Evolução da Meta-Otimização do {algo}", fontweight='bold', pad=10)
     ax.set_xlabel("Avaliações (chamadas do BO)")
     ax.set_ylabel("Pontuação $J$")
 
@@ -299,7 +310,7 @@ def plotar_mapa_calor_ga(df_ga, salvar_em=None):
     ax.scatter(vencedor['crossover_rate'], vencedor['mutation_strength'],
                color='red', marker='*', s=300, label='Configuração ótima', edgecolors='black')
 
-    ax.set_title("Espaço de Hiperparâmetros do GA", fontweight='bold')
+    ax.set_title("Espaço de Hiperparâmetros do GA", fontweight='bold', pad=10)
     ax.set_xlabel("Taxa de Crossover")
     ax.set_ylabel("Força de Mutação")
     ax.grid(True, ls="--", alpha=0.5)
@@ -339,7 +350,7 @@ def plotar_mapa_calor_pso_cognitivo_social(df_pso, salvar_em=None):
     ax.scatter(vencedor['c1'], vencedor['c2'],
                color='red', marker='*', s=300, label='Configuração ótima', edgecolors='black', zorder=5)
 
-    ax.set_title("Espaço de Hiperparâmetros do PSO: Cognitivo x Social", fontweight='bold')
+    ax.set_title("Espaço de Hiperparâmetros do PSO: Cognitivo x Social", fontweight='bold', pad=10)
     ax.set_xlabel("Coeficiente Cognitivo ($c_1$)")
     ax.set_ylabel("Coeficiente Social ($c_2$)")
     ax.grid(True, ls="--", alpha=0.5)
@@ -382,7 +393,7 @@ def plotar_mapa_calor_pso_inercia_atracao(df_pso, salvar_em=None):
     ax.scatter(vencedor['w'], vencedor['forca_atracao'],
                color='red', marker='*', s=300, label='Configuração ótima', edgecolors='black', zorder=5)
 
-    ax.set_title("Estabilidade do PSO: Inércia x Força de Atração", fontweight='bold')
+    ax.set_title("Estabilidade do PSO: Inércia x Força de Atração", fontweight='bold', pad=10)
     ax.set_xlabel("Inércia ($w$)")
     ax.set_ylabel("Força de Atração Total ($c_1 + c_2$)")
     ax.grid(True, ls="--", alpha=0.5)
