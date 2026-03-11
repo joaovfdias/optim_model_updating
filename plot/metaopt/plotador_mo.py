@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 from datetime import datetime
 
 # --- CONFIGURAÇÃO GLOBAL ACADÊMICA ---
@@ -89,18 +90,24 @@ def plotar_sensibilidade_bo(df_bo, legenda=False, salvar_em=None):
         axes[i].scatter(vencedor['Avg_Fit'], vencedor[val_col],
                         color='red', marker='*', s=200, edgecolors='black', label='Melhor Global', zorder=5)
 
-        axes[i].set_title(f"{fam}", fontweight='bold', fontsize=16)
-        if i == 1: axes[i].set_xlabel("Fitness", fontsize=16, labelpad=10)
-        axes[i].set_ylabel(f"Valor de $\\{val_col.lower()}$")
-
-        # Inverte o eixo Y conforme sua sugestão (do maior pro menor)
-        axes[i].invert_yaxis()
+        axes[i].set_title(f"{fam}", fontweight='bold', fontsize=18)
+        if i == 1: axes[i].set_xlabel("Fitness", fontsize=18, labelpad=10)
+        axes[i].set_ylabel(f"Valor de $\\{val_col.lower()}$", fontsize=16)
 
         # Aplica escala logarítmica apenas para o Xi (que varia em casas decimais)
         if val_col == 'Xi':
             axes[i].set_yscale('log')
 
         axes[i].grid(True, which="both", ls="--", alpha=0.5)
+        axes[i].tick_params(axis='both', which='major', labelsize=16)
+
+        # Aplica o MaxNLocator para forçar pelo menos 6 espaços (nbins=6) nos quadros 1 e 3
+        axes[i].xaxis.set_major_locator(MaxNLocator(nbins=6))
+
+        # Inverte o eixo Y conforme sua sugestão (do maior pro menor)
+        axes[i].invert_yaxis()
+        axes[i].invert_xaxis()
+
         if legenda and i == 1:
             axes[i].legend(loc='upper right')
 
@@ -171,8 +178,8 @@ def plotar_sensibilidade_bo_unificado(df_bo, salvar_em=None):
 
     # Opcional: Se quiser inverter também os eixos Y (deixar os maiores valores para baixo)
     # basta descomentar as duas linhas abaixo:
-    # ax1.invert_yaxis()
-    # ax2.invert_yaxis()
+    ax1.invert_yaxis()
+    ax2.invert_yaxis()
 
     # Adiciona o grid tracejado no eixo principal
     ax1.grid(True, which='both', ls='--', alpha=0.5)
