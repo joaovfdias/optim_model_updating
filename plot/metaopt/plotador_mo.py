@@ -29,12 +29,12 @@ def plotar_convergencia_bo(df_bo, ylim:dict={}, log:bool=False, salvar_em=None):
 
         # Plota a trajetória do Hiperparâmetro Ótimo
         axes[i].plot(best_path['Iteration'], best_path[val_col], marker='o',
-                     linestyle='-', linewidth=2, color=cor, label=f'Trajetória Ótima de $\\{val_col.lower()}$')
+                     linestyle='-', linewidth=2, color=cor, label=f'Trajetória ótima')
 
         # Plota todos os pontos testados no fundo para mostrar o "Grid Search" encolhendo
-        axes[i].scatter(df_fam['Iteration'], df_fam[val_col], color='gray', alpha=0.3, s=20, label='Pontos Avaliados')
+        axes[i].scatter(df_fam['Iteration'], df_fam[val_col], color='gray', alpha=0.3, s=20, label='Pontos avaliados')
 
-        axes[i].set_title(f"Refinamento Logarítmico - Função {fam}", fontweight='bold')
+        axes[i].set_title(f"Refinamento: Função {fam}", fontweight='bold', pad=10)
         axes[i].set_ylabel(f"Valor de $\\{val_col.lower()}$")
         if log: axes[i].set_yscale('log')
         if fam in list(ylim.keys()):
@@ -43,7 +43,7 @@ def plotar_convergencia_bo(df_bo, ylim:dict={}, log:bool=False, salvar_em=None):
         axes[i].grid(True, which="both", ls="--", alpha=0.5)
         axes[i].legend(loc='best', fontsize=10)
 
-    axes[-1].set_xlabel("Ciclo de Refinamento (Iteração)")
+    axes[-1].set_xlabel("Ciclo de amostragem (Iteração)", labelpad=10)
 
     fig.tight_layout()
     salvar_como = f"Grafico_BO_1_Convergencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png"
