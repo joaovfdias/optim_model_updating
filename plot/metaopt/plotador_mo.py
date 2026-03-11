@@ -274,6 +274,91 @@ def plotar_mapa_calor_ga(df_ga, salvar_em=None):
     plt.close()
 
 
+def plotar_mapa_calor_pso_cognitivo_social(df_pso, salvar_em=None):
+    """
+    Gera o Mapa de Dispersão Cognitivo (c1) vs Social (c2).
+    Mostra se o enxame foi mais explorador (c2 > c1) ou intensificador (c1 > c2).
+    """
+    # Filtra as falhas numéricas (onde o Score foi 1.0) para não estragar a escala de cores
+    df_valido = df_pso[df_pso['Score'] < 1.0].copy()
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Vamos inverter o Score para que "Maior" bolinha = Melhor (Menor J)
+    tamanho = (df_valido['Score'].max() - df_valido['Score'] + 0.01) * 1000
+
+    # Plota o Scatter: Eixo X = c1, Eixo Y = c2
+    scatter = ax.scatter(df_valido['c1'], df_valido['c2'],
+                         c=df_valido['Score'], cmap='viridis_r', s=tamanho, alpha=0.8, edgecolors='black')
+
+    # Adiciona a barra de cores
+    cbar = fig.colorbar(scatter, ax=ax)
+    cbar.set_label('Pontuação $J$ (Menor é Melhor)')
+
+    # Destaca o vencedor global com uma estrela vermelha
+    vencedor = df_valido.loc[df_valido['Score'].idxmin()]
+    ax.scatter(vencedor['c1'], vencedor['c2'],
+               color='red', marker='*', s=300, label='Configuração ótima', edgecolors='black', zorder=5)
+
+    ax.set_title("Espaço de Hiperparâmetros do PSO: Cognitivo x Social", fontweight='bold')
+    ax.set_xlabel("Coeficiente Cognitivo ($c_1$)")
+    ax.set_ylabel("Coeficiente Social ($c_2$)")
+    ax.grid(True, ls="--", alpha=0.5)
+    ax.legend(loc='lower left')
+
+    salvar_como = f"Grafico_PSO_2_CognitivoSocial_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+    if salvar_em:
+        # Garante que a pasta existe antes de salvar
+        os.makedirs(salvar_em, exist_ok=True)
+        fig.savefig(os.path.join(salvar_em, salvar_como), dpi=300, bbox_inches='tight')
+        print(f"[OK] Salvo: {os.path.join(salvar_em, salvar_como)}")
+
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+
+
+def plotar_mapa_calor_pso_inercia_atracao(df_pso, salvar_em=None):
+    """
+    Gera o Mapa de Estabilidade Inércia (w) vs Força de Atração (c1 + c2).
+    """
+    # Filtra as falhas
+    df_valido = df_pso[df_pso['Score'] < 1.0].copy()
+
+    # Cria a coluna da Força de Atração (Soma de c1 e c2)
+    df_valido['forca_atracao'] = df_valido['c1'] + df_valido['c2']
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    tamanho = (df_valido['Score'].max() - df_valido['Score'] + 0.01) * 1000
+
+    # Plota o Scatter: Eixo X = w, Eixo Y = c1 + c2
+    scatter = ax.scatter(df_valido['w'], df_valido['forca_atracao'],
+                         c=df_valido['Score'], cmap='viridis_r', s=tamanho, alpha=0.8, edgecolors='black')
+
+    cbar = fig.colorbar(scatter, ax=ax)
+    cbar.set_label('Pontuação $J$ (Menor é Melhor)')
+
+    vencedor = df_valido.loc[df_valido['Score'].idxmin()]
+    ax.scatter(vencedor['w'], vencedor['forca_atracao'],
+               color='red', marker='*', s=300, label='Configuração ótima', edgecolors='black', zorder=5)
+
+    ax.set_title("Estabilidade do PSO: Inércia x Força de Atração", fontweight='bold')
+    ax.set_xlabel("Inércia ($w$)")
+    ax.set_ylabel("Força de Atração Total ($c_1 + c_2$)")
+    ax.grid(True, ls="--", alpha=0.5)
+    ax.legend(loc='lower left')
+
+    salvar_como = f"Grafico_PSO_3_InerciaAtracao_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+    if salvar_em:
+        os.makedirs(salvar_em, exist_ok=True)
+        fig.savefig(os.path.join(salvar_em, salvar_como), dpi=300, bbox_inches='tight')
+        print(f"[OK] Salvo: {os.path.join(salvar_em, salvar_como)}")
+
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+
 if __name__ == '__main__':
 
     BO_dir = r"C:\Users\Thiago Artur\OneDrive\Documentos\2025.2\Pesquisa\Rodadas\Problema 2\META-OPT\6 PARAM\BO"
