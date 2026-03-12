@@ -427,6 +427,272 @@ class Plotter:
 
                 self._save_or_show(fig, path)
 
+
+    def plot_convergence_vs_eval_logs(
+            self,
+            algos: list,
+            logs_dir: str | dict,
+            legenda: bool = True,
+            emax: int | None = None,  # >>> MUDANÇA (antes era tmax)
+            ymax: float | None = None,
+            ymax_percentile: float | None = None,
+            cut_ini_pop: bool = False,
+            pop_size: int | None = None  # >>> ADIÇÃO (fallback GA/PSO)
+    ):
+
+        fig, ax = plt.subplots()
+
+        ax.spines["top"].set_visible(True)
+        ax.spines["right"].set_visible(True)
+
+        algo_runs = {}
+        algo_max_evals = []  # >>> MUDANÇA
+        all_means = []
+
+        # -----------------------------
+        # 1) carregar logs
+        # -----------------------------
+
+        for algo in algos:
+
+            if isinstance(logs_dir, dict):
+                pattern = os.path.join(logs_dir[algo], f"{algo}_*.csv")
+            else:
+                pattern = os.path.join(logs_dir, f"{algo}_*.csv")
+
+            files = sorted(glob.glob(pattern))
+
+            if not files:
+                print(f"[AVISO] Nenhum log encontrado para {algo}")
+                continue
+
+            runs = []
+
+            for f in files:
+
+                try:
+                    df = pd.read_csv(f, sep=None, engine="python")
+                except:
+                    continue
+
+                if "Fitness" not in df.columns:
+                    continue
+
+                # --------------------------------------------------
+                # >>> ADIÇÃO: definir eixo de avaliação
+                # --------------------------------------------------
+
+                if "Individual" in df.columns:
+                    evals = pd.to_numeric(df["Individual"], errors="coerce")
+
+                elif "Iteration" in df.columns:
+
+                    if algo == "BO":
+                        evals = pd.to_numeric(df["Iteration"], errors="coerce")
+
+                    else:
+                        if pop_size is None:
+                            raise ValueError(
+                                "pop_size necessário para GA/PSO quando não há coluna Individual"
+                            )
+
+                        evals = pd.to_numeric(df["Iteration"], errors="coerce") * pop_size
+
+                else:
+                    continue
+
+                # --------------------------------------------------
+                # remover população inicial
+                # --------------------------------------------------
+
+                eval_offset = 0
+
+                if cut_ini_pop and "Iteration" in df.columns:
+
+                    iter_col = pd.to_numeric(df["Iteration"], errors="coerce")
+
+                    init_mask = iter_col == 0
+
+                    if init_mask.any():
+                        eval_offset = evals[init_mask].max()
+
+                    df = df[iter_col > 0]
+                    evals = evals[iter_col > 0]
+
+                    if df.empty:
+                        continue
+
+                fitness = pd.to_numeric(df["Fitness"], errors="coerce").values
+                evals = evals.values - eval_offset
+
+                mask = (~np.isnan(fitness)) & (~np.isnan(evals))
+
+                if mask.sum() < 2:
+                    continue
+
+                fitness = fitness[mask]
+                evals = evals[mask]
+
+                order = np.argsort(evals)
+
+                evals = evals[order]
+                fitness = fitness[order]
+
+                best = np.minimum.accumulate(fitness)
+
+                runs.append((evals, best))  # >>> MUDANÇA
+
+            if not runs:
+                continue
+
+            algo_runs[algo] = runs
+            algo_max_evals.append(max(r[0][-1] for r in runs))  # >>> MUDANÇA
+
+        if not algo_runs:
+            print("Nenhum dado válido encontrado.")
+            return
+
+        # -----------------------------
+        # 2) definir limite comum
+        # -----------------------------
+
+        e_max_common = min(algo_max_evals)  # >>> MUDANÇA
+
+        if emax is not None:
+            e_max_common = min(e_max_common, emax)
+
+        ylim = 0
+        ymin = None
+
+        curves = []
+
+        # -----------------------------
+        # 3) processar cada algoritmo
+        # -----------------------------
+
+        for algo, runs in algo_runs.items():
+
+            common_eval = np.linspace(0, e_max_common, 400)  # >>> MUDANÇA
+
+            interpolated = []
+
+            for evals, best in runs:
+
+                mask = evals <= e_max_common
+
+                evals = evals[mask]
+                best = best[mask]
+
+                if len(evals) < 2:
+                    continue
+
+                interp = np.interp(
+                    common_eval,
+                    evals,
+                    best,
+                    left=best[0],
+                    right=best[-1]
+                )
+
+                interpolated.append(interp)
+
+            if not interpolated:
+                continue
+
+            interpolated = np.array(interpolated)
+
+            mean = interpolated.mean(axis=0)
+            std = interpolated.std(axis=0)
+
+            all_means.extend(mean)
+
+            curves.append((algo, common_eval, mean, std))  # >>> MUDANÇA
+
+            ylim = max(ylim, np.max(mean))
+
+            if ymin is None:
+                ymin = np.min(mean)
+            else:
+                ymin = min(ymin, np.min(mean))
+
+        # --------------------------------------------------
+        # ajuste do ymax
+        # --------------------------------------------------
+
+        if ymax_percentile is not None and len(all_means) > 0:
+            ymax_auto = np.percentile(all_means, ymax_percentile)
+        else:
+            ymax_auto = ylim * 1.05
+
+        if ymax is None:
+            ymax = ymax_auto
+
+        ymin = max(ymin, 1e-12)
+
+        # -----------------------------
+        # 4) plotar curvas
+        # -----------------------------
+
+        for algo, common_eval, mean, std in curves:
+            mean = np.clip(mean, ymin, ymax)
+            upper = np.clip(mean + std, ymin, ymax)
+            lower = np.clip(mean - std, ymin, ymax)
+
+            ax.plot(
+                common_eval,
+                mean,
+                label=algo,
+                color=ALGO_COLORS.get(algo, None)
+            )
+
+            ax.fill_between(
+                common_eval,
+                lower,
+                upper,
+                alpha=0.2,
+                color=ALGO_COLORS.get(algo, None)
+            )
+
+        ax.set_ylim(bottom=ymin, top=ymax)
+
+        # -----------------------------
+        # eixo Y (log)
+        # -----------------------------
+
+        ax.set_yscale("log")
+
+        ticks = np.geomspace(ymin, ymax, 6)
+
+        ax.set_yticks(ticks)
+
+        ax.yaxis.set_major_formatter(
+            FuncFormatter(lambda y, _: f"{y:.2g}")
+        )
+
+        ax.yaxis.set_minor_locator(ticker.NullLocator())
+
+        # -----------------------------
+        # eixo X
+        # -----------------------------
+
+        ax.set_xlim(left=0, right=e_max_common)
+
+        ax.set_xlabel("Número de avaliações", labelpad=self.labelpad)  # >>> MUDANÇA
+        ax.set_ylabel("Fitness", labelpad=self.labelpad)
+
+        ax.set_title("Convergência: Fitness × Avaliações", pad=self.titlepad)  # >>> MUDANÇA
+
+        if legenda:
+            ax.legend()
+
+        path = None if not self.salvar_em else os.path.join(
+            self.salvar_em,
+            f"convergence_eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        )
+
+        self._save_or_show(fig, path)
+
+
     def plot_convergence_vs_time_logs(
             self,
             algos: list,
