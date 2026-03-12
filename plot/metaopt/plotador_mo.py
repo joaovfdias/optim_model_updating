@@ -164,16 +164,17 @@ def plotar_sensibilidade_bo_unificado(df_bo, salvar_em=None):
     # --- FORMATAÇÃO DOS EIXOS ---
 
     # Eixo X (Fitness)
-    ax1.set_xlabel("Fitness", fontweight='bold', fontsize=14, labelpad=10)
+    ax1.set_xlabel("Fitness", fontweight='bold', fontsize=18, labelpad=10)
     ax1.invert_xaxis()  # DECRESCENTE: Ponto cego na esquerda, precisão na direita
+    ax1.tick_params(axis='x', which='major', labelsize=16)
 
     # Eixo Y Esquerdo (Kappa)
-    ax1.set_ylabel("Valor de $\kappa$ (LCB)", fontweight='bold', fontsize=12)
-    ax1.tick_params(axis='y', labelcolor='black')
+    ax1.set_ylabel("Valor de $\kappa$ (LCB)", fontweight='bold', fontsize=16)
+    ax1.tick_params(axis='y', labelcolor='black', labelsize=16)
 
     # Eixo Y Direito (Xi)
-    ax2.set_ylabel("Valor de $\\xi$ (EI e PI)", fontweight='bold', fontsize=12)
-    ax2.tick_params(axis='y', labelcolor='black')
+    ax2.set_ylabel("Valor de $\\xi$ (EI e PI)", fontweight='bold', fontsize=16)
+    ax2.tick_params(axis='y', labelcolor='black', labelsize=16)
     ax2.set_yscale('log')  # Escala Logarítmica para o Xi
 
     # Opcional: Se quiser inverter também os eixos Y (deixar os maiores valores para baixo)
@@ -190,7 +191,7 @@ def plotar_sensibilidade_bo_unificado(df_bo, salvar_em=None):
     # A legenda fica na esquerda (onde o erro é alto) para não cobrir as estrelas (onde o erro é baixo)
     ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=11, framealpha=0.9)
 
-    plt.title("Desempenho das Funções de Aquisição", fontweight='bold', fontsize=16, pad=10)
+    plt.title("Desempenho das Funções de Aquisição", fontweight='bold', fontsize=18, pad=10)
 
     # Ajusta as margens para que os dois eixos Y apareçam perfeitamente
     plt.tight_layout()
