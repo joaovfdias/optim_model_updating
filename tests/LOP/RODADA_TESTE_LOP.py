@@ -19,8 +19,12 @@ parameters = pb.parameters
 kv, kh, h_concreto = [1.1e8, 9.7e7, 0.0417]
 
 Econc = 28e9
-Emad = 1.45e9
+Emad = 14.5e9
 
 test_params = [Econc, Emad, 210e9, kv, kh, h_concreto, Emad/16, Emad/16, Emad/16]
+
+# Emad = 15e9
+#
+# test_params = [32.209e9, 15e9, 210e9, 1.1e8, 9.7e7, 0.0417, Emad/16, Emad/16, Emad/16]
 
 avaliar_rodada(parameters, test_params, base_dir, local_dir, script_name, noise)
