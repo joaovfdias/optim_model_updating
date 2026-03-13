@@ -65,7 +65,7 @@ def avaliar_rodada(parameters, target_params, base_dir, local_dir=None, base_scr
         comp_freq = ansys.read_frequencies()
         comp_modes = ansys.read_modes()
 
-        paired_comp_freq, paired_comp_modes, mac_error_sum = SpecialFun.pair_modes_mac(
+        paired_comp_freq, paired_comp_modes, mac_error_sum, macs = SpecialFun.pair_modes_mac(
             comp_freq, comp_modes, ansys.base_modes
         )
         freq_error_sum = SpecialFun.norm_freq_errors(ansys.base_freq, paired_comp_freq)
@@ -74,7 +74,7 @@ def avaliar_rodada(parameters, target_params, base_dir, local_dir=None, base_scr
         peso_mac = 1
         fitness = peso_freq * freq_error_sum + peso_mac * mac_error_sum
 
-        return fitness, {"freq error": freq_error_sum, "mac error": mac_error_sum, "Freq.": paired_comp_freq, "Mode": paired_comp_modes}
+        return fitness, {"freq error": freq_error_sum, "mac error": mac_error_sum, "Freq.": paired_comp_freq, "Freq. Error": [abs((bf-nf)/bf) for bf, nf in zip(ansys.base_freq, paired_comp_freq)], "Mode": paired_comp_modes, "MAC": macs}
 
 
     # agora basta passar os parâmetros corretos para a função e averiguar se o fitness zera para validar o modelo e script
@@ -84,9 +84,13 @@ def avaliar_rodada(parameters, target_params, base_dir, local_dir=None, base_scr
     fitness, datas = fitness_function(target_params)
     print(f"\nFitness: {fitness} | Frequência: {datas["freq error"]} | Modos: {datas["mac error"]}")
     print(f"\nFrequências esperadas: {ansys.base_freq}"
-          f"\nFrequências encontradas: {datas['Freq.']}")
+          f"\nFrequências encontradas: {datas['Freq.']}"
+          f"\nErros nas frequências: {datas['Freq. Error']}")
     print(f"\nModos esperados: {ansys.base_modes}"
-          f"\nModos encontrados: {datas['Mode']}")
+          f"\nModos encontrados: {datas['Mode']}"
+          f"\nMACs: {datas['MAC']}")
+
+    ansys.mapdl.exit()
 
     return
 

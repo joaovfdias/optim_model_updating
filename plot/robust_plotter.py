@@ -282,6 +282,124 @@ class Plotter:
         self._save_or_show(fig, path)
 
 
+    # def plot_convergence_compare(self, selection: dict, pop_sizes: dict = None, legenda=True, save: str = None):
+    #     """
+    #     Plota a convergência de múltiplos algoritmos juntos no mesmo gráfico.
+    #     O eixo X é cortado no limite do algoritmo que realizou o menor número total de avaliações.
+    #
+    #     :param selection: dict especificando quais conjuntos plotar para cada algoritmo.
+    #                       Ex: {'GA': ['Conjunto 2'], 'PSO': ['Conjunto 2']}
+    #     :param pop_sizes: dict mapeando o algoritmo para o tamanho da população.
+    #                       Ex: {'GA': 60, 'PSO': 90}
+    #     """
+    #     if pop_sizes is None: pop_sizes = {}
+    #
+    #     fig, ax = plt.subplots()
+    #     ax.spines["top"].set_visible(True)
+    #     ax.spines["right"].set_visible(True)
+    #
+    #     curves_data = []
+    #     min_max_x = float('inf')  # Começa no infinito para ir reduzindo
+    #
+    #     # 1. Coleta os dados de todas as curvas solicitadas
+    #     for algo, sets in selection.items():
+    #         if algo not in self.dataset:
+    #             print(f"Aviso: Algoritmo {algo} não encontrado no dataset.")
+    #             continue
+    #
+    #         for set_name in sets:
+    #             if set_name not in self.dataset[algo]:
+    #                 print(f"Aviso: Conjunto '{set_name}' não encontrado em {algo}.")
+    #                 continue
+    #
+    #             df = self.dataset[algo][set_name]
+    #
+    #             # Pega o tamanho da pop do algoritmo (ex: 60 para GA). Se não tiver, usa 1.
+    #             multiplier = pop_sizes.get(algo, 1)
+    #
+    #             x = df["Iteracao"].values * multiplier
+    #             mean, std = self._compute_best_so_far_stats(df)
+    #
+    #             label = f"{algo} ({set_name})"
+    #             curves_data.append((label, x, mean, std))
+    #
+    #             # Descobre até onde essa curva foi no eixo X, e atualiza o limite global
+    #             min_max_x = min(min_max_x, np.max(x))
+    #
+    #     if not curves_data:
+    #         print("Nenhum dado válido para plotar.")
+    #         return
+    #
+    #     ylim = 0
+    #     ymin = None
+    #
+    #     # 2. Plota as curvas, cortando no limite de min_max_x
+    #     for label, x, mean, std in curves_data:
+    #         # Filtra (corta) os vetores para não passarem do min_max_x
+    #         mask = x <= min_max_x
+    #         x_filtered = x[mask]
+    #         mean_filtered = mean[mask]
+    #         std_filtered = std[mask]
+    #
+    #         ax.plot(x_filtered, mean_filtered, label=label, linewidth=2)
+    #         ax.fill_between(
+    #             x_filtered,
+    #             mean_filtered - std_filtered,
+    #             mean_filtered + std_filtered,
+    #             alpha=0.2
+    #         )
+    #
+    #         ylim = max(ylim, np.max(mean_filtered))
+    #         if ymin is None:
+    #             ymin = np.min(mean_filtered)
+    #         else:
+    #             ymin = min(ymin, np.min(mean_filtered))
+    #
+    #     # 3. Formatação do Eixo Y (Ajuste logarítmico elegante)
+    #     ymax = ylim * 1.05
+    #     ax.set_ylim(bottom=ymin, top=ymax)
+    #     ax.set_yscale("log")
+    #
+    #     ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=6))
+    #     ticks_atuais = ax.get_yticks()
+    #     tolerancia = (ymax - ymin) * 0.05
+    #     ticks_limpos = [t for t in ticks_atuais if abs(t - ymin) > tolerancia and abs(t - ymax) > tolerancia]
+    #     ticks_limpos.append(ymin)
+    #     ticks_limpos.sort()
+    #
+    #     ax.set_yticks(ticks_limpos)
+    #     ax.set_ylim(bottom=ymin, top=ymax)
+    #
+    #     passo = ticks_atuais[1] - ticks_atuais[0] if len(ticks_atuais) > 1 else 1
+    #     if passo > 0:
+    #         casas_decimais = max(0, -math.floor(math.log10(passo)))
+    #     else:
+    #         casas_decimais = 2
+    #
+    #     formatar_marcadores = self.format_function(ymin, casas_decimais)
+    #     ax.yaxis.set_major_formatter(FuncFormatter(formatar_marcadores))
+    #     ax.yaxis.set_minor_locator(ticker.NullLocator())
+    #
+    #     # 4. Rótulos e Título
+    #     xlabel_str = "Número de Avaliações" if self.portuguese else "Number of Evaluations"
+    #     ax.set_xlabel(xlabel_str, labelpad=self.labelpad)
+    #     ax.set_ylabel("Fitness", labelpad=self.labelpad)
+    #     ax.set_title("Comparativo de Convergência" if self.portuguese else "Convergence Comparison", pad=self.titlepad)
+    #
+    #     if legenda:
+    #         ax.legend()
+    #
+    #     # 5. Salvar Imagem
+    #     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+    #     if not save:
+    #         path = None if not self.salvar_em else os.path.join(self.salvar_em,
+    #                                                             f"convergence_compare_{timestamp_str}.png")
+    #     else:
+    #         path = os.path.join(save, f"convergence_compare_{timestamp_str}.png")
+    #
+    #     self._save_or_show(fig, path)
+
+
     def plot_all_convergences(self, filter_sets:dict= {}, legenda=True):
 
         for algo in self.dataset:
@@ -428,17 +546,25 @@ class Plotter:
                 self._save_or_show(fig, path)
 
 
-    def plot_convergence_vs_eval_logs(
+    def plot_convergence_vs_evaluations_logs(
             self,
             algos: list,
             logs_dir: str | dict,
             legenda: bool = True,
-            emax: int | None = None,  # >>> MUDANÇA (antes era tmax)
+            xmax: int | None = None,
             ymax: float | None = None,
             ymax_percentile: float | None = None,
-            cut_ini_pop: bool = False,
-            pop_size: int | None = None  # >>> ADIÇÃO (fallback GA/PSO)
+            cut_ini_pop: bool = False
     ):
+        """
+        Convergência (best-so-far) × Número de Avaliações usando logs {algo}_*.csv.
+
+        Cada linha do log é considerada uma avaliação.
+
+        - Lê todos os logs
+        - Calcula mínimo cumulativo
+        - Interpola runs para obter média ± desvio
+        """
 
         fig, ax = plt.subplots()
 
@@ -446,7 +572,7 @@ class Plotter:
         ax.spines["right"].set_visible(True)
 
         algo_runs = {}
-        algo_max_evals = []  # >>> MUDANÇA
+        algo_max_evals = []  # ALTERADO
         all_means = []
 
         # -----------------------------
@@ -479,87 +605,63 @@ class Plotter:
                     continue
 
                 # --------------------------------------------------
-                # >>> ADIÇÃO: definir eixo de avaliação
-                # --------------------------------------------------
-
-                if "Individual" in df.columns:
-                    evals = pd.to_numeric(df["Individual"], errors="coerce")
-
-                elif "Iteration" in df.columns:
-
-                    if algo == "BO":
-                        evals = pd.to_numeric(df["Iteration"], errors="coerce")
-
-                    else:
-                        if pop_size is None:
-                            raise ValueError(
-                                "pop_size necessário para GA/PSO quando não há coluna Individual"
-                            )
-
-                        evals = pd.to_numeric(df["Iteration"], errors="coerce") * pop_size
-
-                else:
-                    continue
-
-                # --------------------------------------------------
                 # remover população inicial
                 # --------------------------------------------------
 
-                eval_offset = 0
-
-                if cut_ini_pop and "Iteration" in df.columns:
+                if cut_ini_pop and "Iteration" in df.columns:  # NOVO
 
                     iter_col = pd.to_numeric(df["Iteration"], errors="coerce")
 
-                    init_mask = iter_col == 0
-
-                    if init_mask.any():
-                        eval_offset = evals[init_mask].max()
-
                     df = df[iter_col > 0]
-                    evals = evals[iter_col > 0]
 
                     if df.empty:
                         continue
 
+                # --------------------------------------------------
+                # fitness
+                # --------------------------------------------------
+
                 fitness = pd.to_numeric(df["Fitness"], errors="coerce").values
-                evals = evals.values - eval_offset
 
-                mask = (~np.isnan(fitness)) & (~np.isnan(evals))
-
-                if mask.sum() < 2:
-                    continue
+                mask = ~np.isnan(fitness)
 
                 fitness = fitness[mask]
-                evals = evals[mask]
 
-                order = np.argsort(evals)
+                if len(fitness) < 2:
+                    continue
 
-                evals = evals[order]
-                fitness = fitness[order]
+                # --------------------------------------------------
+                # eixo X = avaliações
+                # --------------------------------------------------
+
+                evals = np.arange(1, len(fitness) + 1)  # NOVO
+
+                # --------------------------------------------------
+                # melhor cumulativo
+                # --------------------------------------------------
 
                 best = np.minimum.accumulate(fitness)
 
-                runs.append((evals, best))  # >>> MUDANÇA
+                runs.append((evals, best))  # ALTERADO
 
             if not runs:
                 continue
 
             algo_runs[algo] = runs
-            algo_max_evals.append(max(r[0][-1] for r in runs))  # >>> MUDANÇA
+            algo_max_evals.append(max(r[0][-1] for r in runs))  # ALTERADO
 
         if not algo_runs:
             print("Nenhum dado válido encontrado.")
             return
 
         # -----------------------------
-        # 2) definir limite comum
+        # 2) definir limite de avaliações
         # -----------------------------
 
-        e_max_common = min(algo_max_evals)  # >>> MUDANÇA
+        eval_max_common = min(algo_max_evals)  # ALTERADO
 
-        if emax is not None:
-            e_max_common = min(e_max_common, emax)
+        if xmax is not None:
+            eval_max_common = min(eval_max_common, xmax)
 
         ylim = 0
         ymin = None
@@ -572,13 +674,13 @@ class Plotter:
 
         for algo, runs in algo_runs.items():
 
-            common_eval = np.linspace(0, e_max_common, 400)  # >>> MUDANÇA
+            common_eval = np.linspace(1, eval_max_common, 400)  # ALTERADO
 
             interpolated = []
 
-            for evals, best in runs:
+            for evals, best in runs:  # ALTERADO
 
-                mask = evals <= e_max_common
+                mask = evals <= eval_max_common
 
                 evals = evals[mask]
                 best = best[mask]
@@ -606,7 +708,7 @@ class Plotter:
 
             all_means.extend(mean)
 
-            curves.append((algo, common_eval, mean, std))  # >>> MUDANÇA
+            curves.append((algo, common_eval, mean, std))  # ALTERADO
 
             ylim = max(ylim, np.max(mean))
 
@@ -655,11 +757,11 @@ class Plotter:
 
         ax.set_ylim(bottom=ymin, top=ymax)
 
-        # -----------------------------
-        # eixo Y (log)
-        # -----------------------------
-
         ax.set_yscale("log")
+
+        # -----------------------------
+        # ticks log robustos
+        # -----------------------------
 
         ticks = np.geomspace(ymin, ymax, 6)
 
@@ -675,19 +777,19 @@ class Plotter:
         # eixo X
         # -----------------------------
 
-        ax.set_xlim(left=0, right=e_max_common)
+        ax.set_xlim(left=1, right=eval_max_common)  # ALTERADO
 
-        ax.set_xlabel("Número de avaliações", labelpad=self.labelpad)  # >>> MUDANÇA
+        ax.set_xlabel("Número de avaliações", labelpad=self.labelpad)  # ALTERADO
         ax.set_ylabel("Fitness", labelpad=self.labelpad)
 
-        ax.set_title("Convergência: Fitness × Avaliações", pad=self.titlepad)  # >>> MUDANÇA
+        ax.set_title("Convergência: Fitness × Avaliações", pad=self.titlepad)  # ALTERADO
 
         if legenda:
             ax.legend()
 
         path = None if not self.salvar_em else os.path.join(
             self.salvar_em,
-            f"convergence_eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            f"convergence_evaluations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         )
 
         self._save_or_show(fig, path)
