@@ -60,12 +60,14 @@ from scipy.ndimage import gaussian_filter1d
 
 PLOT_STYLE = {
     "font.family": "Times New Roman",
-    "font.size": 14,
+    "font.size": 16,
     "figure.figsize": (16, 6),
     "axes.grid": True,
+    "axes.labelsize": 18,
     "grid.linestyle": "--",
     "grid.alpha": 0.4,
     "axes.linewidth": 0.8,
+    "legend.fontsize": 16
 }
 
 ALGO_COLORS = {
@@ -136,9 +138,11 @@ class Plotter:
         if path:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             fig.savefig(path, dpi=300, bbox_inches="tight")
+            plt.show()
             plt.close(fig)
         else:
             plt.show()
+            plt.close(fig)
 
     @staticmethod
     def _compute_best_so_far_stats(df):
@@ -194,7 +198,7 @@ class Plotter:
 
         return formatar_marcadores
 
-    def plot_convergence_algorithm(self, algo, filter_sets:dict= {}, legenda=True, sigma_suavizacao=1.5, save:str|None=None):
+    def plot_convergence_algorithm(self, algo, filter_sets:dict= {}, legenda=True, sigma_suavizacao=1.2, save:str|None=None):
         """
         Gráfico de convergência em escala logarítmica
         """
@@ -580,7 +584,8 @@ class Plotter:
             xmax: int | None = None,
             ymax: float | None = None,
             ymax_percentile: float | None = None,
-            cut_ini_pop: bool = False
+            cut_ini_pop: bool = False,
+            sigma_suavizacao: float = 1.2
     ):
         """
         Convergência (best-so-far) × Número de Avaliações usando logs {algo}_*.csv.
@@ -589,7 +594,7 @@ class Plotter:
 
         - Lê todos os logs
         - Calcula mínimo cumulativo
-        - Interpola runs para obter média ± desvio
+        - Plota média, máximos e mínimos, suavizado
         """
 
         fig, ax = plt.subplots()
@@ -598,11 +603,11 @@ class Plotter:
         ax.spines["right"].set_visible(True)
 
         algo_runs = {}
-        algo_max_evals = []  # ALTERADO
+        algo_max_evals = []
         all_means = []
 
         # -----------------------------
-        # 1) carregar logs
+        # carregar logs
         # -----------------------------
 
         for algo in algos:
@@ -630,11 +635,7 @@ class Plotter:
                 if "Fitness" not in df.columns:
                     continue
 
-                # --------------------------------------------------
-                # remover população inicial
-                # --------------------------------------------------
-
-                if cut_ini_pop and "Iteration" in df.columns:  # NOVO
+                if cut_ini_pop and "Iteration" in df.columns:
 
                     iter_col = pd.to_numeric(df["Iteration"], errors="coerce")
 
@@ -643,172 +644,117 @@ class Plotter:
                     if df.empty:
                         continue
 
-                # --------------------------------------------------
-                # fitness
-                # --------------------------------------------------
-
-                fitness = pd.to_numeric(df["Fitness"], errors="coerce").values
-
-                mask = ~np.isnan(fitness)
-
-                fitness = fitness[mask]
+                fitness = pd.to_numeric(df["Fitness"], errors="coerce").dropna().values
 
                 if len(fitness) < 2:
                     continue
 
-                # --------------------------------------------------
-                # eixo X = avaliações
-                # --------------------------------------------------
-
-                evals = np.arange(1, len(fitness) + 1)  # NOVO
-
-                # --------------------------------------------------
-                # melhor cumulativo
-                # --------------------------------------------------
-
                 best = np.minimum.accumulate(fitness)
 
-                runs.append((evals, best))  # ALTERADO
+                runs.append(best)
 
             if not runs:
                 continue
 
-            algo_runs[algo] = runs
-            algo_max_evals.append(max(r[0][-1] for r in runs))  # ALTERADO
+            min_len = min(len(r) for r in runs)
+
+            runs = [r[:min_len] for r in runs]
+
+            algo_runs[algo] = np.array(runs)
+
+            algo_max_evals.append(min_len)
 
         if not algo_runs:
             print("Nenhum dado válido encontrado.")
             return
 
-        # -----------------------------
-        # 2) definir limite de avaliações
-        # -----------------------------
-
-        eval_max_common = min(algo_max_evals)  # ALTERADO
+        eval_max_common = min(algo_max_evals)
 
         if xmax is not None:
             eval_max_common = min(eval_max_common, xmax)
 
-        ylim = 0
-        ymin = None
-
         curves = []
 
-        # -----------------------------
-        # 3) processar cada algoritmo
-        # -----------------------------
+        ymin = None
+        ymax_local = 0
 
         for algo, runs in algo_runs.items():
 
-            common_eval = np.linspace(1, eval_max_common, 400)  # ALTERADO
+            runs = runs[:, :eval_max_common]
 
-            interpolated = []
+            mean = runs.mean(axis=0)
+            val_min = runs.min(axis=0)
+            val_max = runs.max(axis=0)
 
-            for evals, best in runs:  # ALTERADO
+            # --- APLICA SUAVIZAÇÃO GAUSSIANA ---
+            if sigma_suavizacao > 0:
+                mean = gaussian_filter1d(mean, sigma=sigma_suavizacao)
+                val_min = gaussian_filter1d(val_min, sigma=sigma_suavizacao)
+                val_max = gaussian_filter1d(val_max, sigma=sigma_suavizacao)
 
-                mask = evals <= eval_max_common
-
-                evals = evals[mask]
-                best = best[mask]
-
-                if len(evals) < 2:
-                    continue
-
-                interp = np.interp(
-                    common_eval,
-                    evals,
-                    best,
-                    left=best[0],
-                    right=best[-1]
-                )
-
-                interpolated.append(interp)
-
-            if not interpolated:
-                continue
-
-            interpolated = np.array(interpolated)
-
-            mean = interpolated.mean(axis=0)
-            std = interpolated.std(axis=0)
+            curves.append((algo, mean, val_min, val_max))
 
             all_means.extend(mean)
 
-            curves.append((algo, common_eval, mean, std))  # ALTERADO
-
-            ylim = max(ylim, np.max(mean))
+            ymax_local = max(ymax_local, np.max(mean))
 
             if ymin is None:
                 ymin = np.min(mean)
             else:
                 ymin = min(ymin, np.min(mean))
 
-        # --------------------------------------------------
-        # ajuste do ymax
-        # --------------------------------------------------
-
-        if ymax_percentile is not None and len(all_means) > 0:
+        if ymax_percentile is not None:
             ymax_auto = np.percentile(all_means, ymax_percentile)
         else:
-            ymax_auto = ylim * 1.05
+            ymax_auto = ymax_local * 1.05
 
         if ymax is None:
             ymax = ymax_auto
 
         ymin = max(ymin, 1e-12)
 
+        eval_axis = np.arange(1, eval_max_common + 1)
+
         # -----------------------------
-        # 4) plotar curvas
+        # plot
         # -----------------------------
 
-        for algo, common_eval, mean, std in curves:
+        for algo, mean, val_min, val_max in curves:
             mean = np.clip(mean, ymin, ymax)
-            upper = np.clip(mean + std, ymin, ymax)
-            lower = np.clip(mean - std, ymin, ymax)
+            lower = np.clip(val_min, ymin, ymax)
+            upper = np.clip(val_max, ymin, ymax)
 
             ax.plot(
-                common_eval,
+                eval_axis,
                 mean,
                 label=algo,
                 color=ALGO_COLORS.get(algo, None)
             )
 
             ax.fill_between(
-                common_eval,
+                eval_axis,
                 lower,
                 upper,
-                alpha=0.2,
+                alpha=0.15,
                 color=ALGO_COLORS.get(algo, None)
             )
 
-        ax.set_ylim(bottom=ymin, top=ymax)
+        ax.set_xlim(1, eval_max_common)
+        ax.set_ylim(ymin, ymax)
 
         ax.set_yscale("log")
 
-        # -----------------------------
-        # ticks log robustos
-        # -----------------------------
-
         ticks = np.geomspace(ymin, ymax, 6)
-
         ax.set_yticks(ticks)
 
         ax.yaxis.set_major_formatter(
             FuncFormatter(lambda y, _: f"{y:.2g}")
         )
 
-        ax.yaxis.set_minor_locator(ticker.NullLocator())
-
-        # -----------------------------
-        # eixo X
-        # -----------------------------
-
-        ax.set_xlim(left=1, right=eval_max_common)  # ALTERADO
-
-        ax.set_xlabel("Número de avaliações", labelpad=self.labelpad)  # ALTERADO
+        ax.set_xlabel("Número de avaliações", labelpad=self.labelpad)
         ax.set_ylabel("Fitness", labelpad=self.labelpad)
 
-        ax.set_title("Convergência: Fitness × Avaliações", pad=self.titlepad)  # ALTERADO
+        ax.set_title("Convergência: Fitness × Avaliações", pad=self.titlepad)
 
         if legenda:
             ax.legend()
@@ -829,14 +775,15 @@ class Plotter:
             tmax: float | None = None,
             ymax: float | None = None,
             ymax_percentile: float | None = None,
-            cut_ini_pop: bool = False
+            cut_ini_pop: bool = False,
+            sigma_suavizacao: float = 1.2
     ):
         """
         Convergência (best-so-far) × Tempo usando logs originais {algo}_*.csv.
 
         - Lê todos os logs do diretório com padrão {algo}_*.csv
         - Calcula mínimo cumulativo de fitness por avaliação
-        - Interpola runs para obter média ± desvio
+        - Interpola runs para obter média ± [máx, mín]
         - Limita o eixo de tempo ao menor tempo máximo entre algoritmos
 
         :param logs_dir: pode passar um diretório comum ou dicionário relacionando algoritmo
@@ -852,7 +799,7 @@ class Plotter:
         all_means = []
 
         # -----------------------------
-        # 1) carregar logs
+        # carregar logs
         # -----------------------------
 
         for algo in algos:
@@ -880,27 +827,20 @@ class Plotter:
                 if "Fitness" not in df.columns or "Time (s)" not in df.columns:
                     continue
 
-                # --------------------------------------------------
-                # remover população inicial
-                # --------------------------------------------------
+                time_offset = 0
 
-                time_offset = 0.0
+                if cut_ini_pop and "Iteration" in df.columns:
 
-                if cut_ini_pop:
+                    iter_col = pd.to_numeric(df["Iteration"], errors="coerce")
 
-                    if "Iteration" in df.columns:
+                    init_mask = iter_col == 0
 
-                        iter_col = pd.to_numeric(df["Iteration"], errors="coerce")
+                    if init_mask.any():
+                        time_offset = pd.to_numeric(
+                            df.loc[init_mask, "Time (s)"], errors="coerce"
+                        ).max()
 
-                        # tempo do final da população inicial
-                        init_mask = iter_col == 0
-
-                        if init_mask.any():
-                            time_offset = pd.to_numeric(
-                                df.loc[init_mask, "Time (s)"], errors="coerce"
-                            ).max()
-
-                        df = df[iter_col > 0]
+                    df = df[iter_col > 0]
 
                     if df.empty:
                         continue
@@ -910,11 +850,11 @@ class Plotter:
 
                 mask = (~np.isnan(fitness)) & (~np.isnan(tempo))
 
-                if mask.sum() < 2:
-                    continue
-
                 fitness = fitness[mask]
                 tempo = tempo[mask]
+
+                if len(fitness) < 2:
+                    continue
 
                 order = np.argsort(tempo)
 
@@ -935,23 +875,15 @@ class Plotter:
             print("Nenhum dado válido encontrado.")
             return
 
-        # -----------------------------
-        # 2) definir limite temporal
-        # -----------------------------
-
         t_max_common = min(algo_max_times)
 
         if tmax is not None:
             t_max_common = min(t_max_common, tmax)
 
-        ylim = 0
-        ymin = None
-
         curves = []
 
-        # -----------------------------
-        # 3) processar cada algoritmo
-        # -----------------------------
+        ymin = None
+        ymax_local = 0
 
         for algo, runs in algo_runs.items():
 
@@ -985,27 +917,30 @@ class Plotter:
             interpolated = np.array(interpolated)
 
             mean = interpolated.mean(axis=0)
-            std = interpolated.std(axis=0)
+            val_min = interpolated.min(axis=0)
+            val_max = interpolated.max(axis=0)
+
+            # --- SUAVIZAÇÃO ---
+            if sigma_suavizacao > 0:
+                mean = gaussian_filter1d(mean, sigma=sigma_suavizacao)
+                val_min = gaussian_filter1d(val_min, sigma=sigma_suavizacao)
+                val_max = gaussian_filter1d(val_max, sigma=sigma_suavizacao)
+
+            curves.append((algo, common_time, mean, val_min, val_max))
 
             all_means.extend(mean)
 
-            curves.append((algo, common_time, mean, std))
-
-            ylim = max(ylim, np.max(mean))
+            ymax_local = max(ymax_local, np.max(mean))
 
             if ymin is None:
                 ymin = np.min(mean)
             else:
                 ymin = min(ymin, np.min(mean))
 
-        # --------------------------------------------------
-        # ajuste do ymax
-        # --------------------------------------------------
-
-        if ymax_percentile is not None and len(all_means) > 0:
+        if ymax_percentile is not None:
             ymax_auto = np.percentile(all_means, ymax_percentile)
         else:
-            ymax_auto = ylim * 1.05
+            ymax_auto = ymax_local * 1.05
 
         if ymax is None:
             ymax = ymax_auto
@@ -1014,13 +949,13 @@ class Plotter:
         ymin = max(ymin, 1e-12)
 
         # -----------------------------
-        # 4) plotar curvas (com clipping)
+        # plot
         # -----------------------------
 
-        for algo, common_time, mean, std in curves:
+        for algo, common_time, mean, val_min, val_max in curves:
             mean = np.clip(mean, ymin, ymax)
-            upper = np.clip(mean + std, ymin, ymax)
-            lower = np.clip(mean - std, ymin, ymax)
+            lower = np.clip(val_min, ymin, ymax)
+            upper = np.clip(val_max, ymin, ymax)
 
             ax.plot(
                 common_time,
@@ -1033,44 +968,22 @@ class Plotter:
                 common_time,
                 lower,
                 upper,
-                alpha=0.2,
+                alpha=0.15,
                 color=ALGO_COLORS.get(algo, None)
             )
 
-        ax.set_ylim(bottom=ymin, top=ymax)
-
-        ax.set_yscale("log")
-
-        # --------------------------------------------------
-        # 5) configuração eixo Y
-        # --------------------------------------------------
-
-        # --------------------------------------------------
-        # eixo Y para escala log
-        # --------------------------------------------------
-
-        # --------------------------------------------------
-        # eixo Y para escala log (ticks robustos)
-        # --------------------------------------------------
+        ax.set_xlim(0, t_max_common)
+        ax.set_ylim(ymin, ymax)
 
         ax.set_yscale("log")
 
         # gerar ticks log distribuídos no intervalo real
         ticks = np.geomspace(ymin, ymax, 6)
-
         ax.set_yticks(ticks)
 
         ax.yaxis.set_major_formatter(
             FuncFormatter(lambda y, _: f"{y:.2g}")
         )
-
-        ax.yaxis.set_minor_locator(ticker.NullLocator())
-
-        # -----------------------------
-        # 6) eixo X
-        # -----------------------------
-
-        ax.set_xlim(left=0, right=t_max_common)
 
         ax.set_xlabel("Tempo de processamento (s)", labelpad=self.labelpad)
         ax.set_ylabel("Fitness", labelpad=self.labelpad)
