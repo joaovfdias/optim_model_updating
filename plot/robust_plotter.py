@@ -55,6 +55,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.ticker import FuncFormatter
 
+from scipy.ndimage import gaussian_filter1d
+
 
 PLOT_STYLE = {
     "font.family": "Times New Roman",
@@ -146,15 +148,29 @@ class Plotter:
         if len(run_cols) == 0:
             mean = df["Media_Fitness"].cummin().values
             std = df["Desvio_Fitness"].values
-            return mean, std
+
+            # Se não existirem colunas isoladas das repetições, usa as colunas já prontas do CSV.
+            # O .cummin() garante que os limites só desçam, criando a sombra no formato correto
+            val_min = df["Min_Fitness"].cummin().values
+            val_max = df["Max_Fitness"].cummin().values
+
+            return mean, std, val_min, val_max
 
         runs = df[run_cols].values
+
+        # Cria o histórico "best-so-far" (a escadinha de convergência) independente para CADA rodada
         runs_best = np.minimum.accumulate(runs, axis=0)
 
+        # Calcula a Média e o Desvio Padrão do histórico das rodadas
         mean = runs_best.mean(axis=1)
         std = runs_best.std(axis=1)
 
-        return mean, std
+        # NOVO: Extrai a melhor e a pior rodada exata daquela iteração
+        val_min = runs_best.min(axis=1)
+        val_max = runs_best.max(axis=1)
+
+        return mean, std, val_min, val_max
+
 
     @staticmethod
     def format_function(ymin, casas_decimais):
@@ -178,7 +194,7 @@ class Plotter:
 
         return formatar_marcadores
 
-    def plot_convergence_algorithm(self, algo, filter_sets:dict= {}, legenda=True, save:str|None=None):
+    def plot_convergence_algorithm(self, algo, filter_sets:dict= {}, legenda=True, sigma_suavizacao=1.5, save:str|None=None):
         """
         Gráfico de convergência em escala logarítmica
         """
@@ -201,14 +217,24 @@ class Plotter:
                 continue
 
             x = df["Iteracao"].values
-            mean, std = self._compute_best_so_far_stats(df)
 
-            ax.plot(x, mean, label=set_name)
+            # --- Receber o mínimo e o máximo da função auxiliar ---
+            mean, std, val_min, val_max = self._compute_best_so_far_stats(df)
 
+            # --- APLICA A SUAVIZAÇÃO GAUSSIANA ---
+            if sigma_suavizacao > 0:
+                mean = gaussian_filter1d(mean, sigma=sigma_suavizacao)
+                val_min = gaussian_filter1d(val_min, sigma=sigma_suavizacao)
+                val_max = gaussian_filter1d(val_max, sigma=sigma_suavizacao)
+            # -------------------------------------------
+
+            ax.plot(x, mean, label=set_name, linewidth=2)
+
+            # --- Preencher a área entre o Min e o Max ---
             ax.fill_between(
                 x,
-                mean - std,
-                mean + std,
+                val_min,
+                val_max,
                 alpha=0.2
             )
 
