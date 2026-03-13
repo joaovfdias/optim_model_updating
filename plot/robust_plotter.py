@@ -751,6 +751,8 @@ class Plotter:
             FuncFormatter(lambda y, _: f"{y:.2g}")
         )
 
+        ax.yaxis.set_minor_locator(ticker.NullLocator())
+
         ax.set_xlabel("Número de avaliações", labelpad=self.labelpad)
         ax.set_ylabel("Fitness", labelpad=self.labelpad)
 
@@ -984,6 +986,8 @@ class Plotter:
         ax.yaxis.set_major_formatter(
             FuncFormatter(lambda y, _: f"{y:.2g}")
         )
+
+        ax.yaxis.set_minor_locator(ticker.NullLocator())
 
         ax.set_xlabel("Tempo de processamento (s)", labelpad=self.labelpad)
         ax.set_ylabel("Fitness", labelpad=self.labelpad)
