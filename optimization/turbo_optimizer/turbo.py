@@ -1,6 +1,13 @@
 from ..optimizer import Optimizer
 from ..individual import Individual
 
+from typing import Optional
+from datetime import datetime
+import numpy as np
+import math
+import csv
+import time
+
 from skopt.space import Real
 from skopt import gp_minimize
 
@@ -22,12 +29,9 @@ from botorch.models import SingleTaskGP
 from botorch.optim import optimize_acqf
 from botorch.utils.transforms import unnormalize
 
-from typing import Optional
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+dtype = torch.double
 
-import csv
-import time
-from datetime import datetime
-import numpy as np
 
 class TurBO(Optimizer):
     def __init__(self, fitness_function, parameters, initial_points):
@@ -47,8 +51,12 @@ class TurBO(Optimizer):
         self.initial_evaluations = initial_points
         self.search_space = [Real(p.lower_bound, p.upper_bound, name=p.key) for p in parameters]
 
-        self.sampling_method = 'random'
-        self.sampling_methods = ['random', 'lhs']
+        self.sampling_method = 'sobol'
+        self.sampling_methods = {
+            "random": self.random_initial_population,
+            "lhs": self.LHS_initial_population,
+            "sobol": self.sobol_initial_population
+        }
         self.bounds = None
         self.build_bounds()
 
@@ -76,6 +84,25 @@ class TurBO(Optimizer):
                 f"Método de amostragem '{sampling_method}' inválido. Tipos válidos: {list(self.sampling_methods)}")
             return
 
+    def sobol_initial_population(self):
+
+        dim = len(self.parameters)
+
+        sobol = SobolEngine(dim, scramble=True)
+
+        samples = sobol.draw(self.population_size).numpy()
+
+        lower = np.array([p.lower_bound for p in self.parameters])
+        upper = np.array([p.upper_bound for p in self.parameters])
+
+        scaled = lower + samples * (upper - lower)
+
+        pop = [
+            Individual(list(scaled[i]), self.fitness_function)
+            for i in range(self.population_size)
+        ]
+
+        return pop
 
     def evaluate_model(self, params):
         self.populations.append(Individual(params, self.fitness_function))
@@ -126,6 +153,7 @@ class TurBO(Optimizer):
         best_value: float = -float("inf")
         restart_triggered: bool = False
 
+    @staticmethod
     def update_state(state: TurboState, Y_next:torch.Tensor) -> TurboState:
         """Atualiza o estado  do TurBO para a busca"""
         if max(Y_next) > state.best_value + 1e-3 * math.fabs(state.best_value):
@@ -147,6 +175,7 @@ class TurBO(Optimizer):
             state.restart_triggered = True
         return state
 
+    @staticmethod
     def generate_batch(
             state: TurboState,
             model: SingleTaskGP,  # GP model
@@ -207,11 +236,35 @@ class TurBO(Optimizer):
 
         return X_next
 
+    @staticmethod
+    def _fit_gp(X, Y):
+
+        likelihood = GaussianLikelihood(
+            noise_constraint=Interval(1e-8, 1e-3)
+        )
+
+        covar_module = ScaleKernel(
+            MaternKernel(nu=2.5, ard_num_dims=X.shape[-1])
+        )
+
+        model = SingleTaskGP(
+            X,
+            Y,
+            covar_module=covar_module,
+            likelihood=likelihood
+        )
+
+        mll = ExactMarginalLogLikelihood(model.likelihood, model)
+
+        fit_gpytorch_mll(mll)
+
+        return model
+
     def population_to_tensor(
             self,
             pop,
             dtype: torch.dtype = torch.double,
-            device: torch.device | str = "cpu",
+            device: str = "cuda" if torch.cuda.is_available() else "cpu",
     ) -> torch.Tensor:
         """
         Convert a list of Individuals/Particles to
@@ -222,7 +275,7 @@ class TurBO(Optimizer):
 
         # ---- 1) Extract raw parameter matrix (n, d)
         X_raw = np.array([
-            ind.params  # <-- adjust if attribute name differs
+            ind.param  # <-- adjust if attribute name differs
             for ind in pop
         ], dtype=float)
 
@@ -241,9 +294,13 @@ class TurBO(Optimizer):
 
         return X_tensor
 
-    def get_initial_points(self) -> torch.Tensor:
+    def get_initial_points(
+            self,
+            dtype: torch.dtype = torch.double,
+            device: str = "cuda" if torch.cuda.is_available() else "cpu"
+    ) -> torch.Tensor:
         pop = self.initial_population()
-        return self.population_to_tensor(pop)
+        return self.population_to_tensor(pop, dtype=dtype, device=device)
 
 
     # Otimizar com scikit-optimize
@@ -272,7 +329,7 @@ class TurBO(Optimizer):
         n_init = n_init or (2 * dim)
 
         # --- 1) initial design in [0,1]^d
-        X = self.get_initial_points(dim=dim, n_pts=n_init, seed=seed, dtype=dtype, device=device)
+        X = self.get_initial_points(dtype=dtype, device=device)
 
         # --- 2) evaluate initial points (convert to real domain inside eval)
         # We store Y = -fitness, since we minimize fitness but TuRBO maximizes Y
@@ -307,8 +364,6 @@ class TurBO(Optimizer):
                 Y=Y,
                 batch_size=batch_size,
                 acqf=acqf,
-                dtype=dtype,
-                device=device,
             )
 
             # Evaluate batch
@@ -334,10 +389,10 @@ class TurBO(Optimizer):
                 print(f"[eval {n_evals:4d}/{evaluations}] best fitness={best_fitness:.6g} | "
                       f"TR length={state.length:.3g} | restart={state.restart_triggered}")
 
-            # optional logging hook (keep your existing system)
-            if self.log:
-                it = max((len(self.populations) - self.initial_evaluations), 0)
-                self.add_log(it, [self.populations[-1]])
+            # # optional logging hook (keep your existing system)
+            # if self.log:
+            #     it = max((len(self.populations) - self.initial_evaluations), 0)
+            #     self.add_log(it, [self.populations[-1]])
 
         fim = time.time()
         if self.log:
@@ -380,21 +435,3 @@ class TurBO(Optimizer):
             relative_sensitivities = sensitivities / np.sum(sensitivities)
 
             writer.writerow(["Relative sensitivities:"] + [relative_sensitivities])
-
-
-    # salvar os resultados em log [sem uso]
-    @staticmethod
-    def save_log_BO(filename, result):
-        timestamp = datetime.now().strftime("%d%m%Y_%H%M")
-        filename = filename or f"BayesianOpt_{timestamp}.csv"
-
-        header = ["Iteration", "Fitness", "x", "y", "z"]
-        with open(filename, mode="w", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file, delimiter=";")
-            writer.writerow(header)
-
-            for i, (fitness, params) in enumerate(zip(result.func_vals, result.x_iters)):
-                row = [i + 1, fitness] + list(params)
-                writer.writerow(row)
-
-        print(f"Log saved as {filename}")
