@@ -1,15 +1,27 @@
-from optimization.bo_optimizer.bayesian_from_skopt import BO
+from optimization.turbo_optimizer.turbo import TuRBO
 from external.parser import Ansys
 from external.special_functions import SpecialFun
 
+from datetime import datetime
 import numpy as np
 import time
 import os
-from datetime import datetime
 import shutil
 
 
-def BO_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script_filename=None, noise=False, initial_points=None, evaluations=None, acq_func=None, xi=0.01, kappa=1.96):
+def TuRBO_run(
+        irun,
+        parameters,
+        base_dir,
+        local_dir=None,
+        log_dir=None,
+        base_script_filename=None,
+        noise=False,
+        initial_points=None,
+        evaluations=None,
+        batch_size=4,
+        acqf="ts"
+):
 
     keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
 
@@ -45,7 +57,6 @@ def BO_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script
 
     # --- APLICAÇÃO DE RUÍDO NOS DADOS DE REFERÊNCIA (PROBLEMAS SINTÉTICOS) ---
     if noise:
-
         # Simula incerteza experimental diferente para cada rodada
         # Nível de Ruído (Sigma): 1% (0.01) ou 3% (0.03) são valores comuns
         NOISE_LEVEL = noise
@@ -79,37 +90,43 @@ def BO_run(irun, parameters, base_dir, local_dir=None, log_dir=None, base_script
         peso_mac = 1
         fitness = peso_freq * freq_error_sum + peso_mac * mac_error_sum
 
-        return fitness, {"freq error": freq_error_sum, "mac error": mac_error_sum, "Freq.": paired_comp_freq, "Freq. Error": [abs((bf-nf)/bf) for bf, nf in zip(ansys.base_freq, paired_comp_freq)], "Mode": paired_comp_modes, "MAC": macs}
+        return fitness, {"freq error": freq_error_sum, "mac error": mac_error_sum, "Freq.": paired_comp_freq,
+                         "Freq. Error": [abs((bf - nf) / bf) for bf, nf in zip(ansys.base_freq, paired_comp_freq)],
+                         "Mode": paired_comp_modes, "MAC": macs}
 
 
-    initial_points = initial_points or 5 * len(parameters)
+    initial_points = initial_points or 2 * len(parameters)
     evaluations = evaluations or 40 * len(parameters)
-    sampling_method = 'lhs'
 
-    rodada = BO(fitness_function, parameters, initial_points)
-    rodada.set_sampling_method(sampling_method)
+    rodada = TuRBO(
+        fitness_function,
+        parameters,
+        initial_points
+    )
 
-    # ajuste do registro:
-    log_dir = log_dir or os.path.join(base_dir, 'log', 'runs', 'PSO')
-    hyperp = ""
-    if acq_func != 'gp_hedge':
-        hyperp = f"_kappa({kappa:.4f})" if acq_func=='LCB' else f"_xi({xi:.4f})"
-    log_title = f"BO_SKOPT_ini({initial_points})_eval({evaluations})_acq({acq_func}){hyperp}_{irun}_{datetime.now().strftime("%Y%m%d_%H%M%S")}"  # alterar nome do arquivo gerado, se quiser (todos recebem "_timestamp" no final)
+    log_dir = log_dir or os.path.join(base_dir, 'log', 'runs', 'TuRBO')
 
-    # log_dir = None # alterar diretório do registro, por padrão {diretório atual}\log (lembre-se de usar o formato r"{caminho}" para declarar diretórios)
+    log_title = (
+        f"TuRBO_ini({initial_points})"
+        f"_eval({evaluations})"
+        f"_acq({acqf})"
+        f"_q({batch_size})"
+        f"_{irun}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    )
+
     rodada.set_log(log_title, log_dir, False)
 
-    # chamada:
     try:
-        best, gp_result = rodada.run(evaluations, acq_func=acq_func, xi=xi, kappa=kappa, status=True)
+
+        result = rodada.run(
+            evaluations=evaluations,
+            acqf=acqf,
+            batch_size=batch_size,
+            status=True
+        )
+
     finally:
         try:
             ansys.mapdl.exit(force=True)
         except:
             pass
-
-    # garantia de encerramento
-    # Ansys.kill_ansys_process()
-    time.sleep(1)
-
-    return best, evaluations

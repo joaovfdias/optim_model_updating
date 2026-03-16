@@ -33,8 +33,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.double
 
 
-class TurBO(Optimizer):
-    def __init__(self, fitness_function, parameters, initial_points):
+class TuRBO(Optimizer):
+    def __init__(self, fitness_function, parameters, initial_points=None):
         """
         Otimização Bayesiana utilizando a função "gp_minimize" da biblioteca "scikit-optimize"
         :param fitness_function: função objetivo a ser otimizada (função que recebe lista de valores dos parâmetros e retorna: fitness, [dados]
@@ -48,7 +48,7 @@ class TurBO(Optimizer):
 
         self.populations = []
 
-        self.initial_evaluations = initial_points
+        self.initial_evaluations = initial_points or 5 * len(parameters)
         self.search_space = [Real(p.lower_bound, p.upper_bound, name=p.key) for p in parameters]
 
         self.sampling_method = 'sobol'
@@ -90,7 +90,7 @@ class TurBO(Optimizer):
 
         sobol = SobolEngine(dim, scramble=True)
 
-        samples = sobol.draw(self.population_size).numpy()
+        samples = sobol.draw(self.initial_evaluations).numpy()
 
         lower = np.array([p.lower_bound for p in self.parameters])
         upper = np.array([p.upper_bound for p in self.parameters])
@@ -99,7 +99,7 @@ class TurBO(Optimizer):
 
         pop = [
             Individual(list(scaled[i]), self.fitness_function)
-            for i in range(self.population_size)
+            for i in range(self.initial_evaluations)
         ]
 
         return pop
