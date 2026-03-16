@@ -10,9 +10,9 @@ def run_TuRBO(irun, parameters, base_dir, local_dir=None, log_dir=None, base_scr
 
 if __name__ == '__main__':
 
-    Problema = 4
+    Problema = 3
     Compiuter = "LEST 2"
-    runs = 1
+    runs = 4
 
     pb = indexar_problema(Problema)
     pc = indexar_device(Compiuter)

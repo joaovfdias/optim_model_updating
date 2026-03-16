@@ -237,7 +237,7 @@ class TuRBO(Optimizer):
         return X_next
 
     @staticmethod
-    def _fit_gp(X, Y):
+    def _fit_gp(X: torch.Tensor, Y: torch.Tensor) -> SingleTaskGP:
 
         likelihood = GaussianLikelihood(
             noise_constraint=Interval(1e-8, 1e-3)
@@ -343,7 +343,7 @@ class TuRBO(Optimizer):
         Y = torch.tensor(Y_list, dtype=dtype, device=device).unsqueeze(-1)  # (n_init, 1)
 
         # tracking TuRBO state
-        state = self.TurboState(dim=dim, batch_size=batch_size, failure_tolerance=10)
+        state = self.TurboState(dim=dim, batch_size=batch_size, failure_tolerance=len(self.parameters))
 
         # reporting
         if status:

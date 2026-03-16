@@ -122,7 +122,7 @@ def TuRBO_run(
             evaluations=evaluations,
             acqf=acqf,
             batch_size=batch_size,
-            status=False
+            status=True
         )
 
     finally:
