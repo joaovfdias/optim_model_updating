@@ -65,7 +65,7 @@ class TuRBO(Optimizer):
         Creates BoTorch-compatible bounds tensor of shape (2, d)
         from a list of skopt.space.Real objects.
         """
-        device = device or torch.device("cpu")
+        device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         lb = [dim.low for dim in self.search_space]
         ub = [dim.high for dim in self.search_space]
@@ -316,7 +316,7 @@ class TuRBO(Optimizer):
         assert acqf in ("ts", "ei")
 
         self.inicio = time.time()
-        self.status = status
+        # self.status = status
         self.log = log
 
         timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
@@ -346,7 +346,7 @@ class TuRBO(Optimizer):
         state = self.TurboState(dim=dim, batch_size=batch_size)
 
         # reporting
-        if self.status:
+        if status:
             best_fitness = -Y.max().item()
             print(f"[init] n={n_init} | best fitness={best_fitness:.6g} | TR length={state.length:.3g}")
 
@@ -384,7 +384,7 @@ class TuRBO(Optimizer):
             # Update TR state (based on new Y)
             state = self.update_state(state, Y_next)
 
-            if self.status:
+            if status:
                 best_fitness = -Y.max().item()
                 print(f"[eval {n_evals:4d}/{evaluations}] best fitness={best_fitness:.6g} | "
                       f"TR length={state.length:.3g} | restart={state.restart_triggered}")
