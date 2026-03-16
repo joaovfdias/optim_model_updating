@@ -149,7 +149,7 @@ class TuRBO(Optimizer):
         failure_counter: int = 0
         failure_tolerance: int = float("nan")  # Note: Post-initialized
         success_counter: int = 0
-        success_tolerance: int = 10  # Note: The original paper uses 3
+        success_tolerance: int = 3  # Note: The original paper uses 3
         best_value: float = -float("inf")
         restart_triggered: bool = False
 
@@ -343,7 +343,7 @@ class TuRBO(Optimizer):
         Y = torch.tensor(Y_list, dtype=dtype, device=device).unsqueeze(-1)  # (n_init, 1)
 
         # tracking TuRBO state
-        state = self.TurboState(dim=dim, batch_size=batch_size)
+        state = self.TurboState(dim=dim, batch_size=batch_size, failure_tolerance=10)
 
         # reporting
         if status:
