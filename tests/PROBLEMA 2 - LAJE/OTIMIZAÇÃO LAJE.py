@@ -1,8 +1,8 @@
 import os
 
 from optimization.parameter import *
-from external.special_functions import SpecialFun
-from external.parser import Ansys
+from utils.special_functions import SpecialFun
+from external.ansys.parser import Ansys
 
 parameters = [
     Continuous(20e9,35e9, 'modulo_viga_1'),

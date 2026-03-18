@@ -1,7 +1,6 @@
-from optimization.parameter import *
 from optimization.ga_optimizer import GA
-from external.parser import Ansys
-from external.special_functions import SpecialFun
+from external.ansys.parser import Ansys
+from utils.special_functions import SpecialFun
 
 from datetime import datetime
 import os

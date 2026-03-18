@@ -6,7 +6,7 @@ from datetime import datetime
 import time
 from typing import Union, List
 
-from .kill_ansys import kill_ansys_process
+from .kill_process import kill_ansys_process
 
 
 class Ansys:

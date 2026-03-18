@@ -6,8 +6,8 @@ from datetime import datetime
 from multiprocessing import Process, Queue
 
 from optimization.parameter import Continuous
-from external.parser import Ansys
-from external.special_functions import SpecialFun
+from external.ansys.parser import Ansys
+from utils.special_functions import SpecialFun
 from optimization.bo_optimizer.bayesian_from_skopt import BO
 
 

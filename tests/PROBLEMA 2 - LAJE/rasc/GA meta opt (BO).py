@@ -2,14 +2,10 @@ from GA_run_TEST2 import GA_run
 from PSO_run_TEST2 import PSO_run
 
 from optimization.parameter import *
-from external.parser import Ansys
+from external.ansys.parser import Ansys
 
-from skopt.space import Real
 from skopt import gp_minimize
 
-import time
-from datetime import datetime
-from multiprocessing import Process
 import os
 
 

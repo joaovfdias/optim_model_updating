@@ -1,6 +1,6 @@
 from optimization.bo_optimizer.bayesian_from_skopt import BO
-from external.parser import Ansys
-from external.special_functions import SpecialFun
+from external.ansys.parser import Ansys
+from utils.special_functions import SpecialFun
 
 import numpy as np
 import time

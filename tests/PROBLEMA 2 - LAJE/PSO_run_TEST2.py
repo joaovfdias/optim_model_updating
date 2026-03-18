@@ -1,6 +1,6 @@
 from optimization.pso_optimizer.pso_optimizer import PSO
-from external.parser import Ansys
-from external.special_functions import SpecialFun
+from external.ansys.parser import Ansys
+from utils.special_functions import SpecialFun
 
 import os
 from datetime import datetime

@@ -1,8 +1,8 @@
 from sensitivity.sensitivity import SensitivityAnalyzer, ParamSpec, Sampler
 import pandas as pd
 import numpy as np
-from external.parser import Ansys
-from external.special_functions import SpecialFun
+from external.ansys.parser import Ansys
+from utils.special_functions import SpecialFun
 
 import time
 import os
