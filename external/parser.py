@@ -4,8 +4,9 @@ import numpy as np
 import psutil
 from datetime import datetime
 import time
-
 from typing import Union, List
+
+from .kill_ansys import kill_ansys_process
 
 
 class Ansys:
@@ -69,6 +70,8 @@ class Ansys:
             self.kill_ansys_process()
             from ansys.mapdl.core import launch_mapdl
             self.mapdl = launch_mapdl(run_location=self.ansys_working_dir, override=True)
+
+        self.kill_anys_process = kill_ansys_process
 
 
     def set_output_filenames(self, out_freq_filename, out_modes_filename): # pode ser passado direto nas funções read
@@ -178,16 +181,17 @@ class Ansys:
             return modes
 
 
-    @staticmethod
-    def kill_ansys_process(): # sem uso, testar
-        for proc in psutil.process_iter(['pid', 'name']):
-            try:
-                if proc.info['name'] and 'ANSYS.exe' in proc.info['name']:
-                    print(f"Encerramento forçado do processo {proc.info['name']} (PID {proc.pid})")
-                    proc.kill()
-                    time.sleep(0.2)
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                continue
+    # importada de kill_ansys.py
+    # @staticmethod
+    # def kill_ansys_process():
+    #     for proc in psutil.process_iter(['pid', 'name']):
+    #         try:
+    #             if proc.info['name'] and 'ANSYS.exe' in proc.info['name']:
+    #                 print(f"Encerramento forçado do processo {proc.info['name']} (PID {proc.pid})")
+    #                 proc.kill()
+    #                 time.sleep(0.2)
+    #         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+    #             continue
 
     def cleanup_lock_file(self): # legacy
         lock_path = os.path.join(self.ansys_working_dir, "modeloc.lock")
