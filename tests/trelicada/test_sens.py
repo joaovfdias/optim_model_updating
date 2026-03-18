@@ -1,4 +1,4 @@
-from optimization.sensitivity import SensitivityAnalyzer, ParamSpec, Sampler
+from sensitivity.sensitivity import SensitivityAnalyzer, ParamSpec, Sampler
 import pandas as pd
 import numpy as np
 from optimization.parameter import *

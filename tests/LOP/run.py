@@ -12,7 +12,7 @@ if __name__ == '__main__':
 
     Problema = 3
     Compiuter = "LEST 2"
-    runs = 4
+    runs = 10
 
     pb = indexar_problema(Problema)
     pc = indexar_device(Compiuter)

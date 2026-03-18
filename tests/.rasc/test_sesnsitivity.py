@@ -1,5 +1,5 @@
 from optimization.optimizer import Optimizer
-from optimization.sensitivity import SensitivityAnalyzer
+from sensitivity.sensitivity import SensitivityAnalyzer
 
 import numpy as np
 

@@ -95,8 +95,8 @@ def TuRBO_run(
                          "Mode": paired_comp_modes, "MAC": macs}
 
 
-    initial_points = initial_points or 2 * len(parameters)
-    evaluations = evaluations or 40 * len(parameters)
+    initial_points = initial_points or 5 * len(parameters)
+    evaluations = evaluations or 80 * len(parameters)
 
     rodada = TuRBO(
         fitness_function,

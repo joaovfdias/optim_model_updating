@@ -713,7 +713,7 @@ class Optimizer:
 
     def analyze_sensitivity(self, df=None, **kwargs):
         # df: DataFrame opcional com histórico/log; se None, você pode passar df externamente
-        from .sensitivity import SensitivityAnalyzer
+        from sensitivity.sensitivity import SensitivityAnalyzer
         sa = SensitivityAnalyzer(minimize=True)
         if df is None:
             raise ValueError("Passe um DataFrame 'df' com parâmetros + métricas (+ Fitness opcional).")
