@@ -71,8 +71,6 @@ class Ansys:
             from ansys.mapdl.core import launch_mapdl
             self.mapdl = launch_mapdl(run_location=self.ansys_working_dir, override=True)
 
-        self.kill_anys_process = kill_ansys_process
-
 
     def set_output_filenames(self, out_freq_filename, out_modes_filename): # pode ser passado direto nas funções read
         self.out_freq_filename = out_freq_filename or self.out_freq_filename
@@ -180,6 +178,9 @@ class Ansys:
             modes = np.reshape(data, (self.num_modes, num_nodes))
             return modes
 
+    @staticmethod
+    def kill_ansys_process():
+        kill_ansys_process()
 
     # importada de kill_ansys.py
     # @staticmethod
