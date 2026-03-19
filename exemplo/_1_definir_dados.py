@@ -1,8 +1,11 @@
-# DEFINIÇÃO DOS DADOS DO PROBLEMA
-
 from optimization.parameter import Continuous
 
-# 1. LISTA DE PARÂMETROS
+import os
+
+
+# 1. DEFINIÇÃO DOS DADOS DO PROBLEMA
+
+# 1.1. LISTA DE PARÂMETROS
     # lista de objetos derivados da classe Parameter
         # para esse caso, valores contínuos com limites de busca e identificador
 
@@ -20,7 +23,11 @@ parameters = [
     Continuous(50e6, 50e8, 'rigidez4')
 ]
 
-# 2. CAMINHOS
+# lista apenas com identificadores dos parâmetros (equivalente ao %key% no script.mac)
+keys = [parameter.key for parameter in parameters]
+
+
+# 1.2. CAMINHOS
     # diretório onde os arquivos necessários se encontram:
         # pasta input
             # script MAPDL
@@ -28,5 +35,5 @@ parameters = [
         # modelo base (se houver)
 
 # todos os caminhos de diretórios precisam estar entre r"" (lida com conflitos de formatação)
-diretorio_base = r"C:\Users\Thiago\OneDrive\Documentos\2025.2\Pesquisa\Rodadas\Problema 2"
-nome_script = 'script problema 2 (6 param).mac'
+diretorio_base = os.path.join(os.getcwd(), "Problema 2") # nesse caso, os dados estão na pasta 'Problema 2' diretório atual (os.getcwd())
+nome_script = 'script problema 2 (6 param).mac' # arquivo dentro de diretório_base/input

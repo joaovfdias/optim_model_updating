@@ -1,6 +1,7 @@
 from utils.fitness_function import fitness_function_ansys
-from _1_definir_dados import parameters
-from _2_definir_ansys import ansys
+
+from _1_definir_dados import keys # lista de identificadores
+from _2_definir_ansys import ansys # objeto Ansys
 
 
 # 2. DEFINIR AS MÉTRICAS QUE PONTUAM CADA MODELO
@@ -11,9 +12,6 @@ from _2_definir_ansys import ansys
 preset = 1
 wf = 1
 wm = 1
-
-# é necessário passar a lista de identificadores dos parâmetros e o objeto ansys
-keys = [parameter.key for parameter in parameters]  # (equivalente ao script: %key%)
 
 # definição da função objetivo
 fitness_function = fitness_function_ansys(keys, ansys, preset, wf=wf, wm=wm)

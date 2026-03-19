@@ -1,5 +1,5 @@
 from external.ansys.parser import Ansys
-from _1_definir_dados import diretorio_base, nome_script # importa os dados necessários da etapa 1
+from _1_definir_dados import diretorio_base as base_dir, nome_script as base_script_filename # importa os dados necessários da etapa 1, é possível renomeá-los na importação
 
 import os
 import shutil
@@ -12,10 +12,6 @@ import shutil
 # para execução do ANSYS, podemos criar uma pasta no mesmo diretório base (automático)
 # ou, para não gerar lixo em pastas sincronizadas com a nuvem, por exemplo, definir um diretório local
 local_dir = None # preencher se preferir
-# dados declarados na etapa 1
-base_dir = diretorio_base
-base_script_filename = nome_script
-
 
 # CAMINHOS
 # executável do Ansys [desnecessário alterar caso não use o metodo Legacy (PyAnsys necessário)]
