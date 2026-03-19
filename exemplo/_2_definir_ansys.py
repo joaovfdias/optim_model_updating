@@ -44,7 +44,7 @@ out_freq_filename = "out_freq.txt"
 out_modes_filename = "out_modes.txt"
 
 # criação e configuração do objeto Ansys
-ansys = Ansys(ansys_exe_path, unique_ansys_dir, input_dir, base_script_filename, base_freq_filename, base_modes_filename, output_dir)
+ansys = Ansys(ansys_exe_path, unique_ansys_dir, input_dir, base_script_filename, base_freq_filename, base_modes_filename, output_dir, legacy=False)
 ansys.set_output_filenames(out_freq_filename, out_modes_filename)
 ansys.max_attempts = 6
 

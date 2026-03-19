@@ -1,7 +1,7 @@
 ! DESCRIÇÃO: Script para substituição no ModBase.db (lembrar de gerar e manter na pasta)
 ! V2: módulos das bordas são descartados por falta de sensibilidade, poisson e dens. incluídos
 
-RESUME,'ModBase','db','C:\Users\THIAGO~1\OneDrive\DOCUME~1\2025.2\Pesquisa\4B051~1.ROD\TESTE2~1\LEST2~1\input\',0,0
+RESUME,'ModBase','db'
 /PREP7
 
 ! VALORES ALVO (TARGET)
@@ -145,6 +145,7 @@ nsel = 0
 /INPUT, scratch, gui
 
 FINISH
+
 
 
 
