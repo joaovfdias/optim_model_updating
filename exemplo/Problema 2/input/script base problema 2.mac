@@ -1,0 +1,317 @@
+! DESCRIÇÃO: Modelo de Referência
+
+FINISH
+/CLEAR
+
+/PREP7
+
+! DIMENSÕES
+L_PONTE = 25
+B_PONTE = 8
+T_LAJE = 0.30
+DIST_1 = 1.50
+H_VIGA = 2
+B_VIGA = 0.60
+
+! VALORES ALVO (TARGET)
+! Vigas (Diferença entre elas)
+MOD_VIGA_1 = 32e9      ! Viga 'Esquerda'
+MOD_VIGA_2 = 28e9      ! Viga 'Direita' (menor rigidez)
+
+!! Laje (3 Zonas)
+!MOD_LAJE_CENTRO  = 30e9 ! Centro
+!MOD_LAJE_BORDA_1 = 22e9 ! Borda 1 (Muito degradada)
+!MOD_LAJE_BORDA_2 = 25e9 ! Borda 2 (Levemente degradada)
+
+! Laje (rigidez única)
+MOD_LAJE_CENTRO = 30e9 ! Uniforme
+MOD_LAJE_BORDA_1 = MOD_LAJE_CENTRO
+MOD_LAJE_BORDA_2 = MOD_LAJE_CENTRO
+
+! Molas
+K1 = 50e7
+K2 = 40e7
+K3 = 55e7
+K4 = 60e7
+
+! Fixos
+POISSON = 0.20
+DENS = 2500
+
+! MATERIAIS
+! 1: Viga 1
+MP,EX,1,MOD_VIGA_1
+MP,PRXY,1,POISSON
+MP,DENS,1,DENS
+
+! 2: Viga 2
+MP,EX,2,MOD_VIGA_2
+MP,PRXY,2,POISSON
+MP,DENS,2,DENS
+
+! 3: Laje Centro
+MP,EX,3,MOD_LAJE_CENTRO
+MP,PRXY,3,POISSON
+MP,DENS,3,DENS
+
+! 4: Laje Borda 1
+MP,EX,4,MOD_LAJE_BORDA_1
+MP,PRXY,4,POISSON
+MP,DENS,4,DENS
+
+! 5: Laje Borda 2
+MP,EX,5,MOD_LAJE_BORDA_2
+MP,PRXY,5,POISSON
+MP,DENS,5,DENS
+
+! ELEMENTOS
+ET,1,188  ! Beam
+ET,2,181  ! Shell
+ET,3,14   ! Spring
+KEYOPT,3,2,2
+KEYOPT,3,3,0
+
+! GEOMETRIA
+! Área da Laje
+K,1,0,0,-B_PONTE/2
+K,2,L_PONTE,0,-B_PONTE/2
+K,3,L_PONTE,0,B_PONTE/2
+K,4,0,0,B_PONTE/2
+A,1,2,3,4
+
+! Divisão nas linhas das vigas
+WPOFFS,,,-B_PONTE/2+DIST_1
+ASBW,ALL
+WPCSYS,0
+WPOFFS,,,B_PONTE/2-DIST_1
+ASBW,ALL
+WPCSYS,0
+
+NUMCMP,KP
+
+! Pontos de orientação (auxiliares para vigas)
+K,100,,1, -B_PONTE/2+DIST_1
+K,101,,1, B_PONTE/2-DIST_1
+
+! SEÇÕES
+SECTYPE,1,BEAM,RECT,'VIGA',3
+SECDATA,B_VIGA,H_VIGA,3,3
+SECOFFSET,USER,0,H_VIGA/2
+
+SECTYPE,2,SHELL,,'LAJE',3
+SECDATA,T_LAJE
+SECOFFSET,TOP
+
+! MALHA
+LESIZE,ALL,0.8
+
+! 1. Malha da Laje (Inicia tudo como Material 3 - Centro)
+TYPE,2
+MAT,3
+SECNUM,2
+AMESH,ALL
+
+! 2. Definição das Zonas da Laje
+! Borda 1 (Z < Viga 1) -> Material 4
+ESEL,S,CENT,Z, -B_PONTE/2 - 0.1, -B_PONTE/2 + DIST_1 - 0.01
+MPCHG,4,ALL
+
+! Borda 2 (Z > Viga 2) -> Material 5
+ESEL,S,CENT,Z, B_PONTE/2 - DIST_1 + 0.01, B_PONTE/2 + 0.1
+MPCHG,5,ALL
+ALLSEL
+
+! 3. Malha das Vigas (Longarinas)
+TYPE,1
+SECNUM,1
+
+! Viga 1 (Z negativo) -> Material 1
+MAT,1
+LSEL,S,LOC,Z, -B_PONTE/2 + DIST_1
+LATT,1,,1,,100,,1
+LMESH,ALL
+
+! Viga 2 (Z positivo) -> Material 2
+MAT,2
+LSEL,S,LOC,Z, B_PONTE/2 - DIST_1
+LATT,2,,1,,101,,1
+LMESH,ALL
+ALLSEL
+
+NUMMRG,NODE
+NUMMRG,ELEM
+
+! CONTORNO
+KSEL,S,LOC,X,0
+KSEL,A,LOC,X,L_PONTE
+NSLK,S
+D,ALL,UX,0
+D,ALL,UZ,0
+ALLSEL
+
+! MOLAS
+R,2,K1
+R,3,K2
+R,4,K3
+R,5,K4
+TYPE,3
+
+! Mola 1
+REAL,2
+N,,0,-1,-B_PONTE/2 + DIST_1
+E,NODE(0,-1,-B_PONTE/2 + DIST_1), NODE(0,0,-B_PONTE/2 + DIST_1)
+D,NODE(0,-1,-B_PONTE/2 + DIST_1), ALL, 0
+
+! Mola 2
+REAL,3
+N,,L_PONTE,-1,-B_PONTE/2 + DIST_1
+E,NODE(L_PONTE,-1,-B_PONTE/2 + DIST_1), NODE(L_PONTE,0,-B_PONTE/2 + DIST_1)
+D,NODE(L_PONTE,-1,-B_PONTE/2 + DIST_1), ALL, 0
+
+! Mola 3
+REAL,4
+N,,L_PONTE,-1,B_PONTE/2 - DIST_1
+E,NODE(L_PONTE,-1,B_PONTE/2 - DIST_1), NODE(L_PONTE,0,B_PONTE/2 - DIST_1)
+D,NODE(L_PONTE,-1,B_PONTE/2 - DIST_1), ALL, 0
+
+! Mola 4
+REAL,5
+N,,0,-1,B_PONTE/2 - DIST_1
+E,NODE(0,-1,B_PONTE/2 - DIST_1), NODE(0,0,B_PONTE/2 - DIST_1)
+D,NODE(0,-1,B_PONTE/2 - DIST_1), ALL, 0
+
+ALLSEL
+
+FINISH
+SAVE,'ModBase','db' ! Salvando como modelo base
+
+! SOLUÇÃO
+/SOLU
+ANTYPE,MODAL
+MODOPT,LANB,20
+MXPAND,20,,,YES ! calcula Massa Efetiva e Participação
+SOLVE
+FINISH
+
+! PÓS-PROCESSAMENTO
+/POST1
+ALLSEL
+
+! 1. Definição dos "Sensores Virtuais"
+NUMPONTOS = 9
+*DIM, Nos, ARRAY, NUMPONTOS
+
+! Define as posições relativas estrategicas
+*DIM, LocsX, ARRAY, 3
+LocsX(1) = 0.25 * L_PONTE  ! L/4  (Pega 2º Modo)
+LocsX(2) = 0.50 * L_PONTE  ! L/2  (Pega 1º Modo e Torção)
+LocsX(3) = 0.75 * L_PONTE  ! 3L/4 (Pega 2º Modo)
+
+! Define as posições transversais (Centro e Bordas)
+*DIM, LocsZ, ARRAY, 3
+LocsZ(1) = -B_PONTE/2  ! Borda 1
+LocsZ(2) = 0           ! Centro
+LocsZ(3) = B_PONTE/2   ! Borda 2
+
+cnt = 0
+! Loop Transversal (Z)
+*DO, i, 1, 3
+    pos_z = LocsZ(i)
+
+    ! Loop Longitudinal (X)
+    *DO, j, 1, 3
+        cnt = cnt + 1
+        pos_x = LocsX(j)
+
+        ! Seleciona o nó mais próximo dessa coordenada teórica
+        Nos(cnt) = NODE(pos_x, 0, pos_z)
+    *ENDDO
+*ENDDO
+
+! 2. Configuração de Extração
+
+! filtragem de modos relevantes
+num_sel = 4
+*DIM, WANTED_MODES, ARRAY, NUM_SEL
+WANTED_MODES(1) = 1, 2, 3, 11
+
+!NUM_MODOS_EXT = 15
+*DIM, Freqs, ARRAY, NUM_SEL
+*DIM, ModosY, ARRAY, NUMPONTOS, NUM_SEL
+*DIM, MassEf_Y, ARRAY, NUM_SEL
+*DIM, Indices, ARRAY, NUM_SEL
+*DIM, Ratios, ARRAY, NUM_SEL
+
+! Obter Massa Total via Elementos (MTOT)
+*GET, TOTAL_MASS_Y, ELEM, 0, MTOT, Y
+
+! loop de extração
+*DO, k, 1, NUM_SEL
+
+    ! Pega o índice real do modo (ex: na rodada k=3, idx_ansys vira 8)
+    idx_ansys = k !! versão bruta
+    idx_ansys = WANTED_MODES(k) !! versão filtrada ! comentar linha para versão bruta
+
+    SET,1, idx_ansys
+    *GET, f_temp, ACTIVE, 0, SET, FREQ
+
+    ! Massa Efetiva do modo 'i' na direção Y
+    *GET, effm_temp, MODE, idx_ansys, EFFM, , DIREC, Y
+
+    ! Armazena nos vetores compactos (dim = modos filtrados)
+    Freqs(k) = f_temp
+    MassEf_Y(k) = effm_temp
+    Indices(k) = idx_ansys  ! Guarda o número original (1, 2, 8, 15)
+
+    ! Calcula razão
+    *IF, TOTAL_MASS_Y, GT, 0, THEN
+        Ratios(k) = MassEf_Y(k) / TOTAL_MASS_Y
+    *ELSE
+        Ratios(k) = 0
+    *ENDIF
+
+    ! Extrai os modos para a matriz compacta
+    *DO, p, 1, NUMPONTOS
+        ModosY(p, k) = UY(Nos(p))
+    *ENDDO
+
+*ENDDO
+
+
+! 3. Escrita dos arquivos
+
+*CREATE, scratch, gui
+
+! 3.1 Arquivo de Frequências (Vai escrever 4 linhas)
+*CFOPEN, target_freq, txt
+    *VWRITE, Freqs(1)
+    (1F15.5)
+*CFCLOSE
+
+! 3.2 Arquivo de Modos (Vai escrever matriz 4 linhas x 12 colunas)
+! JIK: J=Linhas(Modos), I=Colunas(Pontos) -> Transpõe o array (Pontos,Modos)
+*MWRITE, ModosY, target_modes, txt,, IJK, NUM_PONTOS, NUM_SEL
+(1F15.8)
+
+! 3.3 Arquivo de Debug
+*CFOPEN, debug_target_mass, txt
+    *VWRITE, 'MODO', 'FREQ', 'EFF_MASS', 'RATIO'
+    (A5, A10, A12, A10)
+
+    ! Escreve os dados dos 4 modos selecionados
+    *VWRITE, Indices(1), Freqs(1), MassEf_Y(1), Ratios(1)
+    (F5.0, F10.3, F12.3, F10.5)
+*CFCLOSE
+
+*END
+/INPUT, scratch, gui
+
+FINISH
+
+
+
+
+
+
+
+

@@ -1,0 +1,159 @@
+! DESCRIÇÃO: Script para substituição no ModBase.db (lembrar de gerar e manter na pasta)
+! V2: módulos das bordas são descartados por falta de sensibilidade, poisson e dens. incluídos
+
+RESUME,'ModBase','db','C:\Users\THIAGO~1\OneDrive\DOCUME~1\2025.2\Pesquisa\4B051~1.ROD\TESTE2~1\LEST2~1\input\',0,0
+/PREP7
+
+! VALORES ALVO (TARGET)
+! Vigas (Diferença entre elas)
+MOD_VIGA_1 = %modulo_viga_1%      ! Viga 'Esquerda'
+MOD_VIGA_2 = %modulo_viga_2%      ! Viga 'Direita' (menor rigidez)
+
+! Laje (3 Zonas -> alterado para rigidez uniforme)
+MOD_LAJE_CENTRO  = %modulo_centro%  ! Centro
+MOD_LAJE_BORDA_1 = MOD_LAJE_CENTRO
+MOD_LAJE_BORDA_2 = MOD_LAJE_CENTRO
+!MOD_LAJE_BORDA_1 = %modulo_borda_1% ! Borda 1 (Muito degradada)
+!MOD_LAJE_BORDA_2 = %modulo_borda_2% ! Borda 2 (Levemente degradada)
+
+POISSON = %poisson%
+!DENS = %dens% ! POUCO SENSÍVEL
+
+! Molas
+K1 = %rigidez1%
+!K2 = %rigidez2%
+!K3 = %rigidez3%
+!K3 = K2 ! POUCO SENSÍVEL, K2 MAIS PRÓXIMO
+K4 = %rigidez4%
+
+! MATERIAIS
+! 1: Viga 1
+MP,EX,1,MOD_VIGA_1
+MP,PRXY,1,POISSON
+MP,DENS,1,DENS
+
+! 2: Viga 2
+MP,EX,2,MOD_VIGA_2
+MP,PRXY,2,POISSON
+MP,DENS,2,DENS
+
+! 3: Laje Centro
+MP,EX,3,MOD_LAJE_CENTRO
+MP,PRXY,3,POISSON
+MP,DENS,3,DENS
+
+! 4: Laje Borda 1
+MP,EX,4,MOD_LAJE_BORDA_1
+MP,PRXY,4,POISSON
+MP,DENS,4,DENS
+
+! 5: Laje Borda 2
+MP,EX,5,MOD_LAJE_BORDA_2
+MP,PRXY,5,POISSON
+MP,DENS,5,DENS
+
+! MOLAS
+R,2,K1
+R,3,K2
+R,4,K3
+R,5,K4
+TYPE,3
+
+ALLSEL
+
+! SOLUÇÃO
+/SOLU
+ANTYPE,MODAL
+MODOPT,LANB,50
+MXPAND,50,,,YES ! calcula Massa Efetiva e Participação
+SOLVE
+
+! PÓS-PROCESSAMENTO
+/POST1
+ALLSEL
+
+! 1. Definição dos "Sensores Virtuais"
+NUMPONTOS = 9
+*DIM, Nos, ARRAY, NUMPONTOS
+
+! Define as posições relativas estrategicas
+*DIM, LocsX, ARRAY, 3
+LocsX(1) = 0.25 * L_PONTE  ! L/4  (Pega 2º Modo)
+LocsX(2) = 0.50 * L_PONTE  ! L/2  (Pega 1º Modo e Torção)
+LocsX(3) = 0.75 * L_PONTE  ! 3L/4 (Pega 2º Modo)
+
+! Define as posições transversais (Centro e Bordas)
+*DIM, LocsZ, ARRAY, 3
+LocsZ(1) = -B_PONTE/2  ! Borda 1
+LocsZ(2) = 0           ! Centro
+LocsZ(3) = B_PONTE/2   ! Borda 2
+
+cnt = 0
+! Loop Transversal (Z)
+*DO, i, 1, 3
+    pos_z = LocsZ(i)
+
+    ! Loop Longitudinal (X)
+    *DO, j, 1, 3
+        cnt = cnt + 1
+        pos_x = LocsX(j)
+
+        ! Seleciona o nó mais próximo dessa coordenada teórica
+        Nos(cnt) = NODE(pos_x, 0, pos_z)
+    *ENDDO
+*ENDDO
+
+! 2. Configuração de Extração
+NUM_MODOS_EXT = 50
+FREQLIM = 30 ! Hz
+
+*DIM, Freqs, ARRAY, NUM_MODOS_EXT
+*DIM, ModosY, ARRAY, NUMPONTOS, NUM_MODOS_EXT
+
+nsel = 0
+
+*DO, i, 1, NUM_MODOS_EXT
+    SET,,i
+    *GET, f_temp, ACTIVE, 0, SET, FREQ
+
+    ! Armazena incondicionalmente
+    Freqs(i) = f_temp
+
+    *DO, k, 1, NUMPONTOS
+        ModosY(k, i) = UY(Nos(k))
+    *ENDDO
+
+    nsel = nsel + 1
+
+    *if,ftemp,GT,FREQLIM,THEN
+        *exit ! para de pegar frequências acima da estipulada em FREQLIM (corte definido com base na referência)
+    *endif
+
+*ENDDO
+
+
+! 3. Escrita dos arquivos
+*CREATE, scratch, gui
+
+*MWRITE,Freqs,out_freq,txt,,,,nsel
+(1f15.5)
+
+*MWRITE, ModosY, out_modes, txt,, IJK, NUM_PONTOS, nsel
+(1F15.8)
+
+*END
+/INPUT, scratch, gui
+
+FINISH
+
+
+
+
+
+
+
+
+
+
+
+
