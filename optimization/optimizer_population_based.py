@@ -2,21 +2,23 @@ from __future__ import annotations
 
 import time
 
-from optimization import Optimizer
+from parameter import Parameter
+from optimization import Optimizer, Individual
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Any
 
 
 # subclasse para funções comuns a algoritmos populacionais
 class PopulationBased(Optimizer):
-    def __init__(self, fitness_function, parameters, population_size):
+    def __init__(self, fitness_function: Callable[[list[float]], tuple[float, dict[str, Any]]], parameters: list[Parameter], population_size: int):
         self.global_best = None
         super().__init__(fitness_function, parameters, population_size)
 
-    def run(self, iterations=100, status=True, log=True):
+    def run(self, iterations: int = 100, status: bool = True, log: bool = True) -> Individual:
         """
-        :param itera: número de iterações a serem executadas
+        :param iterations: número de iterações a serem executadas
         :param status: por padrão mostra o andamento das soluções a cada iteração, False para não mostrar
         :param log: define o registro dos resultados em planilha. True (padrão): registra os melhores indivíduos de cada iteração, "full": registra todos os indivíduos de todas as iterações. False: não cria registro.
-        :return: retorna a melhor partícula encontrada, da qual é possível obter o fitness (.fitness), parâmetros (.param) e dados modais (.data)
+        :return: A melhor partícula encontrada, da qual é possível obter o fitness (.fitness), parâmetros (.param) e dados adicionais (.data)
         """
         self.inicio = time.time()
         self.status = status
@@ -63,5 +65,9 @@ class PopulationBased(Optimizer):
         return self.global_best # retorna o melhor indivíduo final
 
     # @abstractmethod
-    def opt_step(self, iteration): # definida nos algoritmos específicos
+    def opt_step(self, iteration: int) -> None: # definida nos algoritmos específicos
+        """
+        Etapa de otimização específica a cada algoritmo.
+        :param iteration: número (int) da iteração/geração atual.
+        """
         pass

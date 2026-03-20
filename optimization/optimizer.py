@@ -21,7 +21,18 @@ import random
 
 
 class Optimizer:
-    def __init__(self, fitness_function: Callable[[list[float]], tuple[float, dict[str, Any]]], parameters: list[Parameter], population_size: int):
+    """
+    Base dos otimizadores.
+    Reune atributos e funções comuns a todos (passíveis de substituição), como:
+    métodos de amostragem inicial, avaliação de uma população, definição dos critérios de convergência e registro dos resultados.
+    """
+    def __init__(self, fitness_function: Callable[[list[float]], tuple[float, dict[str, Any]]], parameters: list[Parameter], population_size: int | None = None):
+        """
+
+        :param fitness_function: Função que recebe os parâmetros de modelo, avalia as métricas e retorna fitness (float) + dados adicionais (dict).
+        :param parameters: Variáveis que se deseja calibrar: lista de objetos da classe Parameter com os devidos atributos declarados.
+        :param population_size: Tamanho da população. Se não especificado, default para 10 vezes o número de variáveis.
+        """
         self.current_dir = os.getcwd() # definindo o diretório atual
         self.opttime = None
         self.inicio = time.time()
@@ -32,7 +43,7 @@ class Optimizer:
         self.fitness_function = fitness_function
         self.parameters = parameters
         self.parameters_keys = [param.key for param in parameters]
-        self.population_size = population_size
+        self.population_size = population_size or 10 * len(parameters)
 
         self.log_header = False
         self.logfilename = None # função set
@@ -54,9 +65,11 @@ class Optimizer:
 
 
     # funções 'set' que permitem ao usuário modificar valores padrão
-    def set_sampling_method(self, sampling_method: str):
+    def set_sampling_method(self, sampling_method: str) -> None:
         """
-                Permite ao usuário definir o tipo de metodo de amostragem, validando se o tipo é permitido.
+        Permite ao usuário definir o tipo de amostragem, validando se o tipo é permitido.
+
+        :param sampling_method: Nome da amostragem desejada.
         """
         if sampling_method in self.sampling_methods:
             self.sampling_method = sampling_method
