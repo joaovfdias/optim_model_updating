@@ -12,6 +12,7 @@ from pyDOE import lhs
 import pandas as pd
 import io
 
+from .parameter import Parameter
 from .individual import Individual
 from .pso_optimizer.particle import Particle
 
@@ -20,7 +21,7 @@ import random
 
 
 class Optimizer:
-    def __init__(self, fitness_function, parameters, population_size):
+    def __init__(self, fitness_function: Callable[[list[float]], tuple[float, dict[str, Any]]], parameters: list[Parameter], population_size: int):
         self.current_dir = os.getcwd() # definindo o diretório atual
         self.opttime = None
         self.inicio = time.time()
@@ -53,7 +54,7 @@ class Optimizer:
 
 
     # funções 'set' que permitem ao usuário modificar valores padrão
-    def set_sampling_method(self, sampling_method):
+    def set_sampling_method(self, sampling_method: str):
         """
                 Permite ao usuário definir o tipo de metodo de amostragem, validando se o tipo é permitido.
         """
@@ -64,21 +65,21 @@ class Optimizer:
                 f"Método de amostragem '{sampling_method}' inválido. Tipos válidos: {list(self.sampling_methods.keys())}")
             return
 
-    def initial_population(self):
+    def initial_population(self) -> list[Individual]:
 
         pop = self.sampling_methods[self.sampling_method]() # chama a função do metodo indicado
         self.evaluate_population(pop)
 
         return pop
 
-    def random_initial_population(self):
+    def random_initial_population(self) -> list[Individual]:
         pop =   [ # alteração para criar "Individual" no caso do GA e "Partcile" no caso do PSO, evitando repetição da função nas classes
                 self.ind_type([p.random_value() for p in self.parameters], self.fitness_function)
                 for _ in range(self.population_size)
                 ]
         return pop
 
-    def LHS_initial_population(self):
+    def LHS_initial_population(self) -> list[Individual]:
         n_dim = len(self.parameters)
         n_samples = self.population_size
 
@@ -95,14 +96,14 @@ class Optimizer:
                 ]
         return pop
 
-    def resume_from_log(self, csv_path):
+    def resume_from_log(self, csv_path: str) -> None:
         """
         Retoma rodada de otimização com base em log no caminho indicado
         {Não funciona no Bayesiano até implementação própria}
         """
         self.log_history = csv_path if csv_path.endswith(".csv") else f"{csv_path}.csv"
 
-    def resume_initial_population(self):
+    def resume_initial_population(self) -> None:
         """
         Lê o log CSV e reconstrói todas as populações válidas
         """
@@ -200,16 +201,19 @@ class Optimizer:
 
 
     @staticmethod
-    def evaluate_population(population):
+    def evaluate_population(population: list[Individual]) -> None:
         for individual in population:
             individual.evaluate()
 
     @staticmethod
-    def get_best_individual(pop):
+    def get_best_individual(pop: list[Individual]) -> Individual:
+        """
+        Retorna o indivíduo com menor fitness em uma lista.
+        """
         return min(pop, key=lambda x: x.fitness)
 
 
-    def set_log(self, log_title=None, log_dir=None, timestamp=True):
+    def set_log(self, log_title: str = None, log_dir: str = None, timestamp: bool = True) -> None:
         """
 
         :param log_title: nome do arquivo de log. por padrão: {nome_do_algoritmo}_{data_hora}
@@ -224,10 +228,16 @@ class Optimizer:
         else:
             print(f"\nArquivo de registro alterado para: \"{self.logfilename}\"")
 
-    def display_parameters(self, individual):
+    def display_parameters(self, individual: Individual) -> str:
+        """
+        Retorna os parâmetros do indivíduo em forma de string legível com padrão "key = value".
+        """
         return ', '.join(f'{k} = {v:.3g}' for k, v in zip([param.key for param in self.parameters], individual.param))
 
-    def create_log_path(self):
+    def create_log_path(self) -> None:
+        """
+        Cria o arquivo de registro no caminho/nome padrão ou especificado com set_log.
+        """
         timestamp = self.opttime or datetime.now().strftime("%Y%m%d_%H%M%S")
         if self.logfilename:
             # fname, ext = os.path.splitext(self.logfilename)
@@ -241,9 +251,9 @@ class Optimizer:
         os.makedirs(self.log_dir, exist_ok=True)
         self.log_path = os.path.join(self.log_dir, self.logfilename)
 
-    def create_log(self, individual=None, full=False): # alterar dados recebidos para um dicionário, de forma a registrar as keys e values
+    def create_log(self, individual: Individual | None = None, full: bool = False) -> None: # alterar dados recebidos para um dicionário, de forma a registrar as keys e values
         """
-        função que cria uma planilha com cabeçalho relacionando os dados do problema.
+        Função que cria uma planilha com cabeçalho relacionando os dados do problema.
         :param individual: indíviduo declarado da classe Individual (por padrão recebe o 1º da população inicial, só é necessário para quantificar modos e frequências)
         :param full: True caso for criar o registro completo com a função add_full_log, com Iteração e número do Indivíduo no cabeçalho; False (padrão) caso for usar "add_log" para registrar apenas o melhor indivíduo de dada iteração.
         """
@@ -305,9 +315,9 @@ class Optimizer:
 
         self.log_header = True
 
-    def add_log(self, iteration, population, full=False):
+    def add_log(self, iteration: int, population: list[Individual], full: bool = False) -> None:
         """
-        adiciona informações da população inicial da planilha de registro. cria a planilha com o cabeçalho caso ainda não houver (self.log = True).
+        Adiciona informações da população inicial da planilha de registro. cria a planilha com o cabeçalho caso ainda não houver (self.log = True).
         :param iteration: iteração atual
         :param population: população atual
         :param full: False (padrão): adiciona as informações do melhor indivíduo de cada iteração; True: adiciona informações para cada indivíduo de population na planilha de registro.
@@ -358,7 +368,7 @@ class Optimizer:
 
                 writer.writerow(row)
 
-    def log_time(self, fim):
+    def log_time(self, fim: float) -> None:
         tempo = fim - self.inicio
 
         if not self.log_history:
@@ -375,7 +385,7 @@ class Optimizer:
             writer.writerow([])
             writer.writerow(row)
 
-    def log_specs(self):
+    def log_specs(self) -> None:
         with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file, delimiter=';')
 
@@ -388,11 +398,14 @@ class Optimizer:
             writer.writerow(["values:",""] + list(algorithm_parameters.values()))
 
     @property
-    def specs(self):
+    def specs(self) -> None:
+        """
+        Armazena as especificações do algoritmo, declarada nas classes específicas.
+        """
         pass
 
 
-    def set_tolerance(self, fit_abs=None, fit_rel=None, param_rel=None, patience=1):
+    def set_tolerance(self, fit_abs: float = None, fit_rel: float = None, param_rel: float = None, patience: int = 1) -> None:
         """
         Critérios de parada
         :param fit_abs: define a tolerância do valor absoluto de fitness
@@ -408,7 +421,7 @@ class Optimizer:
         self.patience = patience
 
     # criar uma função em otimizador que receba duas populações ou individuos e compare as diferenças, verificando se estão dentro da tolerância por uma quantidade consecutiva de iterações
-    def tolerance(self, previous: List[Individual], current: List[Individual]) -> bool:
+    def tolerance(self, previous: list[Individual], current: list[Individual]) -> bool:
         # estrutura de chamada externa:
             #if self.tolerance(previous, current):
                 #break
@@ -455,15 +468,23 @@ class Optimizer:
 
         return False
 
-    def sync_time(self, stime):
+    def sync_time(self, stime: str):
+        """
+        Sincroniza o timestamp do registro do otimizador com aquele da interface com modelagem.
+        Assim, arquivos log e output com indicação de tempo ficam pareados para facilitar conferência.
+        """
         self.opttime = stime
 
     # --------- métodos para armazenamento de dados ---------
 
-    def _algo_name(self):
+    def _algo_name(self) -> str:
+        """
+        Retorna o nome do algoritmo com base na classe utilizada.
+        :return: Nome da classe do algoritmo atual.
+        """
         return self.__class__.__name__  # "GA" | "PSO" | "BO"
 
-    def _common_state(self):
+    def _common_state(self) -> dict:
         return {
             "sampling_method": getattr(self, "sampling_method", None),
             "tolerance": {
@@ -476,7 +497,7 @@ class Optimizer:
             "logged_time": getattr(self, "logged_time", 0.0),
         }
 
-    def _algo_state(self):
+    def _algo_state(self) -> dict:
         algo = self._algo_name()
         if algo == "GA":
             return {"GA": getattr(self, "specs", {})}
@@ -512,7 +533,7 @@ class Optimizer:
             return bo
         return {}
 
-    def save_state(self, filename: str | None = None, fitness_spec: dict | None = None, include_rng_state: bool = True):
+    def save_state(self, filename: str | None = None, fitness_spec: dict | None = None, include_rng_state: bool = True) -> str:
         now = time.time()
         algo = self._algo_name()
 
@@ -583,7 +604,7 @@ class Optimizer:
         return filepath  # retorna caminho completo
 
     @classmethod
-    def load_state(cls, filename: str, fitness_function=None, snapshot=False):  # recriação do estado de otimização
+    def load_state(cls, filename: str, fitness_function: Callable[[list[float]], tuple[float, dict[str, Any]]] | None = None, snapshot: bool = False):  # recriação do estado de otimização
         print(f"[load_state] Carregando estado de: {filename}")
         d = loads_json(filename)
         algo = d["algorithm"]
