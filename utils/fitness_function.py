@@ -4,39 +4,26 @@ from utils.special_functions import SpecialFun
 from typing import Callable, Any
 
 
-def fitness_function_ansys(keys: list[str], ansys: 'Ansys', preset: int=1, **kwargs) -> Callable[[list[float]], tuple[float, dict[str, Any]]]:
+def fitness_function_ansys(keys: list[str], ansys: 'Ansys', preset: int = 1, **kwargs) -> Callable[[list[float]], tuple[float, dict[str, Any]]]:
     """
     Presets de funções objetivo para avaliação dos modelos. Expansível.
 
-    Parameters
-    ----------
-    keys
-        Identificadores dos parâmetros conforme definidos no script MAPDL.
-    ansys
-        Objeto da classe Ansys que gerencia a comunicação com o solver.
-    preset
-        Define o tipo de função objetivo a ser construída (padrão é 1).
+    :param keys: Identificadores dos parâmetros conforme definidos no script MAPDL.
+    :param ansys: Objeto da classe Ansys que gerencia a comunicação com o solver.
+    :param preset: Define o tipo de função objetivo a ser construída (padrão é 1).
         * 1: Frequências naturais + modos de vibração com pareamento (MAC).
         * 2: Apenas frequências naturais.
-    **kwargs
-        Parâmetros adicionais opcionais dependentes do preset escolhido.
-
+    :param kwargs: Parâmetros adicionais opcionais dependentes do preset escolhido.
         Para o Preset 1:
         * wf (float): Peso associado ao erro de frequência.
         * wm (float): Peso associado ao erro de MAC.
 
-    Returns
-    -------
-    fitness_function
-        A função objetivo configurada e pronta para avaliação.
-        Essa função interna recebe uma lista de parâmetros numéricos (`params`)
-        e retorna uma tupla contendo o valor calculado de `fitness` (float)
-        e um dicionário (`info`) com os dados auxiliares para análise ou logging.
+    :return: A função objetivo configurada e pronta para avaliação. Essa função interna
+        recebe uma lista de parâmetros numéricos (`params`) e retorna uma tupla
+        contendo o valor calculado de `fitness` (float) e um dicionário (`info`) com
+        os dados auxiliares para análise ou logging.
 
-    Raises
-    ------
-    ValueError
-        Caso o preset informado não seja suportado.
+    :raises ValueError: Caso o preset informado não seja suportado.
     """
 
     def run_model(params: list, frequencies: bool, modes: bool):
