@@ -10,15 +10,15 @@ def fitness_function_ansys(keys: list[str], ansys: 'Ansys', preset: int=1, **kwa
 
     Parameters
     ----------
-    keys : list[str]
+    keys
         Identificadores dos parâmetros conforme definidos no script MAPDL.
-    ansys : Ansys
+    ansys
         Objeto da classe Ansys que gerencia a comunicação com o solver.
-    preset : int, optional
+    preset
         Define o tipo de função objetivo a ser construída (padrão é 1).
         * 1: Frequências naturais + modos de vibração com pareamento (MAC).
         * 2: Apenas frequências naturais.
-    **kwargs : dict[str, Any]
+    **kwargs
         Parâmetros adicionais opcionais dependentes do preset escolhido.
 
         Para o Preset 1:
@@ -27,7 +27,7 @@ def fitness_function_ansys(keys: list[str], ansys: 'Ansys', preset: int=1, **kwa
 
     Returns
     -------
-    Callable[[list[float]], tuple[float, dict[str, Any]]]
+    fitness_function
         A função objetivo configurada e pronta para avaliação.
         Essa função interna recebe uma lista de parâmetros numéricos (`params`)
         e retorna uma tupla contendo o valor calculado de `fitness` (float)
@@ -50,7 +50,7 @@ def fitness_function_ansys(keys: list[str], ansys: 'Ansys', preset: int=1, **kwa
 
         def fitness_function(params: list) -> tuple[float, dict[str, Any]]:
             """
-            Preset 1: Frequências naturais + modos de vibração
+            Preset 1: Frequências naturais + modos de vibração.
             Analisa o modelo construído com 'params' e retorna o fitness e dicionário de dados adicionais.
             """
 
@@ -80,7 +80,7 @@ def fitness_function_ansys(keys: list[str], ansys: 'Ansys', preset: int=1, **kwa
 
         def fitness_function(params: list) -> tuple[float, dict[str, Any]]:
             """
-            Preset 2: Frequências naturais
+            Preset 2: Frequências naturais.
             Analisa o modelo construído com 'params' e retorna o fitness e dicionário de dados adicionais.
             """
 
