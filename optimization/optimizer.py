@@ -79,6 +79,11 @@ class Optimizer:
             return
 
     def initial_population(self) -> list[Individual]:
+        """
+        Gera a população inicial com base no metodo de amostragem definido.
+
+        :return: População inicial (lista de objetos da classe Individual).
+        """
 
         pop = self.sampling_methods[self.sampling_method]() # chama a função do metodo indicado
         self.evaluate_population(pop)
@@ -86,6 +91,11 @@ class Optimizer:
         return pop
 
     def random_initial_population(self) -> list[Individual]:
+        """
+        Metodo de geração da população inicial: aleatório.
+
+        :return: População inicial (lista de objetos da classe Individual).
+        """
         pop =   [ # alteração para criar "Individual" no caso do GA e "Partcile" no caso do PSO, evitando repetição da função nas classes
                 self.ind_type([p.random_value() for p in self.parameters], self.fitness_function)
                 for _ in range(self.population_size)
@@ -93,6 +103,12 @@ class Optimizer:
         return pop
 
     def LHS_initial_population(self) -> list[Individual]:
+        """
+        Metodo de geração da população inicial: LHS.
+
+        :return: População inicial (lista de objetos da classe Individual).
+        """
+
         n_dim = len(self.parameters)
         n_samples = self.population_size
 
@@ -111,14 +127,16 @@ class Optimizer:
 
     def resume_from_log(self, csv_path: str) -> None:
         """
-        Retoma rodada de otimização com base em log no caminho indicado
-        {Não funciona no Bayesiano até implementação própria}
+        Define o caminho do log .csv que o algoritmo vai utilizar para reconstruir as populações avaliadas.
+        {Integração pendente para o BO e TuRBO}
+
+        :param csv_path: Caminho do arquivo para retomada.
         """
         self.log_history = csv_path if csv_path.endswith(".csv") else f"{csv_path}.csv"
 
     def resume_initial_population(self) -> None:
         """
-        Lê o log CSV e reconstrói todas as populações válidas
+        Lê o log CSV e reconstrói todas as populações válidas.
         """
         valid_lines = []
         with open(self.log_history, mode='r', newline='', encoding='utf-8') as f:
@@ -215,6 +233,11 @@ class Optimizer:
 
     @staticmethod
     def evaluate_population(population: list[Individual]) -> None:
+        """
+        Executa a avaliação cada indivíduo da população entrada.
+
+        :param population: Lista de indivíduos (objetos da classe Individual) que se deseja pontuar.
+        """
         for individual in population:
             individual.evaluate()
 
@@ -222,16 +245,21 @@ class Optimizer:
     def get_best_individual(pop: list[Individual]) -> Individual:
         """
         Retorna o indivíduo com menor fitness em uma lista.
+
+        :param pop: Lista de indivíduos (objetos da classe Individual).
+
+        :return: Individuo (instância) com menor fitness.
         """
         return min(pop, key=lambda x: x.fitness)
 
 
     def set_log(self, log_title: str = None, log_dir: str = None, timestamp: bool = True) -> None:
         """
+        Permite especificar um novo nome e/ou diretório para armazenamento do registro de rodada, assim com a adição do Timestamp Suffix ou não.
 
-        :param log_title: nome do arquivo de log. por padrão: {nome_do_algoritmo}_{data_hora}
-        :param log_dir: diretório em que log será salvo. por padrão, subpasta log no diretório de chamada
-        :return:
+        :param log_title: Nome do arquivo de registro. * Por padrão: {nome_do_algoritmo}_{data_horário}.
+        :param log_dir: Diretório em que o registro será salvo. * Por padrão: subpasta \\log no diretório de chamada.
+        :param timestamp: Indica se deseja adicionar um sufixo com estampa de tempo ao final do nome do arquivo ou não. Importante para evitar overwriting.
         """
         self.logtimestamp = timestamp
         self.logfilename = log_title
@@ -243,7 +271,11 @@ class Optimizer:
 
     def display_parameters(self, individual: Individual) -> str:
         """
-        Retorna os parâmetros do indivíduo em forma de string legível com padrão "key = value".
+        Retorna os parâmetros do indivíduo em forma de string legível.
+
+        :param individual: Indivíduo (instância) com os parâmetros que se deseja exibir.
+
+        :return: String com os parâmetros indicados no formato: key1 = value1, key2 = value2, [...].
         """
         return ', '.join(f'{k} = {v:.3g}' for k, v in zip([param.key for param in self.parameters], individual.param))
 
@@ -266,9 +298,9 @@ class Optimizer:
 
     def create_log(self, individual: Individual | None = None, full: bool = False) -> None: # alterar dados recebidos para um dicionário, de forma a registrar as keys e values
         """
-        Função que cria uma planilha com cabeçalho relacionando os dados do problema.
-        :param individual: indíviduo declarado da classe Individual (por padrão recebe o 1º da população inicial, só é necessário para quantificar modos e frequências)
-        :param full: True caso for criar o registro completo com a função add_full_log, com Iteração e número do Indivíduo no cabeçalho; False (padrão) caso for usar "add_log" para registrar apenas o melhor indivíduo de dada iteração.
+        [Função interna] Cria uma planilha e o cabeçalho relacionando os dados do problema.
+        :param individual: Indivíduo (instância). Se vazio (padrão): recebe o 1º indivíduo da população inicial (só é necessário para quantificar os dados do cabeçalho).
+        :param full: Booleano que define o tipo de registro. * True: cria o registro completo de todos os indivíduos. * False (padrão): registra apenas o melhor indivíduo de dada iteração.
         """
         self.create_log_path()
 
@@ -330,10 +362,11 @@ class Optimizer:
 
     def add_log(self, iteration: int, population: list[Individual], full: bool = False) -> None:
         """
-        Adiciona informações da população inicial da planilha de registro. cria a planilha com o cabeçalho caso ainda não houver (self.log = True).
-        :param iteration: iteração atual
-        :param population: população atual
-        :param full: False (padrão): adiciona as informações do melhor indivíduo de cada iteração; True: adiciona informações para cada indivíduo de population na planilha de registro.
+        Adiciona informações da população inicial da planilha de registro. Cria a planilha com o cabeçalho caso ainda não houver.
+
+        :param iteration: Iteração atual.
+        :param population: População (lista de objetos Individual) atual.
+        :param full: Booleano que define o tipo de registro. * True: adiciona informações para cada indivíduo da população. * False (padrão): adiciona apenas as informações do melhor indivíduo de cada iteração.
 
         """
 
@@ -382,6 +415,11 @@ class Optimizer:
                 writer.writerow(row)
 
     def log_time(self, fim: float) -> None:
+        """
+        Registra, ao final do arquivo .csv, o tempo decorrente desde a inicialização da instância.
+
+        :param fim: Tempo atual no padrão Unix Time.
+        """
         tempo = fim - self.inicio
 
         if not self.log_history:
@@ -399,6 +437,9 @@ class Optimizer:
             writer.writerow(row)
 
     def log_specs(self) -> None:
+        """
+        Registra, ao final do arquivo .csv, as especificações atuais do algoritmo empregado.
+        """
         with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file, delimiter=';')
 
@@ -420,12 +461,12 @@ class Optimizer:
 
     def set_tolerance(self, fit_abs: float = None, fit_rel: float = None, param_rel: float = None, patience: int = 1) -> None:
         """
-        Critérios de parada
-        :param fit_abs: define a tolerância do valor absoluto de fitness
-        :param fit_tol: define a tolerância da diferença relativa entre melhores fitness de iterações consecutivas
-        :param param_tol: define a tolerância da diferença entre valores dos parâmetros dos melhores indivíduos de iterações consecutivas (normalizada pelo espaço de busca)
-        :param patience: define quantas vezes as tolerâncias podem ser superadas antes de interromper o algoritmo
-        :return:
+        Definição dos critérios de parada. Anterior à rodada.
+
+        :param fit_abs: Tolerância no valor absoluto de fitness.
+        :param fit_rel: Tolerância na diferença relativa entre melhores fitness de iterações consecutivas.
+        :param param_rel: Tolerância na diferença nos parâmetros dos melhores indivíduos de iterações consecutivas (normalizada pelo espaço de busca).
+        :param patience: Quantas vezes alguma das tolerâncias definidas pode ser superada antes da interrupção do algoritmo.
         """
         self.stopping_criteria = True
         self.fitness_abs_tol = fit_abs
@@ -435,6 +476,14 @@ class Optimizer:
 
     # criar uma função em otimizador que receba duas populações ou individuos e compare as diferenças, verificando se estão dentro da tolerância por uma quantidade consecutiva de iterações
     def tolerance(self, previous: list[Individual], current: list[Individual]) -> bool:
+        """
+        [Função interna] Retorna se os critérios de tolerância foram atingidos nas 2 populações informadas.
+
+        :param previous: População da iteração/geração anterior.
+        :param current: População da iteração/geração atual.
+
+        :return: Booleano indicando se os critérios foram atingidos (True) ou não (False).
+        """
         # estrutura de chamada externa:
             #if self.tolerance(previous, current):
                 #break
@@ -483,8 +532,10 @@ class Optimizer:
 
     def sync_time(self, stime: str):
         """
-        Sincroniza o timestamp do registro do otimizador com aquele da interface com modelagem.
+        Sincroniza o timestamp do registro do otimizador com aquele desejado (normalmente, o da interface com modelagem).
         Assim, arquivos log e output com indicação de tempo ficam pareados para facilitar conferência.
+
+        :param stime: Timestamp a ser adotado.
         """
         self.opttime = stime
 
@@ -493,6 +544,7 @@ class Optimizer:
     def _algo_name(self) -> str:
         """
         Retorna o nome do algoritmo com base na classe utilizada.
+
         :return: Nome da classe do algoritmo atual.
         """
         return self.__class__.__name__  # "GA" | "PSO" | "BO"
