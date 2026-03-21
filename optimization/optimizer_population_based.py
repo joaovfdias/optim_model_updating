@@ -9,19 +9,32 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple, Any
 
 # subclasse para funções comuns a algoritmos populacionais
 class PopulationBased(Optimizer):
+    """
+    Subclasse de Optimizer para comportar o fluxo de execução comum a algoritmos populacionais.
+    """
     def __init__(self, fitness_function: Callable[[list[float]], tuple[float, dict[str, Any]]], parameters: list[Parameter], population_size: int):
+        """
+
+        :param fitness_function: Função que recebe os parâmetros de modelo, avalia as métricas e retorna fitness (float) + dados adicionais (dict).
+        :param parameters: Variáveis que se deseja calibrar: lista de objetos da classe Parameter com os devidos atributos declarados.
+        :param population_size: Tamanho da população. Se não especificado, default para 10 vezes o número de variáveis.
+        """
         self.global_best = None
         super().__init__(fitness_function, parameters, population_size)
 
-    def run(self, iterations: int = 100, status: bool = True, log: bool = True) -> Individual:
+    def run(self, iterations: int = None, status: bool = True, log: bool | str = True) -> Individual:
         """
-        :param iterations: número de iterações a serem executadas
-        :param status: por padrão mostra o andamento das soluções a cada iteração, False para não mostrar
-        :param log: define o registro dos resultados em planilha. True (padrão): registra os melhores indivíduos de cada iteração, "full": registra todos os indivíduos de todas as iterações. False: não cria registro.
-        :return: A melhor partícula encontrada, da qual é possível obter o fitness (.fitness), parâmetros (.param) e dados adicionais (.data)
+        Executa a otimização pela quantidade de iterações/gerações definida. Para definir critérios de parada, usar set_tolerance anteriormente a chamada desta função.
+
+        :param iterations: Número de iterações/gerações máximo a serem executadas. Se não definido, usa 10 vezes o número de variáveis.
+        :param status: Booleano para mostrar ou não o andamento de cada iteração no terminal.
+        :param log: Define o registro dos resultados em planilha. * True (padrão): registra os melhores indivíduos de cada iteração. * "full": registra todos os indivíduos de todas as iterações. * False: não cria registro.
+
+        :return: O melhor indivíduo/partícula encontrado, do qual é possível obter o fitness (.fitness), parâmetros (.param) e dados adicionais (.data)
         """
         self.inicio = time.time()
         self.status = status
+        iterations = iterations or 10 * len(self.parameters)
 
         if not self.log_history: # caso não tenha sido indicada reconstrução a partir de log anterior, gera e registra a população inicial normalmente
             self.populations.append(self.initial_population())
@@ -68,6 +81,7 @@ class PopulationBased(Optimizer):
     def opt_step(self, iteration: int) -> None: # definida nos algoritmos específicos
         """
         Etapa de otimização específica a cada algoritmo.
-        :param iteration: número (int) da iteração/geração atual.
+
+        :param iteration: Número da iteração/geração atual.
         """
         pass

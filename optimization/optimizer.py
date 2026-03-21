@@ -25,6 +25,7 @@ class Optimizer:
     Base dos otimizadores.
     Reune atributos e funções comuns a todos (passíveis de substituição), como:
     métodos de amostragem inicial, avaliação de uma população, definição dos critérios de convergência e registro dos resultados.
+    Funções 'set' permitem ao usuário modificar outros atributos específicos.
     """
     def __init__(self, fitness_function: Callable[[list[float]], tuple[float, dict[str, Any]]], parameters: list[Parameter], population_size: int | None = None):
         """
@@ -64,7 +65,7 @@ class Optimizer:
         self.populations = []
 
 
-    # funções 'set' que permitem ao usuário modificar valores padrão
+    # funções 'set' permitem ao usuário modificar valores padrão
     def set_sampling_method(self, sampling_method: str) -> None:
         """
         Permite ao usuário definir o tipo de amostragem, validando se o tipo é permitido.
@@ -80,7 +81,7 @@ class Optimizer:
 
     def initial_population(self) -> list[Individual]:
         """
-        Gera a população inicial com base no metodo de amostragem definido.
+        Chama a função que gera a população inicial com base no metodo de amostragem definido.
 
         :return: População inicial (lista de objetos da classe Individual).
         """
@@ -298,7 +299,14 @@ class Optimizer:
 
     def create_log(self, individual: Individual | None = None, full: bool = False) -> None: # alterar dados recebidos para um dicionário, de forma a registrar as keys e values
         """
-        [Função interna] Cria uma planilha e o cabeçalho relacionando os dados do problema.
+        [Função interna] Cria um arquivo csv com cabeçalho relacionando os dados do problema. Para registrar dados adicionais, é necessário que a segunda saída de 'fitness_function' seja um dicionário no formato {'Identificador do dado': Valor (escalar, vetor ou matriz)}
+
+        Trata o dicionário, destrinchando listas (vetores) e listas de listas (matrizes), numerando adequadamente e organizando as colunas para apresentar os dados em linha.
+        Para vetores (n), cada linha é indicada por "key #i" (i de 1 até n, sendo n o tamanho do vetor, ou número de colunas).
+        Para matrizes (m x n), cada linha é indicada por "key #i" (i de 1 até m, sendo m o número de linhas) e espaçada uma da outra por n-1 colunas (sendo n o número de colunas da matriz).
+
+        Estrutura do header: Iteration, Individual (full), Global Best (BO), Fitness, [parameter keys], Time (s), [data: escalar, vetor #1, vetor #2, ..., vetor #n, matriz #1, , , ..., matriz #2, , , ..., matriz #m, , , ...]
+
         :param individual: Indivíduo (instância). Se vazio (padrão): recebe o 1º indivíduo da população inicial (só é necessário para quantificar os dados do cabeçalho).
         :param full: Booleano que define o tipo de registro. * True: cria o registro completo de todos os indivíduos. * False (padrão): registra apenas o melhor indivíduo de dada iteração.
         """
@@ -363,6 +371,7 @@ class Optimizer:
     def add_log(self, iteration: int, population: list[Individual], full: bool = False) -> None:
         """
         Adiciona informações da população inicial da planilha de registro. Cria a planilha com o cabeçalho caso ainda não houver.
+        Para registrar dados adicionais, é necessário que a segunda saída de 'fitness_function' seja um dicionário no formato {'Identificador do dado': Valor (escalar, vetor ou matriz)}.
 
         :param iteration: Iteração atual.
         :param population: População (lista de objetos Individual) atual.
@@ -474,7 +483,7 @@ class Optimizer:
         self.parameters_rel_tol = param_rel
         self.patience = patience
 
-    # criar uma função em otimizador que receba duas populações ou individuos e compare as diferenças, verificando se estão dentro da tolerância por uma quantidade consecutiva de iterações
+    # função que receba duas populações ou individuos e compara as diferenças, verificando se estão dentro da tolerância por uma quantidade consecutiva de iterações
     def tolerance(self, previous: list[Individual], current: list[Individual]) -> bool:
         """
         [Função interna] Retorna se os critérios de tolerância foram atingidos nas 2 populações informadas.
