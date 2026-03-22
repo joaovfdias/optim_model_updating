@@ -22,7 +22,7 @@ class PopulationBased(Optimizer):
         self.global_best = None
         super().__init__(fitness_function, parameters, population_size)
 
-    def run(self, iterations: int = None, status: bool = True, log: bool | str = True) -> Individual:
+    def run(self, iterations: int | None = None, status: bool = True, log: bool | str = True) -> Individual:
         """
         Executa a otimização pela quantidade de iterações/gerações definida. Para definir critérios de parada, usar set_tolerance anteriormente a chamada desta função.
 
@@ -78,10 +78,12 @@ class PopulationBased(Optimizer):
         return self.global_best # retorna o melhor indivíduo final
 
     # @abstractmethod
-    def opt_step(self, iteration: int) -> None: # definida nos algoritmos específicos
+    def opt_step(self, iteration: int) -> list[Individual]: # definida nos algoritmos específicos
         """
         Etapa de otimização específica a cada algoritmo.
 
         :param iteration: Número da iteração/geração atual.
+
+        :return: Nova população gerada para a iteração (lista de instâncias de Individual).
         """
         pass

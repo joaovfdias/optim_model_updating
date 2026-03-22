@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Any
+from typing import Callable, Any
 
 import os
 import csv
@@ -254,7 +254,7 @@ class Optimizer:
         return min(pop, key=lambda x: x.fitness)
 
 
-    def set_log(self, log_title: str = None, log_dir: str = None, timestamp: bool = True) -> None:
+    def set_log(self, log_title: str | None = None, log_dir: str | None = None, timestamp: bool = True) -> None:
         """
         Permite especificar um novo nome e/ou diretório para armazenamento do registro de rodada, assim com a adição do Timestamp Suffix ou não.
 
@@ -461,16 +461,18 @@ class Optimizer:
             writer.writerow(["values:",""] + list(algorithm_parameters.values()))
 
     @property
-    def specs(self) -> None:
+    def specs(self) -> dict[str, Any]:
         """
         Armazena as especificações do algoritmo, declarada nas classes específicas.
+
+        :return: Dicionário contendo os hiperparâmetros e configurações do algoritmo.
         """
         pass
 
 
-    def set_tolerance(self, fit_abs: float = None, fit_rel: float = None, param_rel: float = None, patience: int = 1) -> None:
+    def set_tolerance(self, fit_abs: float | None = None, fit_rel: float | None = None, param_rel: float | None = None, patience: int = 1) -> None:
         """
-        Definição dos critérios de parada. Anterior à rodada.
+        Definição de um ou mais critérios de parada. Anterior à rodada.
 
         :param fit_abs: Tolerância no valor absoluto de fitness.
         :param fit_rel: Tolerância na diferença relativa entre melhores fitness de iterações consecutivas.
@@ -558,7 +560,9 @@ class Optimizer:
         """
         return self.__class__.__name__  # "GA" | "PSO" | "BO"
 
-    def _common_state(self) -> dict:
+    def _common_state(self) -> dict[str, Any]:
+        """Gera um dicionário com os estados comuns a todos os otimizadores."""
+
         return {
             "sampling_method": getattr(self, "sampling_method", None),
             "tolerance": {
@@ -571,7 +575,9 @@ class Optimizer:
             "logged_time": getattr(self, "logged_time", 0.0),
         }
 
-    def _algo_state(self) -> dict:
+    def _algo_state(self) -> dict[str, Any]:
+        """Gera um dicionário com os estados e hiperparâmetros específicos do algoritmo atual."""
+
         algo = self._algo_name()
         if algo == "GA":
             return {"GA": getattr(self, "specs", {})}
@@ -607,7 +613,16 @@ class Optimizer:
             return bo
         return {}
 
-    def save_state(self, filename: str | None = None, fitness_spec: dict | None = None, include_rng_state: bool = True) -> str:
+    def save_state(self, filename: str | None = None, fitness_spec: dict[str, Any] | None = None, include_rng_state: bool = True) -> str:
+        """
+        Salva o estado atual da otimização em um arquivo JSON para retomada futura.
+
+        :param filename: Caminho/nome do arquivo de saída. Se None, gera um nome automático.
+        :param fitness_spec: Dicionário opcional com as especificações da função objetivo.
+        :param include_rng_state: Se True, salva os estados de seed do gerador de números aleatórios.
+
+        :return: Caminho completo do arquivo JSON salvo.
+        """
         now = time.time()
         algo = self._algo_name()
 
@@ -678,7 +693,17 @@ class Optimizer:
         return filepath  # retorna caminho completo
 
     @classmethod
-    def load_state(cls, filename: str, fitness_function: Callable[[list[float]], tuple[float, dict[str, Any]]] | None = None, snapshot: bool = False):  # recriação do estado de otimização
+    def load_state(cls, filename: str, fitness_function: Callable[[list[float]], tuple[float, dict[str, Any]]] | None = None, snapshot: bool = False) -> Optimizer:  # recriação do estado de otimização
+        """
+        Recria uma instância do otimizador a partir de um arquivo de estado salvo previamente.
+
+        :param filename: Caminho do arquivo JSON contendo o estado.
+        :param fitness_function: Função objetivo a ser reatribuída ao otimizador.
+        :param snapshot: Se True, tenta reconstruir modelos internos (como o GP do Bayesian Optimization).
+
+        :return: Instância reconstruída e pronta para retomada da execução.
+        """
+
         print(f"[load_state] Carregando estado de: {filename}")
         d = loads_json(filename)
         algo = d["algorithm"]
@@ -806,7 +831,16 @@ class Optimizer:
         print("[load_state] OK ✔ Estado reconstituído.")
         return opt
 
-    def analyze_sensitivity(self, df=None, **kwargs):
+    # revisar
+    def analyze_sensitivity(self, df: pd.DataFrame | None = None, **kwargs) -> tuple[list[str], Any]:
+        """
+        Realiza a análise de sensibilidade dos parâmetros em relação à função objetivo.
+
+        :param df: DataFrame contendo o histórico de parâmetros e fitness.
+        :param kwargs: Argumentos adicionais repassados ao SensitivityAnalyzer (ex: topk, strategy).
+
+        :return: Tupla contendo a lista dos parâmetros selecionados e a instância do analisador.
+        """
         # df: DataFrame opcional com histórico/log; se None, você pode passar df externamente
         from sensitivity.sensitivity import SensitivityAnalyzer
         sa = SensitivityAnalyzer(minimize=True)
