@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from abc import abstractmethod
+from typing import Callable, Any
+
 import os
 import csv
 import time
@@ -7,6 +12,7 @@ from pyDOE import lhs
 import pandas as pd
 import io
 
+from .parameter import Parameter
 from .individual import Individual
 from .pso_optimizer.particle import Particle
 
@@ -15,7 +21,19 @@ import random
 
 
 class Optimizer:
-    def __init__(self, fitness_function, parameters, population_size):
+    """
+    Base dos otimizadores.
+    Reune atributos e funções comuns a todos (passíveis de substituição), como:
+    métodos de amostragem inicial, avaliação de uma população, definição dos critérios de convergência e registro dos resultados.
+    Funções 'set' permitem ao usuário modificar outros atributos específicos.
+    """
+    def __init__(self, fitness_function: Callable[[list[float]], tuple[float, dict[str, Any]]], parameters: list[Parameter], population_size: int | None = None):
+        """
+
+        :param fitness_function: Função que recebe os parâmetros de modelo, avalia as métricas e retorna fitness (float) + dados adicionais (dict).
+        :param parameters: Variáveis que se deseja calibrar: lista de objetos da classe Parameter com os devidos atributos declarados.
+        :param population_size: Tamanho da população. Se não especificado, default para 10 vezes o número de variáveis.
+        """
         self.current_dir = os.getcwd() # definindo o diretório atual
         self.opttime = None
         self.inicio = time.time()
@@ -26,12 +44,13 @@ class Optimizer:
         self.fitness_function = fitness_function
         self.parameters = parameters
         self.parameters_keys = [param.key for param in parameters]
-        self.population_size = population_size
+        self.population_size = population_size or 10 * len(parameters)
 
         self.log_header = False
         self.logfilename = None # função set
         self.log_dir = None # função set
         self.log_path = None
+        self.logtimestamp = True
         self.status = True
 
         self.log_history = None
@@ -41,15 +60,17 @@ class Optimizer:
         self.iter_label = "Iteração"
         self.sampling_method = "lhs"
         self.sampling_methods = {"random": self.random_initial_population, "lhs": self.LHS_initial_population}
-        self.algorithms = {"GA": Individual, "PSO": Particle} # auxiliar do inicializador de população
+        self.ind_type = Particle if self.__class__.__name__ == "PSO" else Individual # auxiliar do inicializador de população
 
         self.populations = []
 
 
-    # funções 'set' que permitem ao usuário modificar valores padrão
-    def set_sampling_method(self, sampling_method):
+    # funções 'set' permitem ao usuário modificar valores padrão
+    def set_sampling_method(self, sampling_method: str) -> None:
         """
-                Permite ao usuário definir o tipo de metodo de amostragem, validando se o tipo é permitido.
+        Permite ao usuário definir o tipo de amostragem, validando se o tipo é permitido.
+
+        :param sampling_method: Nome da amostragem desejada.
         """
         if sampling_method in self.sampling_methods:
             self.sampling_method = sampling_method
@@ -58,21 +79,37 @@ class Optimizer:
                 f"Método de amostragem '{sampling_method}' inválido. Tipos válidos: {list(self.sampling_methods.keys())}")
             return
 
-    def initial_population(self):
+    def initial_population(self) -> list[Individual]:
+        """
+        Chama a função que gera a população inicial com base no metodo de amostragem definido.
+
+        :return: População inicial (lista de objetos da classe Individual).
+        """
 
         pop = self.sampling_methods[self.sampling_method]() # chama a função do metodo indicado
         self.evaluate_population(pop)
 
         return pop
 
-    def random_initial_population(self):
+    def random_initial_population(self) -> list[Individual]:
+        """
+        Metodo de geração da população inicial: aleatório.
+
+        :return: População inicial (lista de objetos da classe Individual).
+        """
         pop =   [ # alteração para criar "Individual" no caso do GA e "Partcile" no caso do PSO, evitando repetição da função nas classes
-                self.algorithms[self.__class__.__name__]([p.random_value() for p in self.parameters], self.fitness_function)
+                self.ind_type([p.random_value() for p in self.parameters], self.fitness_function)
                 for _ in range(self.population_size)
                 ]
         return pop
 
-    def LHS_initial_population(self):
+    def LHS_initial_population(self) -> list[Individual]:
+        """
+        Metodo de geração da população inicial: LHS.
+
+        :return: População inicial (lista de objetos da classe Individual).
+        """
+
         n_dim = len(self.parameters)
         n_samples = self.population_size
 
@@ -84,21 +121,23 @@ class Optimizer:
         scaled_samples = lower_bounds + samples * (upper_bounds - lower_bounds)
 
         pop =   [ # alteração para criar "Individual" no caso do GA e "Partcile" no caso do PSO, evitando repetição da função nas classes
-                self.algorithms[self.__class__.__name__]([float(value) for value in scaled_samples[i]], self.fitness_function)
+                self.ind_type([float(value) for value in scaled_samples[i]], self.fitness_function)
                 for i in range(self.population_size)
                 ]
         return pop
 
-    def resume_from_log(self, csv_path):
+    def resume_from_log(self, csv_path: str) -> None:
         """
-        Retoma rodada de otimização com base em log no caminho indicado
-        {Não funciona no Bayesiano até implementação própria}
-        """
-        self.log_history = csv_path
+        Define o caminho do log .csv que o algoritmo vai utilizar para reconstruir as populações avaliadas.
+        {Integração pendente para o BO e TuRBO}
 
-    def resume_initial_population(self):
+        :param csv_path: Caminho do arquivo para retomada.
         """
-        Lê o log CSV e reconstrói todas as populações válidas
+        self.log_history = csv_path if csv_path.endswith(".csv") else f"{csv_path}.csv"
+
+    def resume_initial_population(self) -> None:
+        """
+        Lê o log CSV e reconstrói todas as populações válidas.
         """
         valid_lines = []
         with open(self.log_history, mode='r', newline='', encoding='utf-8') as f:
@@ -140,7 +179,7 @@ class Optimizer:
                 curr_iteration = iteration
 
             # Adiciona indivíduo atual
-            individuo = self.algorithms[self.__class__.__name__]([row[param.key] for param in self.parameters], self.fitness_function)
+            individuo = self.ind_type([row[param.key] for param in self.parameters], self.fitness_function)
             individuo.fitness = float(row["Fitness"])
             if self.__class__.__name__ == 'PSO':
                 part_vel = [row[v] for v in vel]
@@ -194,22 +233,36 @@ class Optimizer:
 
 
     @staticmethod
-    def evaluate_population(population):
+    def evaluate_population(population: list[Individual]) -> None:
+        """
+        Executa a avaliação cada indivíduo da população entrada.
+
+        :param population: Lista de indivíduos (objetos da classe Individual) que se deseja pontuar.
+        """
         for individual in population:
             individual.evaluate()
 
     @staticmethod
-    def get_best_individual(pop):
+    def get_best_individual(pop: list[Individual]) -> Individual:
+        """
+        Retorna o indivíduo com menor fitness em uma lista.
+
+        :param pop: Lista de indivíduos (objetos da classe Individual).
+
+        :return: Individuo (instância) com menor fitness.
+        """
         return min(pop, key=lambda x: x.fitness)
 
 
-    def set_log(self, log_title=None, log_dir=None):
+    def set_log(self, log_title: str | None = None, log_dir: str | None = None, timestamp: bool = True) -> None:
         """
+        Permite especificar um novo nome e/ou diretório para armazenamento do registro de rodada, assim com a adição do Timestamp Suffix ou não.
 
-        :param log_title: nome do arquivo de log. por padrão: {nome_do_algoritmo}_{data_hora}
-        :param log_dir: diretório em que log será salvo. por padrão, subpasta log no diretório de chamada
-        :return:
+        :param log_title: Nome do arquivo de registro. * Por padrão: {nome_do_algoritmo}_{data_horário}.
+        :param log_dir: Diretório em que o registro será salvo. * Por padrão: subpasta \\log no diretório de chamada.
+        :param timestamp: Indica se deseja adicionar um sufixo com estampa de tempo ao final do nome do arquivo ou não. Importante para evitar overwriting.
         """
+        self.logtimestamp = timestamp
         self.logfilename = log_title
         self.log_dir = log_dir
         if not log_title:
@@ -217,22 +270,45 @@ class Optimizer:
         else:
             print(f"\nArquivo de registro alterado para: \"{self.logfilename}\"")
 
-    def display_parameters(self, individual):
+    def display_parameters(self, individual: Individual) -> str:
+        """
+        Retorna os parâmetros do indivíduo em forma de string legível.
+
+        :param individual: Indivíduo (instância) com os parâmetros que se deseja exibir.
+
+        :return: String com os parâmetros indicados no formato: key1 = value1, key2 = value2, [...].
+        """
         return ', '.join(f'{k} = {v:.3g}' for k, v in zip([param.key for param in self.parameters], individual.param))
 
-    def create_log_path(self):
+    def create_log_path(self) -> None:
+        """
+        Cria o arquivo de registro no caminho/nome padrão ou especificado com set_log.
+        """
         timestamp = self.opttime or datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{self.logfilename}_{timestamp}" if self.logfilename else f"{self.__class__.__name__}_{timestamp}"
-        self.logfilename = f"{filename}.csv"
+        if self.logfilename:
+            # fname, ext = os.path.splitext(self.logfilename)
+            fname = self.logfilename[:-4] if self.logfilename.lower().endswith(".csv") else self.logfilename
+            filename = f"{fname}_{timestamp}" if self.logtimestamp else self.logfilename
+        else:
+            filename = f"{self.__class__.__name__}_{timestamp}"
+        self.logfilename = filename if filename.endswith(".csv") else f"{filename}.csv"
+            # f"{filename}.csv"
         self.log_dir = self.log_dir or os.path.join(self.current_dir, "log")
         os.makedirs(self.log_dir, exist_ok=True)
         self.log_path = os.path.join(self.log_dir, self.logfilename)
 
-    def create_log(self, individual=None, full=False): # alterar dados recebidos para um dicionário, de forma a registrar as keys e values
+    def create_log(self, individual: Individual | None = None, full: bool = False) -> None: # alterar dados recebidos para um dicionário, de forma a registrar as keys e values
         """
-        função que cria uma planilha com cabeçalho relacionando os dados do problema.
-        :param individual: indíviduo declarado da classe Individual (por padrão recebe o 1º da população inicial, só é necessário para quantificar modos e frequências)
-        :param full: True caso for criar o registro completo com a função add_full_log, com Iteração e número do Indivíduo no cabeçalho; False (padrão) caso for usar "add_log" para registrar apenas o melhor indivíduo de dada iteração.
+        [Função interna] Cria um arquivo csv com cabeçalho relacionando os dados do problema. Para registrar dados adicionais, é necessário que a segunda saída de 'fitness_function' seja um dicionário no formato {'Identificador do dado': Valor (escalar, vetor ou matriz)}
+
+        Trata o dicionário, destrinchando listas (vetores) e listas de listas (matrizes), numerando adequadamente e organizando as colunas para apresentar os dados em linha.
+        Para vetores (n), cada linha é indicada por "key #i" (i de 1 até n, sendo n o tamanho do vetor, ou número de colunas).
+        Para matrizes (m x n), cada linha é indicada por "key #i" (i de 1 até m, sendo m o número de linhas) e espaçada uma da outra por n-1 colunas (sendo n o número de colunas da matriz).
+
+        Estrutura do header: Iteration, Individual (full), Global Best (BO), Fitness, [parameter keys], Time (s), [data: escalar, vetor #1, vetor #2, ..., vetor #n, matriz #1, , , ..., matriz #2, , , ..., matriz #m, , , ...]
+
+        :param individual: Indivíduo (instância). Se vazio (padrão): recebe o 1º indivíduo da população inicial (só é necessário para quantificar os dados do cabeçalho).
+        :param full: Booleano que define o tipo de registro. * True: cria o registro completo de todos os indivíduos. * False (padrão): registra apenas o melhor indivíduo de dada iteração.
         """
         self.create_log_path()
 
@@ -292,12 +368,14 @@ class Optimizer:
 
         self.log_header = True
 
-    def add_log(self, iteration, population, full=False):
+    def add_log(self, iteration: int, population: list[Individual], full: bool = False) -> None:
         """
-        adiciona informações da população inicial da planilha de registro. cria a planilha com o cabeçalho caso ainda não houver (self.log = True).
-        :param iteration: iteração atual
-        :param population: população atual
-        :param full: False (padrão): adiciona as informações do melhor indivíduo de cada iteração; True: adiciona informações para cada indivíduo de population na planilha de registro.
+        Adiciona informações da população inicial da planilha de registro. Cria a planilha com o cabeçalho caso ainda não houver.
+        Para registrar dados adicionais, é necessário que a segunda saída de 'fitness_function' seja um dicionário no formato {'Identificador do dado': Valor (escalar, vetor ou matriz)}.
+
+        :param iteration: Iteração atual.
+        :param population: População (lista de objetos Individual) atual.
+        :param full: Booleano que define o tipo de registro. * True: adiciona informações para cada indivíduo da população. * False (padrão): adiciona apenas as informações do melhor indivíduo de cada iteração.
 
         """
 
@@ -345,7 +423,12 @@ class Optimizer:
 
                 writer.writerow(row)
 
-    def log_time(self, fim):
+    def log_time(self, fim: float) -> None:
+        """
+        Registra, ao final do arquivo .csv, o tempo decorrente desde a inicialização da instância.
+
+        :param fim: Tempo atual no padrão Unix Time.
+        """
         tempo = fim - self.inicio
 
         if not self.log_history:
@@ -362,7 +445,10 @@ class Optimizer:
             writer.writerow([])
             writer.writerow(row)
 
-    def log_specs(self):
+    def log_specs(self) -> None:
+        """
+        Registra, ao final do arquivo .csv, as especificações atuais do algoritmo empregado.
+        """
         with open(self.log_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file, delimiter=';')
 
@@ -375,18 +461,23 @@ class Optimizer:
             writer.writerow(["values:",""] + list(algorithm_parameters.values()))
 
     @property
-    def specs(self):
+    def specs(self) -> dict[str, Any]:
+        """
+        Armazena as especificações do algoritmo, declarada nas classes específicas.
+
+        :return: Dicionário contendo os hiperparâmetros e configurações do algoritmo.
+        """
         pass
 
 
-    def set_tolerance(self, fit_abs=None, fit_rel=None, param_rel=None, patience=1):
+    def set_tolerance(self, fit_abs: float | None = None, fit_rel: float | None = None, param_rel: float | None = None, patience: int = 1) -> None:
         """
-        Critérios de parada
-        :param fit_abs: define a tolerância do valor absoluto de fitness
-        :param fit_tol: define a tolerância da diferença relativa entre melhores fitness de iterações consecutivas
-        :param param_tol: define a tolerância da diferença entre valores dos parâmetros dos melhores indivíduos de iterações consecutivas (normalizada pelo espaço de busca)
-        :param patience: define quantas vezes as tolerâncias podem ser superadas antes de interromper o algoritmo
-        :return:
+        Definição de um ou mais critérios de parada. Anterior à rodada.
+
+        :param fit_abs: Tolerância no valor absoluto de fitness.
+        :param fit_rel: Tolerância na diferença relativa entre melhores fitness de iterações consecutivas.
+        :param param_rel: Tolerância na diferença nos parâmetros dos melhores indivíduos de iterações consecutivas (normalizada pelo espaço de busca).
+        :param patience: Quantas vezes alguma das tolerâncias definidas pode ser superada antes da interrupção do algoritmo.
         """
         self.stopping_criteria = True
         self.fitness_abs_tol = fit_abs
@@ -394,8 +485,16 @@ class Optimizer:
         self.parameters_rel_tol = param_rel
         self.patience = patience
 
-    # criar uma função em otimizador que receba duas populações ou individuos e compare as diferenças, verificando se estão dentro da tolerância por uma quantidade consecutiva de iterações
-    def tolerance(self, previous, current):
+    # função que receba duas populações ou individuos e compara as diferenças, verificando se estão dentro da tolerância por uma quantidade consecutiva de iterações
+    def tolerance(self, previous: list[Individual], current: list[Individual]) -> bool:
+        """
+        [Função interna] Retorna se os critérios de tolerância foram atingidos nas 2 populações informadas.
+
+        :param previous: População da iteração/geração anterior.
+        :param current: População da iteração/geração atual.
+
+        :return: Booleano indicando se os critérios foram atingidos (True) ou não (False).
+        """
         # estrutura de chamada externa:
             #if self.tolerance(previous, current):
                 #break
@@ -415,7 +514,7 @@ class Optimizer:
                 self.tolerance_flag[0] += 1
                 if self.tolerance_flag[0] >= self.patience:
                     print(
-                        f"\nCritério de convergência atingido: fitness menor que {self.fitness_abs_tol} por {self.patience} iterações consecutivas. \nExecução interrompida.")
+                        f"\nCritério de convergência atingido: fitness menor que {self.fitness_abs_tol} por {self.patience} iterações consecutivas.")
                     return True
             else:
                 self.tolerance_flag[0] = 0
@@ -425,7 +524,7 @@ class Optimizer:
                 self.tolerance_flag[1] += 1
                 if self.tolerance_flag[1] >= self.patience:
                     print(
-                        f"\nCritério de convergência atingido: valores de fitness entre iterações apresentaram diferença menor que {self.fitness_rel_tol*100}% por {self.patience} vezes consecutivas. \nExecução interrompida.")
+                        f"\nCritério de convergência atingido: valores de fitness entre iterações apresentaram diferença menor que {self.fitness_rel_tol*100}% por {self.patience} vezes consecutivas.")
                     return True
             else:
                 self.tolerance_flag[1] = 0
@@ -435,22 +534,35 @@ class Optimizer:
                 self.tolerance_flag[2] += 1
                 if self.tolerance_flag[2] >= self.patience:
                     print(
-                        f"\nCritério de convergência atingido: valores de parâmetros entre iterações apresentaram diferença menor que {self.parameters_rel_tol*100}% do intervalo de busca por {self.patience} vezes consecutivas. \nExecução interrompida.")
+                        f"\nCritério de convergência atingido: valores de parâmetros entre iterações apresentaram diferença menor que {self.parameters_rel_tol*100}% do intervalo de busca por {self.patience} vezes consecutivas.")
                     return True
             else:
                 self.tolerance_flag[2] = 0
 
         return False
 
-    def sync_time(self, stime):
+    def sync_time(self, stime: str):
+        """
+        Sincroniza o timestamp do registro do otimizador com aquele desejado (normalmente, o da interface com modelagem).
+        Assim, arquivos log e output com indicação de tempo ficam pareados para facilitar conferência.
+
+        :param stime: Timestamp a ser adotado.
+        """
         self.opttime = stime
 
     # --------- métodos para armazenamento de dados ---------
 
-    def _algo_name(self):
+    def _algo_name(self) -> str:
+        """
+        Retorna o nome do algoritmo com base na classe utilizada.
+
+        :return: Nome da classe do algoritmo atual.
+        """
         return self.__class__.__name__  # "GA" | "PSO" | "BO"
 
-    def _common_state(self):
+    def _common_state(self) -> dict[str, Any]:
+        """Gera um dicionário com os estados comuns a todos os otimizadores."""
+
         return {
             "sampling_method": getattr(self, "sampling_method", None),
             "tolerance": {
@@ -463,7 +575,9 @@ class Optimizer:
             "logged_time": getattr(self, "logged_time", 0.0),
         }
 
-    def _algo_state(self):
+    def _algo_state(self) -> dict[str, Any]:
+        """Gera um dicionário com os estados e hiperparâmetros específicos do algoritmo atual."""
+
         algo = self._algo_name()
         if algo == "GA":
             return {"GA": getattr(self, "specs", {})}
@@ -484,7 +598,11 @@ class Optimizer:
             bo["BO"]["bounds"] = getattr(self, "bounds", None).tolist() if getattr(self, "bounds", None) is not None else None
             bo["BO"]["history_X"] = [x.tolist() for x in getattr(self, "history_X", [])]
             bo["BO"]["history_y"] = list(getattr(self, "history_y", []))
-            # snapshot facultativo do kernel treinado
+            bo["BO"]["best"] = indiv_to_dict(self.best) if self.best else None
+            # RGN local
+            if hasattr(self, "_get_local_rng_state"):
+                bo["BO"]["rng_state"] = self._get_local_rng_state()
+            # snapshot opcional do kernel treinado
             gp = getattr(self, "gp", None)
             if gp and getattr(gp, "kernel_", None) is not None:
                 bo["BO"]["gp_snapshot"] = {
@@ -495,7 +613,16 @@ class Optimizer:
             return bo
         return {}
 
-    def save_state(self, filename: str | None = None, fitness_spec: dict | None = None, include_rng_state: bool = True):
+    def save_state(self, filename: str | None = None, fitness_spec: dict[str, Any] | None = None, include_rng_state: bool = True) -> str:
+        """
+        Salva o estado atual da otimização em um arquivo JSON para retomada futura.
+
+        :param filename: Caminho/nome do arquivo de saída. Se None, gera um nome automático.
+        :param fitness_spec: Dicionário opcional com as especificações da função objetivo.
+        :param include_rng_state: Se True, salva os estados de seed do gerador de números aleatórios.
+
+        :return: Caminho completo do arquivo JSON salvo.
+        """
         now = time.time()
         algo = self._algo_name()
 
@@ -562,11 +689,21 @@ class Optimizer:
             f"[save_state] Iterações: {total_iters} | Indivíduos totais: {total_inds} | RNG state incluso: {bool(rng.get('py_random_state') or rng.get('numpy_state'))}")
 
         dumps_json(run, filepath)
-        print(f"[save_state] OK ✔ Arquivo gravado.")
-        return filepath  # <-- retorna caminho completo
+        print(f"[save_state] Arquivo gravado.")
+        return filepath  # retorna caminho completo
 
     @classmethod
-    def load_state(cls, filename: str, fitness_function=None):  # recriação do estado de otimização
+    def load_state(cls, filename: str, fitness_function: Callable[[list[float]], tuple[float, dict[str, Any]]] | None = None, snapshot: bool = False) -> Optimizer:  # recriação do estado de otimização
+        """
+        Recria uma instância do otimizador a partir de um arquivo de estado salvo previamente.
+
+        :param filename: Caminho do arquivo JSON contendo o estado.
+        :param fitness_function: Função objetivo a ser reatribuída ao otimizador.
+        :param snapshot: Se True, tenta reconstruir modelos internos (como o GP do Bayesian Optimization).
+
+        :return: Instância reconstruída e pronta para retomada da execução.
+        """
+
         print(f"[load_state] Carregando estado de: {filename}")
         d = loads_json(filename)
         algo = d["algorithm"]
@@ -602,21 +739,36 @@ class Optimizer:
                       init_vel_ratio=pso_cfg.get("initial velocity ratio") or pso_cfg.get("init_vel_ratio") or 0.2)
         elif algo == "BO":
             from .bo_optimizer.bayesian import BO, BOConfig
-            bo_cfg = d["optimizer"]["BO"].get("config", {})
+            bo_block = d["optimizer"]["BO"]
+            bo_cfg = bo_block.get("config", {})
             cfg = BOConfig(**bo_cfg)
-            opt = BO(fitness_function, params, population_size=1, config=cfg)
-            # restaurar BO: bounds, history, gp
-            if d["optimizer"]["BO"].get("bounds"):
-                opt.bounds = np.array(d["optimizer"]["BO"]["bounds"], dtype=float)
-            opt.history_X = [np.asarray(x, dtype=float) for x in d["optimizer"]["BO"].get("history_X", [])]
-            opt.history_y = [float(y) for y in d["optimizer"]["BO"].get("history_y", [])]
+
+            init_pts = d.get("population_size") \
+                       or bo_cfg.get("init_points") \
+                       or cfg.init_points \
+                       or cfg.computed_init_points(len(params))  # fallback seguro
+
+            opt = BO(fitness_function, params, initial_points=init_pts, config=cfg)
+
+            # bounds, history
+            if bo_block.get("bounds"):
+                opt.bounds = np.array(bo_block["bounds"], dtype=float)
+                opt._fit_scaler()  # garantir scaler consistente com bounds carregado
+            opt.history_X = [np.asarray(x, dtype=float) for x in bo_block.get("history_X", [])]
+            opt.history_y = [float(y) for y in bo_block.get("history_y", [])]
+
+            # RGN local
+            if bo_block.get("rng_state") is not None and hasattr(opt, "_set_local_rng_state"):
+                opt._set_local_rng_state(bo_block["rng_state"])
+
             print(f"[load_state] BO: history_X={len(opt.history_X)} pontos | history_y={len(opt.history_y)}")
+
         else:
             raise ValueError(f"Unsupported algorithm '{algo}' in archive")
 
         # 4) campos comuns
         opt.iter_label = d.get("iter_label", opt.iter_label)
-        opt.population_size = d.get("population_size", opt.population_size)
+        if algo != "BO": opt.population_size = d.get("population_size", opt.population_size)
         opt.sampling_method = d["optimizer"]["common"].get("sampling_method", opt.sampling_method)
         tol = d["optimizer"]["common"].get("tolerance", {})
         if any(v is not None for v in tol.values()):
@@ -645,78 +797,63 @@ class Optimizer:
             print(f"[load_state] PSO: global_best fitness={getattr(gb, 'fitness', None)}")
 
         if algo == "BO":
+            best_dict = bo_block.get("best")
+            if best_dict is not None:
+                opt.best = indiv_from_dict(best_dict, fitness_function)
+
             # reconstruir GP (opcional): refit com history, respeitando config.random_state
-            if len(opt.history_X) > 0:
-                try:
-                    opt._fit_gp()
-                    print("[load_state] BO: GP refit concluído.")
-                except Exception as e:
-                    print(f"[load_state] BO: falha ao refazer fit do GP: {e}")
+            try:
+                snap = bo_block.get("gp_snapshot") if snapshot else None
+                if snap and "params" in snap:
+                    from sklearn.gaussian_process import GaussianProcessRegressor
+                    k0 = opt.config.kernel or opt._default_kernel(np.asarray(opt.history_y, dtype=float))
+                    k0.set_params(**snap["params"])
+                    # Reconstrói o GP com os parâmetros salvos
+                    opt.gp = GaussianProcessRegressor(
+                        kernel=k0,
+                        alpha=opt.config.alpha,
+                        normalize_y=opt.config.normalize_y,
+                        optimizer=None,  # congela hiperparâmetros na inicialização
+                        n_restarts_optimizer=0,
+                        random_state=opt.rng,
+                    )
+                    opt.gp.fit(np.vstack(opt.history_X), np.array(opt.history_y))
+                else:
+                    # fallback: refit normal
+                    if opt.history_X:
+                        opt._fit_gp()
+                print("[load_state] BO: GP refit concluído.")
+
+            except Exception as e:
+                print(f"[load_state] BO: falha ao refazer fit do GP: {e}")
+                pass
 
         print("[load_state] OK ✔ Estado reconstituído.")
         return opt
 
-    def analyze_sensitivity(self, **kwargs):
-        from .sensitivity import SensitivityAnalyzer
-        sa = SensitivityAnalyzer.from_optimizer(self)
-        return sa.run(**kwargs), sa
-
-
-# subclasse para funções comuns a algoritmos populacionais
-class PopulationBased(Optimizer):
-    def __init__(self, fitness_function, parameters, population_size):
-        self.global_best = None
-        super().__init__(fitness_function, parameters, population_size)
-
-    def run(self, iterations=100, status=True, log=True):
+    # revisar
+    def analyze_sensitivity(self, df: pd.DataFrame | None = None, **kwargs) -> tuple[list[str], Any]:
         """
-        :param itera: número de iterações a serem executadas
-        :param status: por padrão mostra o andamento das soluções a cada iteração, False para não mostrar
-        :param log: define o registro dos resultados em planilha. True (padrão): registra os melhores indivíduos de cada iteração, "full": registra todos os indivíduos de todas as iterações. False: não cria registro.
-        :return: retorna a melhor partícula encontrada, da qual é possível obter o fitness (.fitness), parâmetros (.param) e dados modais (.data)
+        Realiza a análise de sensibilidade dos parâmetros em relação à função objetivo.
+
+        :param df: DataFrame contendo o histórico de parâmetros e fitness.
+        :param kwargs: Argumentos adicionais repassados ao SensitivityAnalyzer (ex: topk, strategy).
+
+        :return: Tupla contendo a lista dos parâmetros selecionados e a instância do analisador.
         """
-        self.inicio = time.time()
-        self.status = status
-
-        if not self.log_history: # caso não tenha sido indicada reconstrução a partir de log anterior, gera e registra a população inicial normalmente
-            self.populations.append(self.initial_population())
-            full = log == "full"
-            if log:
-                self.add_log(0, self.populations[-1], full=full)
-            if self.status:
-                print(f"\nPopulação Inicial: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
-
-        else:
-            self.resume_initial_population() # reconstroi as populações iniciais com base em log anterior
-            full = True # demanda registro completo
-
-        for iteration in range(self.logged_iteration, iterations):
-
-            new_pop = self.opt_step(iteration)
-
-            self.evaluate_population(new_pop)
-            self.populations.append(new_pop)
-
-            if log:
-                self.add_log(iteration+1, new_pop, full=full)
-
-            if self.status:
-                print(f"{self.iter_label} {iteration + 1}: Melhor Fitness = {self.get_best_individual(self.populations[-1]).fitness:.4g}, Parâmetros: {self.display_parameters(self.get_best_individual(self.populations[-1]))}")
-
-            if self.tolerance(self.populations[-2], self.populations[-1]): # critério de parada, determinado com a função set_tolerance
-                break
-
-        fim = time.time()
-        if log:
-            self.log_specs()
-            self.log_time(fim)
-            print(f"\nRegistro salvo em: {self.log_path}")
-
-        self.global_best = self.global_best or self.get_best_individual(self.populations[-1])
-
-        print(f"\nMelhor solução encontrada: Fitness = {self.global_best.fitness:.4g}, Parâmetros: {self.display_parameters(self.global_best)}")
-
-        return self.global_best # retorna o melhor indivíduo final
-
-    def opt_step(self, iteration): # definida nos algoritmos específicos
-        pass
+        # df: DataFrame opcional com histórico/log; se None, você pode passar df externamente
+        from sensitivity.sensitivity import SensitivityAnalyzer
+        sa = SensitivityAnalyzer(minimize=True)
+        if df is None:
+            raise ValueError("Passe um DataFrame 'df' com parâmetros + métricas (+ Fitness opcional).")
+        selected = sa.workflow(
+            df,
+            fitness_col=kwargs.get("fitness_col", "Fitness"),
+            param_keys_hint=[p.key for p in self.parameters],
+            strategy=kwargs.get("strategy", "max_abs"),
+            tau=kwargs.get("tau", None),
+            topk=kwargs.get("topk", None),
+            show_plot=kwargs.get("show_plot", True),
+            interactive=kwargs.get("interactive", True),
+        )
+        return selected, sa

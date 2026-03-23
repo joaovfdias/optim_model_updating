@@ -5,63 +5,77 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple, Any
 import numpy as np
 import time
 import warnings
-import json
 
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF, Matern, WhiteKernel, ConstantKernel as C
+from sklearn.gaussian_process.kernels import Matern, WhiteKernel, ConstantKernel as C
 from sklearn.exceptions import ConvergenceWarning
 from scipy.stats import norm
+from scipy.optimize import fmin_l_bfgs_b
 
+# Import your package classes
 from ..optimizer import Optimizer
 from ..individual import Individual
 from ..parameter import *
 
 
+# ==================
+# CONFIGURAÇÃO DO BO
+# ==================
 @dataclass
 class BOConfig:
     """
     Configuration object for Bayesian Optimization.
     """
 
+    # GP / surrogate
     kernel: Any = None
-    alpha: float = 1e-6 # ruído/regularização, aumentar para altos níveis de ruído
+    alpha: float = 1e-6              # regularização numérica (ruído)
     normalize_y: bool = True
-    n_restarts_optimizer: int = 5
+    n_restarts_optimizer: int = 5    # reinícios para otimizar hiperparâmetros do GP
+    normalize_X: bool = True         # normaliza X para [0,1]^d no GP
 
+    # aquisição
     acquisition: str = "EI"
-    xi: float = 0.01 # para EI e POI
-    kappa: float = 2.576 # para UCB
+    xi: float = 0.01                 # EI/POI
+    kappa: float = 2.576             # UCB
 
-    init_points: Optional[int] = None # computado depois conforme número de parâmetros
-    batch_size: int = 1 # avaliações por iteração
-    max_iter: Optional[int] = 100
-    random_state: Optional[int] = None # reprodutibilidade
+    # otimização da aquisição
+    acq_optimizer: str = "lbfgs"  # "sampling" (tradicional) | "lbfgs"
+    acq_hyper_tuning = 3 # quantidade de vezes em que os hiperparâmetros podem ser reduzidos em caso de estagnação (0 or None para desligar). use set_tolerance para definir os critérios para alteração.
+    # lbfgs:
+    acq_n_points: int = 10000        # pontos para pré-seleção
+    acq_n_restarts: int = 5          # multi-starts
+    acq_maxiter: int = 20            # iterações
+    # sampling:
+    n_acq_candidates: int = 5000
+    n_local_perturb: int = 800
 
-    n_acq_candidates: int = 5000 # candidatos amostrados pelo GP para otimizar a acq_func
-    n_local_perturb: int = 800 # amostras locais ao redor do melhor ponto observado
+    # loop
+    init_points: Optional[int] = None
+    init_multiplier = 5
+    init_min = 10
+    batch_size: int = 1
+    # max_iter: Optional[int] = 100 | passar para run
+    random_state: Optional[int] = None
 
+    # objetivo
     minimize: bool = True
 
-    _PRESETS = { # configurações que afetam o custo do BO
-        "default": {
+    # presets de custo
+    _PRESETS = {
+        "low": {
             "init_multiplier": 3,
-            "min_init": 8,
-            "batch_size": 1,
-            "xi": 0.01,
-            "n_restarts_optimizer": 5,
-            "n_acq_candidates": 5000,
-            "n_local_perturb": 800,
-        },
-        "low_budget": {
-            "init_multiplier": 2,
             "min_init": 8,
             "batch_size": 1,
             "xi": 0.02,
             "n_restarts_optimizer": 3,
             "n_acq_candidates": 3000,
             "n_local_perturb": 500,
+            "acq_n_points": 6000,
+            "acq_n_restarts": 3,
+            "acq_maxiter": 1000,
         },
-        "high_cost": {
+        "high": {
             "init_multiplier": 5,
             "min_init": 20,
             "batch_size": 1,
@@ -69,44 +83,35 @@ class BOConfig:
             "n_restarts_optimizer": 8,
             "n_acq_candidates": 8000,
             "n_local_perturb": 1500,
+            "acq_n_points": 20000,
+            "acq_n_restarts": 10,
+            "acq_maxiter": 40,
         },
     }
 
     def computed_init_points(self, n_dims: int, multiplier: float = 3.0, min_points: int = 8) -> int:
-        """
-        Compute the number of initial points given number of dimensions.
-        """
         return max(min_points, int(np.ceil(multiplier * n_dims)))
 
     @classmethod
     def from_preset(cls, name: str, n_dims: Optional[int] = None, base: Optional["BOConfig"] = None, overwrite: bool = False) -> "BOConfig":
-        """
-        Cria um BOConfig a partir de um preset (função interna).
-        - name: nome do preset em _PRESETS
-        - n_dims: calcula init_points via init_multiplier
-        - base: serve como ponto de partida (os campos do preset serão aplicados sobre ele)
-        - overwrite: se True: preset sobrescreve campos do base. Se False: preserva campos que o usuário já alterou no base (comparando com o default).
-        """
         if name not in cls._PRESETS:
             raise ValueError(f"Unknown preset '{name}'. Available: {list(cls._PRESETS.keys())}")
 
         preset = cls._PRESETS[name].copy()
-        # calcula init_points a partir de init_multiplier se for o caso
         preset_init = None
         if n_dims is not None and "init_multiplier" in preset:
             preset_init = max(preset.get("min_init", 8), int(np.ceil(preset["init_multiplier"] * n_dims)))
 
-        default = cls()              # valores padrão do dataclass
+        default = cls()
         cfg = cls() if base is None else cls(**asdict(base))
+        # keys_to_apply = {k: v for k, v in preset.items() if k not in ("init_multiplier", "min_init")}
+        keys_to_apply = {k: v for k, v in preset.items()}
 
-        # campos explícitos do preset a aplicar (ignorar keys de controle)
-        keys_to_apply = {k: v for k, v in preset.items() if k not in ("init_multiplier", "min_init")}
 
         for k, v in keys_to_apply.items():
             if not hasattr(cfg, k):
                 continue
             if not overwrite and base is not None:
-                # se o usuário mudou esse campo (base != default), manter
                 if getattr(base, k) != getattr(default, k):
                     continue
             setattr(cfg, k, v)
@@ -114,50 +119,40 @@ class BOConfig:
         if preset_init is not None:
             if overwrite:
                 cfg.init_points = preset_init
-                # se base foi fornecido e usuário já alterou init_points, manter
             else:
                 if base is None or getattr(base, "init_points") == getattr(default, "init_points"):
                     cfg.init_points = preset_init
-                # caso contrário, valor do base
 
         return cfg
 
     def apply_preset(self, name: str, n_dims: Optional[int] = None, overwrite: bool = False) -> None:
-        """
-        Aplica o preset *na própria instância*, preservando campos conforme overwrite.
-        """
         new_cfg = self.from_preset(name, n_dims=n_dims, base=self, overwrite=overwrite)
-        # atualiza a instância em-place
         for k, v in asdict(new_cfg).items():
             setattr(self, k, v)
 
-    # def to_json(self, path: str) -> None:
-    #     d = asdict(self)
-    #     if d.get("kernel") is not None:
-    #         d["kernel"] = None
-    #     with open(path, "w", encoding="utf-8") as f:
-    #         json.dump(d, f, indent=2)
-    #
-    # @classmethod
-    # def from_json(cls, path: str) -> "BOConfig":
-    #     with open(path, "r", encoding="utf-8") as f:
-    #         d = json.load(f)
-    #     return cls(**d)
 
-
+# =====================
+# BAYESIAN OPTIMIZATION
+# =====================
 class BO(Optimizer):
     def __init__(
         self,
-        fitness_function: Callable[[List[float]], Any],
+        fitness_function,
         parameters: Sequence[Parameter],
-        population_size: int = 1,
+        initial_points: int = None,
         config: Optional[BOConfig] = None,
-):
-        super().__init__(fitness_function, list(parameters), population_size)
-
-        self.algorithms[self.__class__.__name__] = Individual
+    ):
 
         self.config = config or BOConfig()
+        self.n_dims = len(list(parameters))
+
+        if not initial_points and not self.config.init_points:
+            initial_points = self.config.computed_init_points(self.n_dims)
+        else:
+            initial_points = initial_points or self.config.init_points
+
+        super().__init__(fitness_function, list(parameters), population_size=initial_points)
+
         self.rng = np.random.RandomState(self.config.random_state)
 
         self.history_X: List[np.ndarray] = []
@@ -165,22 +160,40 @@ class BO(Optimizer):
         self.gp: Optional[GaussianProcessRegressor] = None
 
         self.parameters = list(parameters)
-        self.n_dims = len(self.parameters)
-
-        # compute default init_points if not provided
-        if self.config.init_points is None:
-            self.config.init_points = self.config.computed_init_points(self.n_dims, multiplier=3.0, min_points=8)
 
         self.bounds = np.array([[getattr(p, "lower_bound"), getattr(p, "upper_bound")] for p in self.parameters], dtype=float)
         self.population: List[Individual] = []
+        self.best = None
 
+        # scaler (normalização interna do GP)
+        self._fit_scaler()
 
-    def _default_kernel(self):
-        n_dims = max(1, self.n_dims)
-        base = Matern(length_scale=np.ones(n_dims), length_scale_bounds=(1e-3, 1e3), nu=2.5)
-        kernel = C(1.0, (1e-3, 1e3)) * base + WhiteKernel(noise_level=1e-6, noise_level_bounds=(1e-9, 1e-3))
-        return kernel
+        if self.config.acq_hyper_tuning:
+            self.set_tolerance(fit_rel=1e-2, patience=10)
+        self.acq_hyper_tuning = self.config.acq_hyper_tuning
 
+    # -----------------
+    # Normalização (GP)
+    # -----------------
+    def _fit_scaler(self) -> None:
+        lo = self.bounds[:, 0]
+        hi = self.bounds[:, 1]
+        span = hi - lo
+        self._x_lo = lo.astype(float)
+        self._x_span = np.where(span == 0.0, 1.0, span).astype(float)
+
+    def _to_unit(self, X: np.ndarray) -> np.ndarray:
+        # [0,1]^d quando normalize_X=True
+        if not self.config.normalize_X:
+            return X
+        Xu = (X - self._x_lo) / self._x_span
+        return np.clip(Xu, 0.0, 1.0)
+
+    def _from_unit(self, Xu: np.ndarray) -> np.ndarray:
+        Xu = np.clip(Xu, 0.0, 1.0)
+        if not self.config.normalize_X:
+            return Xu
+        return self._x_lo + Xu * self._x_span  # Xu * span + lo
 
     def _vec_to_param_list(self, x: np.ndarray) -> List[float]:
         return [float(v) for v in x]
@@ -188,90 +201,132 @@ class BO(Optimizer):
     def _param_list_to_vec(self, param_list: Sequence[float]) -> np.ndarray:
         return np.asarray(param_list, dtype=float)
 
+    # Kernel default (em espaço normalizado)
+    def _default_kernel(self, y: np.ndarray):
+        """
+        Constant * Matern(ARD, ℓ≈0.2) + White(noise_bounds escalados por var(y)).
+        """
+        n_dims = max(1, self.n_dims)
+        ls0 = np.full(n_dims, 0.2, dtype=float)
+        ls_bounds = [(1e-2, 1e2)] * n_dims # testar 1e-3, 1e3
+        var_y = float(np.var(y)) if y.size > 1 else 1.0
+        nl_bounds = (max(1e-12, 1e-9 * var_y), max(1e-9, 1e2 * var_y))
+        base = Matern(length_scale=ls0, length_scale_bounds=ls_bounds, nu=2.5)
+        kernel = C(1.0, (1e-6, 1e6)) * base + WhiteKernel(noise_level=1e-6, noise_level_bounds=nl_bounds)
+        return kernel
 
+    # -------------
+    # Inicialização
+    # -------------
     def initialize(self) -> List[Individual]:
-        n0 = max(1, int(self.config.init_points))
-        backup = getattr(self, "population_size", None)
-        try:
-            if backup is not None:
-                self.population_size = n0
-            pop = super().initial_population()
-        finally:
-            if backup is not None:
-                self.population_size = backup
 
-        # ensure Individuals
-        # pop_checked: List[Individual] = []
+        pop = super().initial_population()
 
         for p in pop:
             if not isinstance(p, Individual):
                 raise TypeError("Initial_population must return a list of 'Individual' objects")
 
-        #     if isinstance(p, Individual):
-        #         pop_checked.append(p)
-        #     elif isinstance(p, dict):
-        #         pop_checked.append(Individual(param=p, fitness_function=self.fitness_function))
-        #     else:
-        #         # assume list/sequence of values in same order as parameters
-        #         pop_checked.append(Individual(param=self._vec_to_param_list(np.asarray(p)), fitness_function=self.fitness_function))
-        # self.population = pop_checked
-
         self.population = pop
-        return pop
+        return self.population
 
-    # EVALUATION ----------
+    # ---------- Avaliação ----------
     def evaluate(self, population: Optional[List[Individual]] = None):
-
-
         pop = population or self.population
-
         for ind in pop:
             ind.evaluate()
+            ind.data = ind.data or {}
+
             x = self._param_list_to_vec(ind.param)
             y = float(ind.fitness)
 
+            # guarda histórico em escala ORIGINAL (deduplicate/prints/logs usam isto)
             self.history_X.append(x)
             self.history_y.append(y if self.config.minimize else -y)
 
-            # armazenar previsão e incerteza
+            # previsão do GP no ponto avaliado (se já houver GP ajustado)
             if self.gp is not None:
-                mu, sigma = self.gp.predict(x.reshape(1, -1), return_std=True)
-                ind.data["pred_fitness"] = float(mu[0])
+                mu, sigma = self._predict_mu_sigma(x.reshape(1, -1))
+                ind.data["pred_mu"] = float(mu[0])
                 ind.data["pred_sigma"] = float(sigma[0])
 
+    # ------------
+    # Ajuste do GP
+    # ------------
     def _fit_gp(self):
-        X = np.vstack(self.history_X)
+        # treina sempre no espaço normalizado (quando normalize_X=True)
+        X_raw = np.vstack(self.history_X)
+        X = self._to_unit(X_raw)
         y = np.asarray(self.history_y, dtype=float)
-        kernel = self.config.kernel or self._default_kernel()
+
+        # filtro de linhas válidas
+        # ok = np.isfinite(X).all(axis=1) & np.isfinite(y)
+        # X, y = X[ok], y[ok]
+
+        # warm-start do kernel otimizado anterior
+        if self.gp is not None and hasattr(self.gp, "kernel_"):
+            kernel0 = self.gp.kernel_
+        else:
+            kernel0 = self.config.kernel or self._default_kernel(y)
+
         self.gp = GaussianProcessRegressor(
-            kernel=kernel,
+            kernel=kernel0,
             alpha=self.config.alpha,
             normalize_y=self.config.normalize_y,
-            n_restarts_optimizer=self.config.n_restarts_optimizer,
+            n_restarts_optimizer=max(1, self.config.n_restarts_optimizer),
+            optimizer="fmin_l_bfgs_b",
             random_state=self.rng,
         )
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=ConvergenceWarning)
             self.gp.fit(X, y)
 
-    def _extract_length_scales(self, kernel):
-        # busca recursiva pelo componente que possui length_scale
-        if hasattr(kernel, "length_scale"):
-            ls = np.atleast_1d(kernel.length_scale).astype(float).tolist()
-            return ls
+    # --------------
+    # Predição do GP
+    # --------------
+    def _predict_mu_sigma(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        assert self.gp is not None
+        Xu = self._to_unit(np.asarray(X, dtype=float))  # normaliza antes de predizer
+        if not np.isfinite(Xu).all():
+            raise ValueError("Predict recebeu X com NaN/inf.")
+        mu, std = self.gp.predict(Xu, return_std=True)
+        std = np.maximum(std, 1e-12)  # evita divisão por zero no EI/PI
+        return mu.reshape(-1,), std.reshape(-1,)
+
+    # --------------------------------
+    # Diagnóstico do kernel (para log)
+    # --------------------------------
+    def _extract_length_scales(self, kernel_obj) -> Optional[List[float]]:
+        if hasattr(kernel_obj, "length_scale"):
+            ls = np.atleast_1d(kernel_obj.length_scale).astype(float)
+            return ls.tolist()
+        # varre k1/k2 recursivamente até achar length_scale
         for attr in ("k1", "k2"):
-            if hasattr(kernel, attr):
-                ls = self._extract_length_scales(getattr(kernel, attr))
+            if hasattr(kernel_obj, attr):
+                ls = self._extract_length_scales(getattr(kernel_obj, attr))
                 if ls is not None:
                     return ls
         return None
 
-    # ACQUISITION FUNCTION ----------
-    def _predict_mu_sigma(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]: # prediz média e desvio padrão do GP
-        assert self.gp is not None
-        mu, std = self.gp.predict(X, return_std=True)
-        return mu.reshape(-1,), std.reshape(-1,)
+    def _kernel_diagnostics(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {}
+        if self.gp is not None and hasattr(self.gp, "kernel_"):
+            k = self.gp.kernel_
+            d["kernel_str"] = str(k)
+            d["length_scales"] = self._extract_length_scales(k)
+            try:
+                d["signal_variance"] = float(k.k1.k1.constant_value)
+            except Exception:
+                pass
+            try:
+                d["noise_level"] = float(k.k2.noise_level)
+            except Exception:
+                pass
+            d["log_marginal_likelihood"] = float(getattr(self.gp, "log_marginal_likelihood_value_", np.nan))
+        return d
 
+    # --------------------
+    # Funções de Aquisição
+    # --------------------
     def _ei(self, X: np.ndarray, best_y: float) -> np.ndarray:
         mu, sigma = self._predict_mu_sigma(X)
         sigma = np.maximum(sigma, 1e-12)
@@ -290,28 +345,30 @@ class BO(Optimizer):
         return norm.cdf(Z)
 
     def _acquisition(self, X: np.ndarray, best_y: float) -> np.ndarray:
-        acq = self.config.acquisition.lower()
-        if acq == 'ei':
+        acq = self.config.acquisition.upper()
+        if acq == 'EI':
             return self._ei(X, best_y)
-        if acq == 'ucb':
+        if acq == 'UCB':
             return self._ucb(X)
-        if acq == 'poi':
+        if acq == 'POI':
             return self._poi(X, best_y)
         raise ValueError(f"Unknown acquisition: {self.config.acquisition}")
 
-    # CANDIDATOS ----------
+    # ---------------------
+    # Candidatos (sampling)
+    # ---------------------
     def _sample_candidates(self, n: int) -> np.ndarray:
         lo = self.bounds[:, 0]
         hi = self.bounds[:, 1]
-        return self.rng.uniform(lo, hi, size=(n, self.n_dims)) # testar outras amostragens
+        return self.rng.uniform(lo, hi, size=(n, self.n_dims))
 
     def _local_around_best(self, best_x: np.ndarray, n: int) -> np.ndarray:
         span = (self.bounds[:, 1] - self.bounds[:, 0])
-        scale = 0.05 * span # testar outras escalas?
+        scale = 0.05 * span
         X = best_x + self.rng.randn(n, self.n_dims) * scale
         return np.clip(X, self.bounds[:, 0], self.bounds[:, 1])
 
-    def _deduplicate(self, X: np.ndarray, existing: np.ndarray, tol: float = 1e-3) -> np.ndarray: # remove pontos próximos aos já observados
+    def _deduplicate(self, X: np.ndarray, existing: np.ndarray, tol: float = 1e-3) -> np.ndarray:
         if existing.size == 0:
             return X
         keep = []
@@ -319,55 +376,180 @@ class BO(Optimizer):
             span = self.bounds[:, 1] - self.bounds[:, 0]
             diff = (existing - X[i]) / span  # normaliza por faixa
             d = np.min(np.linalg.norm(diff, axis=1))
-            if d > tol: # testar outras tolerâncias?
+            if d > tol:
                 keep.append(i)
         if keep:
             return X[keep]
         return X[:0]
 
+    # ----------------------------------
+    # Otimização da aquisição por L-BFGS
+    # ----------------------------------
+    def _optimize_acq_lbfgs(self, best_y: float, q: int) -> np.ndarray:
+        """
+        Otimiza a aquisição em [0,1]^d com L-BFGS-B (multi-start) e retorna q pontos em escala ORIGINAL.
+        Estratégia: pré-amostrar acq em acq_n_points, pegar top-k como seeds e refinar via L-BFGS.
+        """
+        # 1) pré-amostra seeds em [0,1]^d
+        npts = int(max(self.config.acq_n_points, q * 100))
+        Xu = self.rng.rand(npts, self.n_dims)  # seeds no espaço normalizado [0,1]
+        Xu = np.clip(Xu, 0.0, 1.0)  # clip defensivo
+
+        X0 = self._from_unit(Xu)  # escala original
+        # filtro de finitude antes da aquisição
+        # ok = np.isfinite(X0).all(axis=1)
+        # Xu, X0 = Xu[ok], X0[ok]
+        # if X0.size == 0:
+        #     # fallback extremo: centro do domínio
+        #     return self._from_unit(np.full((q, self.n_dims), 0.5))
+
+        vals = self._acquisition(X0, best_y)  # maior é melhor
+        vals = np.asarray(vals, dtype=float)
+        # substitui NaN/inf da aquisição por -inf para não virar seed
+        # vals[~np.isfinite(vals)] = -np.inf
+
+        # 2) selecione multi-starts
+        k = int(max(self.config.acq_n_restarts, q))
+        # garante que há pelo menos k seeds válidas
+        order = np.argsort(-vals)[:min(k, len(vals))]
+        starts = Xu[order]
+
+        bounds_unit = [(0.0, 1.0)] * self.n_dims
+
+        def obj(z_unit: np.ndarray) -> Tuple[float, np.ndarray]:
+            # clip defensivo no espaço unitário
+            z_unit = np.clip(z_unit, 0.0, 1.0)
+            X_real = self._from_unit(z_unit.reshape(1, -1))
+
+            # penalizações se algo sair não-finito
+            # if not np.isfinite(X_real).all():
+            #     return 1e9, None
+
+            val = self._acquisition(X_real, best_y)
+            # if not np.isfinite(val).all():
+            #     return 1e9, None
+
+            # L-BFGS minimiza → usamos negativo (queremos maximizar aquisição)
+            return -float(val[0]), None
+
+        chosen: list[np.ndarray] = []
+        tried: list[tuple[np.ndarray, float]] = []
+
+        # 3) roda L-BFGS a partir de cada seed
+        for x0 in starts:
+            x0 = np.clip(x0, 0.0, 1.0)  # seed clip
+            try:
+                xopt, f, _ = fmin_l_bfgs_b(func=obj, x0=x0, bounds=bounds_unit,
+                                           maxiter=self.config.acq_maxiter)
+                score = -f
+                if not np.isfinite(score):
+                    continue
+                tried.append((xopt.copy(), float(score)))
+            except Exception:
+                # se o solver falhar nesse start, apenas pula
+                continue
+
+        if not tried:
+            # fallback: devolve pontos aleatórios (robustez)
+            Xu_fallback = np.clip(self.rng.rand(q, self.n_dims), 0.0, 1.0)
+            return self._from_unit(Xu_fallback)
+
+        # 4) ordena por valor de aquisição e aplica diversidade simples
+        tried.sort(key=lambda t: t[1], reverse=True)
+        hard_radius = 1e-3  # em [0,1]^d
+
+        for xopt, _score in tried:
+            if len(chosen) >= q:
+                break
+            if not chosen:
+                chosen.append(xopt)
+            else:
+                d = np.min([np.linalg.norm(xopt - c) for c in chosen])
+                if d > hard_radius:
+                    chosen.append(xopt)
+
+        # se ainda faltou preencher q, completa com aleatório robusto
+        while len(chosen) < q:
+            chosen.append(np.clip(self.rng.rand(self.n_dims), 0.0, 1.0))
+
+        Xu_best = np.vstack(chosen[:q])
+        return self._from_unit(Xu_best)
+
+    # ----------------
+    # Seleção do batch
+    # ----------------
     def _propose_batch(self, q: int) -> List[List[float]]:
         assert self.gp is not None and len(self.history_y) > 0
         X_obs = np.vstack(self.history_X)
         y_obs = np.asarray(self.history_y, dtype=float)
 
-        best_idx = int(np.argmin(y_obs)) # melhor ponto até agora
+        best_idx = int(np.argmin(y_obs))
         best_y = float(y_obs[best_idx])
         best_x = X_obs[best_idx]
 
-        Xc = self._sample_candidates(self.config.n_acq_candidates) # gera candidatos aleatórios no espaço inteiro
-        Xc = np.vstack([Xc, self._local_around_best(best_x, self.config.n_local_perturb)]) # adiciona candidatos ao redor do melhor atual (para refinamento/exploitation)
-        Xc = self._deduplicate(Xc, X_obs) # remove candidatos muito próximos aos já testados
-        if Xc.shape[0] == 0:
-            Xc = self._sample_candidates(max(self.config.n_acq_candidates // 2, q))
+        acq_opt = self.config.acq_optimizer.lower()
 
-        acq_vals = self._acquisition(Xc, best_y) # recebem score da acq_func, maior = melhor
+        if acq_opt == "lbfgs":
+            # caminho novo: otimiza aquisição em [0,1]^d
+            X_new = self._optimize_acq_lbfgs(best_y, q)
+        else:
+            # caminho existente: sampling + diversidade
+            Xc = self._sample_candidates(self.config.n_acq_candidates)
+            Xc = np.vstack([Xc, self._local_around_best(best_x, self.config.n_local_perturb)])
+            Xc = self._deduplicate(Xc, X_obs)
+            if Xc.shape[0] == 0:
+                Xc = self._sample_candidates(max(self.config.n_acq_candidates // 2, q))
 
-        span = (self.bounds[:, 1] - self.bounds[:, 0])
-        span = np.where(span == 0, 1.0, span)  # evita divisão por zero
-        hard_radius = 1e-3  # relativo ao espaço (≈0.1% da diagonal normalizada)
-        soft_sigma = 0.02  # largura da penalização (2% ~ suave)
+            acq_vals = self._acquisition(Xc, best_y)
 
-        chosen: List[int] = []
-        acq_copy = acq_vals.copy()
-        Xc_copy = Xc.copy()
-        for _ in range(q):
-            idx = int(np.argmax(acq_copy))  # escolhe canditado com melhor valor de aquisição
-            chosen.append(idx)
+            span = (self.bounds[:, 1] - self.bounds[:, 0])
+            span = np.where(span == 0, 1.0, span)
+            hard_radius = 1e-3
+            soft_sigma = 0.02
 
-            # distância NORMALIZADA
-            diff = (Xc_copy - Xc_copy[idx]) / span
-            d = np.linalg.norm(diff, axis=1)
+            chosen: List[int] = []
+            acq_copy = acq_vals.copy()
+            Xc_copy = Xc.copy()
+            for _ in range(q):
+                idx = int(np.argmax(acq_copy))
+                chosen.append(idx)
 
-            # remove pontos muito próximos (em termos relativos)
-            acq_copy[d < hard_radius] = -np.inf
+                diff = (Xc_copy - Xc_copy[idx]) / span
+                d = np.linalg.norm(diff, axis=1)
 
-            # penalização suave: decai com a distância normalizada
-            acq_copy -= 0.1 * np.exp(-(d ** 2) / (2 * (soft_sigma ** 2))) # penaliza próximos
+                acq_copy[d < hard_radius] = -np.inf
+                acq_copy -= 0.1 * np.exp(-(d ** 2) / (2 * (soft_sigma ** 2)))
 
-        X_new = Xc[chosen]
-        return [self._vec_to_param_list(x) for x in X_new]
+            X_new = Xc[chosen]
 
-    # UPDATE / RUN ----------
+        return [self._vec_to_param_list(x) for x in np.atleast_2d(X_new)]
+
+    # ---------
+    # save/load
+    # ---------
+
+    def _get_local_rng_state(self):
+        try:
+            return list(self.rng.get_state())
+        except Exception:
+            return None
+
+    def _set_local_rng_state(self, state):
+        if state is None:
+            return
+        try:
+            # state[1] pode ter vindo como lista → converte para ndarray
+            if isinstance(state, list) and len(state) >= 2 and isinstance(state[1], list):
+                state = list(state)
+                state[1] = np.asarray(state[1], dtype=np.uint32)
+                state = tuple(state)
+            self.rng.set_state(state)
+        except Exception:
+            pass
+
+    # ------------
+    # Update / Run
+    # ------------
     def update(self) -> List[Individual]:
         if len(self.history_X) == 0:
             raise RuntimeError("Call initialize() and evaluate() before update().")
@@ -376,106 +558,68 @@ class BO(Optimizer):
         new_param_lists = self._propose_batch(q)
         return [Individual(param=plist, fitness_function=self.fitness_function) for plist in new_param_lists]
 
-    def run(self, max_iter=None, status=True, log=True):
-        """
-        Execução do BO:
-          - cria população inicial (n0 = init_points)
-          - avalia, registra pop0, atualiza best
-          - itera propondo batches (q = batch_size), avalia e registra
-          - aplica critério de parada via Optimizer.tolerance entre populações consecutivas
-          - registra specs (inclui length_scales) e tempos ao final
-        """
+    def run(self, iterations) -> Individual:
         self.inicio = time.time()
-        self.status = status
-        max_iter = int(max_iter if max_iter is not None else self.config.max_iter)
 
-        # 1) População inicial
+        # Pontos iniciais
         pop0 = self.initialize()
         self.evaluate(pop0)
-        # armazena como primeira população
-        self.populations = [pop0]
+        self.best = min(self.population, key=lambda p:p.fitness)
 
-        # best global (usado pelo add_log para BO)
-        self.best = self.get_best_individual(pop0)
-
-        if self.status:
-            print(f"\n{len(pop0)} Pontos Iniciais: Melhor Fitness = {self.best.fitness:.4g}, "
-                  f"Parâmetros: {self.display_parameters(self.best)}")
-
-        # logging inicial
-        if log:
+        # status + log dos iniciais
+        best0 = self.get_best_individual(pop0)
+        print(f"\n{len(pop0)} Pontos Iniciais: Melhor Fitness = {best0.fitness:.4g}, Parâmetros: {self.display_parameters(best0)}")
+        # kernel ainda não existe aqui; loga apenas o que houver
+        try:
             self.add_log(0, pop0)
+        except Exception:
+            pass
 
-        # 2) Loop principal
-        for it in range(1, max_iter + 1):
-            # ajusta GP com t0do historico
-            new_pop = self.update()  # propõe 'q' novos pontos
-            self.evaluate(new_pop)  # avalia
-            self.populations.append(new_pop)  # registra batch como “população” desta iteração
+        # Iterações BO
+        for it in range(1, int(iterations) + 1):
 
-            # atualiza melhor global
+            if self.config.acq_hyper_tuning and it == int(0.10*iterations):
+                self.config.n_restarts_optimizer = 1
+
+            # atualiza GP e propõe batch
+            new_pop = self.update()
+            # avalia batch
+            self.evaluate(new_pop)
+            # anexa diagnósticos do kernel (length scales etc.) no data de cada indivíduo
+            diag = self._kernel_diagnostics()
+            for ind in new_pop:
+                ind.data = ind.data or {}
+                ind.data.update(diag)
+
+            if self.acq_hyper_tuning and self.tolerance([self.best], [min(new_pop + [self.best], key=lambda p: p.fitness)]): # critério de parada, determinado com a função set_tolerance
+                self.tolerance_flag = [0] * len(self.tolerance_flag)
+                self.acq_hyper_tuning -= 1
+
+                self.config.xi = self.config.xi / 10
+                self.config.kappa = self.config.kappa * 0.60
+                print(f"Hyperparameter {'kappa' if self.config.acquisition.upper() == 'UCB' else 'xi'} reduced to {self.config.kappa if self.config.acquisition == 'UCB' else self.config.xi} due to fitness stagnation [set config.acq_hyper_tuning=False to keep hyperparameters fixed]")
+
+            self.population.extend(new_pop)
+            self.best = min(self.population, key=lambda p: p.fitness)
+
+            # status desta iteração
             best_new = self.get_best_individual(new_pop)
-            if best_new.fitness < self.best.fitness:
-                self.best = best_new
+            pred_mu = best_new.data.get("pred_mu", None)
+            pred_sig = best_new.data.get("pred_sigma", None)
+            if pred_mu is not None:
+                print(f"Ponto {it}: Fitness = {best_new.fitness:.4g} | Previsto = {pred_mu:.4g} ± {pred_sig:.4g}, Parâmetros: {self.display_parameters(best_new)}")
+            else:
+                print(f"Ponto {it}: Fitness = {best_new.fitness:.4g}, Parâmetros: {self.display_parameters(best_new)}")
 
-            # mensagens de status (inclui previsão do GP se disponível)
-            pred = best_new.data.get("pred_fitness", None)
-            sig = best_new.data.get("pred_sigma", None)
-            if self.status:
-                if pred is not None:
-                    print(f"Ponto {it}: Fitness real = {best_new.fitness:.4g}, "
-                          f"Previsto = {pred:.4g} ± {sig:.4g}, "
-                          f"Parâmetros: {self.display_parameters(best_new)}")
-                else:
-                    print(f"Ponto {it}: Fitness = {best_new.fitness:.4g}, "
-                          f"Parâmetros: {self.display_parameters(best_new)}")
-
-            # logging por iteração
-            if log:
+            # logging por iteração (incluindo pred e diag do kernel)
+            try:
                 self.add_log(it, new_pop)
+            except Exception:
+                pass
 
-            # critério de parada (usa as duas últimas “populações”/batches)
-            if self.tolerance(self.populations[-2], self.populations[-1]):
-                break
-
-        # 3) Finalização
-        fim = time.time()
-
-        if log:
-            # escreve specs (inclui length_scales e sensibilidades relativas) e tempos
-            self.log_specs()
-            self.log_time(fim)
-            print(f"\nRegistro salvo em: {self.log_path}")
-
-        print(f"\nMelhor solução encontrada: Fitness = {self.best.fitness:.4g}, "
-              f"Parâmetros: {self.display_parameters(self.best)}")
-
+        print(f"\nMelhor solução encontrada: Fitness = {self.best.fitness:.4g}, Parâmetros: {self.display_parameters(self.best)}")
         return self.best
 
-    @property
-    def specs(self):
-        cfg = asdict(self.config)
-        kernel_str = None
-        length_scales = None
-        rel_sens = None
 
-        if self.gp is not None and hasattr(self.gp, "kernel_"):
-            kernel_str = str(self.gp.kernel_)
-            length_scales = self._extract_length_scales(self.gp.kernel_)
-            if length_scales:
-                arr = np.array(length_scales, dtype=float)
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    sens = 1.0 / arr
-                    if np.all(np.isfinite(sens)) and sens.sum() > 0:
-                        rel_sens = (sens / sens.sum()).tolist()
-
-        return {
-            "config": cfg,
-            "kernel_str": kernel_str,
-            "length_scales": length_scales,
-            "relative_sensitivities": rel_sens,
-        }
-
-
-# nome alternativo (alias)
+# alias
 BayesianOptimization = BO

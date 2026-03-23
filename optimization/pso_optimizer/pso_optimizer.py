@@ -1,6 +1,7 @@
 import time
 
-from ..optimizer import Optimizer, PopulationBased
+from ..optimizer import Optimizer
+from ..optimizer_population_based import PopulationBased
 
 
 class PSO(PopulationBased):

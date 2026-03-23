@@ -112,7 +112,7 @@ class BO(Optimizer):
 
         print(f"\nMelhor solução encontrada: Fitness = {best_individual.fitness}, Parâmetros: {self.display_parameters(best_individual)}")
 
-        return result
+        return best_individual, result
 
 
     def add_log_specs(self, specs_dictionary, length_scales):

@@ -1,6 +1,7 @@
 import time
 
-from ..optimizer import Optimizer, PopulationBased
+from ..optimizer import Optimizer
+from ..optimizer_population_based import PopulationBased
 from ..parameter import *
 from ..individual import Individual
 from .operators.parents_selection import select_parent
