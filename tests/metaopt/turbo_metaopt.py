@@ -1,15 +1,22 @@
 import numpy as np
 from skopt import gp_minimize
 from skopt.space import Real, Integer
+import os
+import csv
+from datetime import datetime
 
 from optimization.turbo_optimizer.turbo import TuRBO
-from tests.indexador_2026 import indexar_problema
+from tests.indexador_2026 import indexar_problema, indexar_device
+
+from TuRBO_run import TuRBO_run
+
 
 
 class MetaTuRBO:
     def __init__(
             self,
             problem_ids,
+            device,
             evaluations=120,
             batch_size=4,
             n_runs=5,
@@ -28,6 +35,7 @@ class MetaTuRBO:
         """
 
         self.problem_ids = problem_ids
+        self.device = device
         self.evaluations = evaluations
         self.batch_size = batch_size
         self.n_runs = n_runs
@@ -38,6 +46,9 @@ class MetaTuRBO:
         self.problems = [indexar_problema(pid) for pid in problem_ids]
 
         self.dim = len(self.problems[0]["parameters"])
+
+        self.iter_counter = 0
+        self.log_dir = None
 
         # espaço de busca
         self.space = [
@@ -86,6 +97,67 @@ class MetaTuRBO:
 
         return np.array(baselines)
 
+    # REGISTRO
+    @staticmethod
+    def log_meta_iteration(
+            log_dir: str,
+            iter_id: int,
+            config: dict,
+            score_mean: float,
+            score_std: float | None = None,
+            filename: str | None = None,
+    ):
+        """
+        Registra uma iteração da meta-otimização em CSV.
+
+        :param log_dir: diretório onde salvar o log
+        :param iter_id: número da iteração
+        :param config: dicionário com hiperparâmetros
+        :param score_mean: valor médio da função objetivo
+        :param score_std: desvio padrão (opcional)
+        :param filename: nome do arquivo (opcional)
+        """
+
+        os.makedirs(log_dir, exist_ok=True)
+
+        # define nome do arquivo (fixo por execução)
+        if filename is None:
+            filename = "meta_turbo_log.csv"
+
+        filepath = os.path.join(log_dir, filename)
+
+        file_exists = os.path.isfile(filepath)
+
+        # campos do CSV
+        fieldnames = [
+            "iter",
+            "length",
+            "success_tol",
+            "failure_tol",
+            "n_init",
+            "score_mean",
+            "score_std",
+            "timestamp"
+        ]
+
+        with open(filepath, mode="a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+            # escreve header só uma vez
+            if not file_exists:
+                writer.writeheader()
+
+            writer.writerow({
+                "iter": iter_id,
+                "length": config["length"],
+                "success_tol": config["success_tol"],
+                "failure_tol": config["failure_tol"],
+                "n_init": config["n_init"],
+                "score_mean": score_mean,
+                "score_std": score_std,
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            })
+
     # ============================
     # FUNÇÃO OBJETIVO
     # ============================
@@ -95,27 +167,36 @@ class MetaTuRBO:
 
         problem_scores = []
 
-        for i, prob in enumerate(self.problems):
+        for Problema in self.problem_ids:
+
+            pb = indexar_problema(Problema)
+            pc = indexar_device(self.device)
+
+            base_dir = os.path.join(pc.base_path, f"Problema {Problema}")
+            local_dir = os.path.join(pc.local_path, f"Problema {Problema}")
+
+            log_dir = self.log_dir or os.path.join(base_dir, "log", "metaopt")
+
+            script_name = pb.script_filename
+            noise = pb.noise
+            parameters = pb.parameters
 
             run_scores = []
 
-            for run_id in range(self.n_runs):
+            for i in range(self.n_runs):
 
-                seed = self.seeds[run_id % len(self.seeds)]
-
-                optimizer = TuRBO(
-                    prob["fitness_function"],
-                    prob["parameters"],
-                    initial_points=n_init
-                )
-
-                result = optimizer.run(
+                result = TuRBO_run(
+                    irun=i,
+                    parameters=parameters,
+                    base_dir=base_dir,
+                    local_dir=local_dir,
+                    log_dir=os.path.join(log_dir, "runs"),
+                    base_script_filename=script_name,
+                    noise=noise,
+                    initial_points=n_init,
                     evaluations=self.evaluations,
                     batch_size=self.batch_size,
-                    n_init=n_init,
-                    seed=seed,
-                    status=False,
-                    log=False,
+                    acqf="ts",
                     turbo_params={
                         "length": length,
                         "success_tol": int(success_tol),
@@ -127,19 +208,27 @@ class MetaTuRBO:
 
             run_scores = np.array(run_scores)
 
-            # média e desvio
             mean = np.mean(run_scores)
             std = np.std(run_scores)
 
-            # normalização (opcional)
-            if self.normalize:
-                mean = mean / (self.baselines[i] + 1e-12)
-                std = std / (self.baselines[i] + 1e-12)
-
-            # penalizar variabilidade
             score = mean + 0.2 * std
 
+            self.log_meta_iteration(
+                log_dir=log_dir,
+                iter_id=self.iter_counter,
+                config={
+                    "length": length,
+                    "success_tol": int(success_tol),
+                    "failure_tol": int(failure_tol),
+                    "n_init": int(n_init),
+                },
+                score_mean=mean,
+                score_std=std
+            )
+
             problem_scores.append(score)
+
+            self.iter_counter += 1
 
         return np.mean(problem_scores)
 

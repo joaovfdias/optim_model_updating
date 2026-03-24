@@ -20,12 +20,11 @@ def TuRBO_run(
         initial_points=None,
         evaluations=None,
         batch_size=4,
-        acqf="ts"
+        acqf="ts",
+        turbo_params=None
 ):
 
     keys = [parameter.key for parameter in parameters]  # identificadores dos parâmetros (equivalente ao script: %key%)
-
-    keys = [p.key for p in parameters]
 
     ansys_exe_path = r"C:\Program Files\ANSYS Inc\ANSYS Student\v252\commonfiles\launcherQT\src\..\..\..\ansys\bin\winx64\MAPDL.EXE"
 
@@ -122,11 +121,16 @@ def TuRBO_run(
             evaluations=evaluations,
             acqf=acqf,
             batch_size=batch_size,
-            status=True
+            status=True,
+            turbo_params=turbo_params
         )
+
 
     finally:
         try:
-            ansys.mapdl.exit(force=True)
-        except:
-            pass
+            if hasattr(ansys, 'mapdl'):
+                ansys.mapdl.exit(force=True)
+        except Exception as e:
+            print(f"Erro ao finalizar MAPDL: {e}")
+
+    return result
