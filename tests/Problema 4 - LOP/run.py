@@ -10,23 +10,24 @@ def run_TuRBO(irun, parameters, base_dir, local_dir=None, log_dir=None, base_scr
 
 if __name__ == '__main__':
 
-    Problema = 3
-    Compiuter = "LEST 2"
+    Compiuter = "LEST 1"
     runs = 10
+    Problemas = [2]
 
-    pb = indexar_problema(Problema)
-    pc = indexar_device(Compiuter)
+    for Problema in Problemas:
+        pb = indexar_problema(Problema)
+        pc = indexar_device(Compiuter)
 
-    base_dir = os.path.join(pc.base_path, f"Problema {Problema}")
-    local_dir = os.path.join(pc.local_path, f"Problema {Problema}")
+        base_dir = os.path.join(pc.base_path, f"Problema {Problema}")
+        local_dir = os.path.join(pc.local_path, f"Problema {Problema}")
 
-    script_name = pb.script_filename
-    noise = pb.noise
-    parameters = pb.parameters
+        script_name = pb.script_filename
+        noise = pb.noise
+        parameters = pb.parameters
 
-    for irun in range(1, runs+1):
-        print(f"\nRunning TuRBO ({irun}/{runs}). . .")
+        for irun in range(1, runs+1):
+            print(f"\nRunning TuRBO ({irun}/{runs}). . .")
 
-        p = Process(target=run_TuRBO, args=(irun, parameters, base_dir, local_dir, None, script_name, noise))
-        p.start()
-        p.join()
+            p = Process(target=run_TuRBO, args=(irun, parameters, base_dir, local_dir, None, script_name, noise))
+            p.start()
+            p.join()
