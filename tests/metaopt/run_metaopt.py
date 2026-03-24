@@ -1,9 +1,11 @@
 import os
 from datetime import datetime
+
+from tests.indexador_2026 import indexar_device
 from turbo_metaopt import MetaTuRBO
 
 
-def executar_metaopt(nome_etapa, lista_problemas, device):
+def executar_metaopt(nome_etapa, lista_problemas, device, log_dir=None):
     """
     Função auxiliar para instanciar e rodar a meta-otimização,
     evitando repetição de código.
@@ -14,9 +16,9 @@ def executar_metaopt(nome_etapa, lista_problemas, device):
     print("=" * 70)
 
     # Configurações de orçamento (ajuste conforme necessário)
-    EVALS_TURBO = 120
+    EVALS_TURBO = 400
     BATCH_SIZE = 4
-    NUM_RODADAS = 3
+    NUM_RODADAS = 5
 
     # Se for mais de 1 problema, é recomendável ligar a normalização
     # para que um problema com fitness escala 1000 não ofusque um de escala 0.1
@@ -32,13 +34,15 @@ def executar_metaopt(nome_etapa, lista_problemas, device):
         seeds=(42, 100, 333)
     )
 
+    meta_optimizer.log_dir = log_dir
+
     start_time = datetime.now()
 
     # Executa o gp_minimize do skopt
     result, best_params = meta_optimizer.run(
-        n_calls=40,  # Orçamento do BO
+        n_calls=80,  # Orçamento do BO
         n_initial_points=8,  # Exploração inicial (Random/Sobol)
-        random_state=42
+        random_state=None
     )
 
     end_time = datetime.now()
@@ -57,14 +61,15 @@ def executar_metaopt(nome_etapa, lista_problemas, device):
 
 
 if __name__ == "__main__":
-    # Garante que as pastas raiz existam
-    os.makedirs("log", exist_ok=True)
-    os.makedirs("output", exist_ok=True)
+    # # Garante que as pastas raiz existam
+    # os.makedirs("log", exist_ok=True)
+    # os.makedirs("output", exist_ok=True)
 
-    DEVICE_LOCAL = "desktop"  # Ou "notebook"
+    DEVICE_LOCAL = "LEST 2"  # Ou "notebook"
+    pc = indexar_device(DEVICE_LOCAL)
 
     # Lista de todos os problemas que você quer meta-otimizar
-    TODOS_OS_PROBLEMAS = [1, 2, 3]
+    TODOS_OS_PROBLEMAS = [1, 2, 3, 4]
 
     melhores_configs_individuais = {}
 
@@ -82,12 +87,13 @@ if __name__ == "__main__":
     # FASE 2: META-OTIMIZAÇÃO GLOBAL (Generalista) - OPCIONAL
     # =====================================================================
     RODAR_GLOBAL = True
+    GLOBAL_LOG = os.path.join(pc.base_dir, "metaopt", "log")
 
     if RODAR_GLOBAL and len(TODOS_OS_PROBLEMAS) > 1:
         nome_etapa = "Calibração Global (Todos os Problemas)"
 
         # Passa a lista completa. O seu código vai calcular a média de todos!
-        best_params_global = executar_metaopt(nome_etapa, TODOS_OS_PROBLEMAS, DEVICE_LOCAL)
+        best_params_global = executar_metaopt(nome_etapa, TODOS_OS_PROBLEMAS, DEVICE_LOCAL, log_dir=GLOBAL_LOG)
 
     # =====================================================================
     # RESUMO FINAL
