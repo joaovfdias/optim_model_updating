@@ -305,7 +305,7 @@ class TuRBO(Optimizer):
 
     # Otimizar com scikit-optimize
     def run(self, evaluations: int, acqf: str = "ts", status: bool = True, log: bool = True,
-            batch_size: int = 4, n_init: Optional[int] = None, seed: int = 0, turbo_params=None):
+            batch_size: int = 4, n_init: Optional[int] = None, seed: int = 0, turbo_params={}):
         """
         TuRBO-1 loop like BoTorch tutorial.
         - evaluations: total evaluation budget
@@ -343,7 +343,7 @@ class TuRBO(Optimizer):
         Y = torch.tensor(Y_list, dtype=dtype, device=device).unsqueeze(-1)  # (n_init, 1)
 
         # tracking TuRBO state
-        state = self.TurboState(dim=dim, batch_size=batch_size, failure_tolerance=turbo_params.get("failure_tol", len(self.parameters)))
+        state = self.TurboState(dim=dim, batch_size=batch_size, failure_tolerance=turbo_params.get("failure_tol", max(10, len(self.parameters))))
 
         # sobrescrever parâmetros
         state.length = turbo_params.get("length", state.length)

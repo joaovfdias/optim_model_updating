@@ -104,7 +104,7 @@ def TuRBO_run(
         initial_points
     )
 
-    log_dir = log_dir or os.path.join(base_dir, 'log', 'runs', 'TuRBO')
+    log_dir = log_dir or os.path.join(base_dir, 'log', 'runs', 'TuRBO', 'UPD')
 
     log_title = (
         f"TuRBO_ini({initial_points})"
