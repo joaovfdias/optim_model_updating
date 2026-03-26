@@ -116,7 +116,7 @@ def TuRBO_run(
     rodada.set_log(log_title, log_dir, False)
 
     try:
-
+        # Tenta executar a otimização normalmente
         result = rodada.run(
             evaluations=evaluations,
             acqf=acqf,
@@ -124,13 +124,27 @@ def TuRBO_run(
             status=True,
             turbo_params=turbo_params
         )
+    except Exception as e:
+        # Se qualquer coisa explodir matematicamente dentro do TuRBO
+        # (incluindo o botorch.exceptions.errors.ModelFittingError)
+        print(f"\n[FALHA MATEMÁTICA] A configuração de hiperparâmetros falhou: {e}")
+        print("Atribuindo penalidade máxima para descartar essa configuração.")
 
+        # Cria um resultado falso com um fitness absurdo (ex: 1.000.000)
+        # para que o meta-otimizador (gp_minimize) aprenda que essa configuração é horrível
+        result = {
+            "best_fitness": 10,  # fitness bem ruim
+            "X": None,
+            "Y": None,
+            "state": None
+        }
 
     finally:
+        # Garante que o processo do ANSYS vai morrer de qualquer jeito
         try:
             if hasattr(ansys, 'mapdl'):
                 ansys.mapdl.exit(force=True)
         except Exception as e:
-            print(f"Erro ao finalizar MAPDL: {e}")
+            print(f"Erro ao forçar fechamento do MAPDL: {e}")
 
     return result

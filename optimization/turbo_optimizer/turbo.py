@@ -29,6 +29,9 @@ from botorch.models import SingleTaskGP
 from botorch.optim import optimize_acqf
 from botorch.utils.transforms import unnormalize
 
+import warnings
+from botorch.exceptions.errors import ModelFittingError
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.double
 
@@ -238,9 +241,10 @@ class TuRBO(Optimizer):
 
     @staticmethod
     def _fit_gp(X: torch.Tensor, Y: torch.Tensor) -> SingleTaskGP:
-
+        # Aumentamos ligeiramente o limite superior do ruído de 1e-3 para 1e-1
+        # para dar mais folga matemática ao BotTorch em problemas difíceis
         likelihood = GaussianLikelihood(
-            noise_constraint=Interval(1e-8, 1e-3)
+            noise_constraint=Interval(1e-8, 1e-1)
         )
 
         covar_module = ScaleKernel(
@@ -256,7 +260,30 @@ class TuRBO(Optimizer):
 
         mll = ExactMarginalLogLikelihood(model.likelihood, model)
 
-        fit_gpytorch_mll(mll)
+        # Adiciona uma camada de proteção try-except para o ModelFittingError
+        try:
+            # Tenta o ajuste padrão
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                fit_gpytorch_mll(mll)
+        except ModelFittingError:
+            print("\n[Aviso] Falha primária no ajuste do GP. Aplicando Jitter manual...")
+            # Se falhar (ex: por causa de dados muito iguais/platô),
+            # nós quebramos a singularidade somando um ruído minúsculo ("jitter") no Y
+            Y_jittered = Y + 1e-6 * torch.randn_like(Y)
+
+            # Recria o modelo com o Y ligeiramente bagunçado e tenta de novo
+            model = SingleTaskGP(
+                X,
+                Y_jittered,
+                covar_module=covar_module,
+                likelihood=likelihood
+            )
+            mll = ExactMarginalLogLikelihood(model.likelihood, model)
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                fit_gpytorch_mll(mll)
 
         return model
 

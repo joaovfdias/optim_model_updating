@@ -45,7 +45,7 @@ class MetaTuRBO:
         # carregar problemas
         self.problems = [indexar_problema(pid) for pid in problem_ids]
 
-        self.dim = len(self.problems[0]["parameters"])
+        self.dim = len(max(prob.parameters for prob in self.problems))
 
         self.iter_counter = 0
         self.log_dir = None
