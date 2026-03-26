@@ -176,7 +176,7 @@ class MetaTuRBO:
             local_dir = os.path.join(pc.local_path, f"Problema {Problema}")
             os.makedirs(local_dir, exist_ok=True)
 
-            log_dir = self.log_dir or os.path.join(base_dir, "log", "metaopt")
+            log_dir = self.log_dir or os.path.join(base_dir, "log", "metaopt", "lest 1")
             os.makedirs(log_dir, exist_ok=True)
 
             script_name = pb.script_filename

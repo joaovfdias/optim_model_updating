@@ -65,11 +65,11 @@ if __name__ == "__main__":
     # os.makedirs("log", exist_ok=True)
     # os.makedirs("output", exist_ok=True)
 
-    DEVICE_LOCAL = "LEST 2"  # Ou "notebook"
+    DEVICE_LOCAL = "LEST 1"  # Ou "notebook"
     pc = indexar_device(DEVICE_LOCAL)
 
     # Lista de todos os problemas que você quer meta-otimizar
-    TODOS_OS_PROBLEMAS = [1, 2, 3, 4]
+    TODOS_OS_PROBLEMAS = [4]
 
     melhores_configs_individuais = {}
 
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     # =====================================================================
     # FASE 2: META-OTIMIZAÇÃO GLOBAL (Generalista) - OPCIONAL
     # =====================================================================
-    RODAR_GLOBAL = True
+    RODAR_GLOBAL = False
     GLOBAL_LOG = os.path.join(pc.base_dir, "metaopt", "log")
 
     if RODAR_GLOBAL and len(TODOS_OS_PROBLEMAS) > 1:
