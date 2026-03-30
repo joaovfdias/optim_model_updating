@@ -144,7 +144,7 @@ class TuRBO(Optimizer):
         dim: int
         batch_size: int
         length: float = 0.8
-        length_min: float = 0.5 ** 7
+        length_min: float = 0.5 ** 4
         length_max: float = 1.6
         failure_counter: int = 0
         failure_tolerance: int = float("nan")  # Note: Post-initialized
@@ -209,20 +209,26 @@ class TuRBO(Optimizer):
             pert = sobol.draw(n_candidates).to(dtype=dtype, device=device)
             pert = tr_lb + (tr_ub - tr_lb) * pert
 
-            # Create a perturbation mask
             prob_perturb = min(20.0 / dim, 1.0)
             mask = torch.rand(n_candidates, dim, dtype=dtype, device=device) <= prob_perturb
             ind = torch.where(mask.sum(dim=1) == 0)[0]
             mask[ind, torch.randint(0, dim - 1, size=(len(ind),), device=device)] = 1
 
-            # Create candidate points from the perturbations and the mask
             X_cand = x_center.expand(n_candidates, dim).clone()
             X_cand[mask] = pert[mask]
 
-            # Sample on the candidate points
             thompson_sampling = MaxPosteriorSampling(model=model, replacement=False)
-            with torch.no_grad():  # We don't need gradients when using TS
+            with torch.no_grad():
                 X_next = thompson_sampling(X_cand, num_samples=batch_size)
+
+                # Filtro de deduplicacao para evitar singularidade na matriz de covariancia
+                min_dist = 1e-4
+                for i in range(X_next.shape[0]):
+                    distances = torch.norm(X - X_next[i], dim=1)
+                    if torch.any(distances < min_dist):
+                        # Aplicar jitter aleatorio dentro da TR caso o ponto seja muito proximo ao historico
+                        jitter = (torch.rand(dim, dtype=dtype, device=device) - 0.5) * min_dist * 2
+                        X_next[i] = torch.clamp(X_next[i] + jitter, tr_lb, tr_ub)
 
         elif acqf == "ei":
             ei = qExpectedImprovement(model, Y.max())
@@ -239,9 +245,9 @@ class TuRBO(Optimizer):
     @staticmethod
     def _fit_gp(X: torch.Tensor, Y: torch.Tensor) -> SingleTaskGP:
 
-        # Utiliza GreaterThan para estipular apenas um piso numérico, permitindo que o otimizador infira o ruído real dos dados.
+        # Permitir que o modelo utilize um ruido maior para suavizar descontinuidades
         likelihood = GaussianLikelihood(
-            noise_constraint=GreaterThan(1e-6)
+            noise_constraint=GreaterThan(1e-4)
         )
 
         covar_module = ScaleKernel(
@@ -327,7 +333,7 @@ class TuRBO(Optimizer):
         dtype = self.bounds.dtype
 
         dim = self.bounds.shape[1]
-        n_init = n_init or (2 * dim)
+        n_init = n_init or int(1.3 * dim)
 
         # --- 1) initial design in [0,1]^d
         X = self.get_initial_points(dtype=dtype, device=device)
@@ -344,7 +350,7 @@ class TuRBO(Optimizer):
         Y = torch.tensor(Y_list, dtype=dtype, device=device).unsqueeze(-1)  # (n_init, 1)
 
         # tracking TuRBO state
-        state = self.TurboState(dim=dim, batch_size=batch_size, failure_tolerance=turbo_params.get("failure_tol", max(10, len(self.parameters))))
+        state = self.TurboState(dim=dim, batch_size=batch_size, failure_tolerance=turbo_params.get("failure_tol", max(4, len(self.parameters))))
 
         # sobrescrever parâmetros
         state.length = turbo_params.get("length", state.length)

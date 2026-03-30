@@ -10,9 +10,9 @@ def run_TuRBO(irun, parameters, base_dir, local_dir=None, log_dir=None, base_scr
 
 if __name__ == '__main__':
 
-    Compiuter = "LEST 2"
-    runs = 10
-    Problemas = [1,2,3]
+    Compiuter = "DESKTOP"
+    runs = 5
+    Problemas = [1]
 
     for Problema in Problemas:
         pb = indexar_problema(Problema)
