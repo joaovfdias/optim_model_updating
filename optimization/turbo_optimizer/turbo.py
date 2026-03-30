@@ -23,6 +23,7 @@ from torch.quasirandom import SobolEngine
 
 from botorch.acquisition import qExpectedImprovement, qLogExpectedImprovement
 from botorch.exceptions import BadInitialCandidatesWarning
+from botorch.exceptions.errors import ModelFittingError
 from botorch.fit import fit_gpytorch_mll
 from botorch.generation import MaxPosteriorSampling
 from botorch.models import SingleTaskGP
@@ -144,7 +145,7 @@ class TuRBO(Optimizer):
         dim: int
         batch_size: int
         length: float = 0.8
-        length_min: float = 0.5 ** 4
+        length_min: float = 0.5 ** 7
         length_max: float = 1.6
         failure_counter: int = 0
         failure_tolerance: int = float("nan")  # Note: Post-initialized
@@ -221,15 +222,6 @@ class TuRBO(Optimizer):
             with torch.no_grad():
                 X_next = thompson_sampling(X_cand, num_samples=batch_size)
 
-                # Filtro de deduplicacao para evitar singularidade na matriz de covariancia
-                min_dist = 1e-4
-                for i in range(X_next.shape[0]):
-                    distances = torch.norm(X - X_next[i], dim=1)
-                    if torch.any(distances < min_dist):
-                        # Aplicar jitter aleatorio dentro da TR caso o ponto seja muito proximo ao historico
-                        jitter = (torch.rand(dim, dtype=dtype, device=device) - 0.5) * min_dist * 2
-                        X_next[i] = torch.clamp(X_next[i] + jitter, tr_lb, tr_ub)
-
         elif acqf == "ei":
             ei = qExpectedImprovement(model, Y.max())
             X_next, acq_value = optimize_acqf(
@@ -247,7 +239,7 @@ class TuRBO(Optimizer):
 
         # Permitir que o modelo utilize um ruido maior para suavizar descontinuidades
         likelihood = GaussianLikelihood(
-            noise_constraint=GreaterThan(1e-4)
+            noise_constraint=Interval(1e-8, 1e-3)
         )
 
         covar_module = ScaleKernel(
