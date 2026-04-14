@@ -69,7 +69,7 @@ if __name__ == "__main__":
     pc = indexar_device(DEVICE_LOCAL)
 
     # Lista de todos os problemas que você quer meta-otimizar
-    TODOS_OS_PROBLEMAS = [4]
+    TODOS_OS_PROBLEMAS = [3]
 
     melhores_configs_individuais = {}
 
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     # =====================================================================
     # FASE 2: META-OTIMIZAÇÃO GLOBAL (Generalista) - OPCIONAL
     # =====================================================================
-    RODAR_GLOBAL = False
+    RODAR_GLOBAL = True
     GLOBAL_LOG = os.path.join(pc.base_dir, "metaopt", "log")
 
     if RODAR_GLOBAL and len(TODOS_OS_PROBLEMAS) > 1:

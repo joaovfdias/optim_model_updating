@@ -9,7 +9,7 @@ def mutate(individual, param, mutation_type, mutation_rate, mutation_strength):
     options =   {
                 "gaussian": mutate_gaussian,
                 "uniform": mutate_uniform,
-                "bitflip": mutate_bitflib,
+                "bitflip": mutate_bitflip,
                 "random": mutate_random
                 }
     new = []
@@ -33,7 +33,7 @@ def mutate_uniform(value, bounds, rate, strength):
     new_param = bounds.random_value() if random.random() < rate else value
     return new_param
 
-def mutate_bitflib(value, bounds, rate, strength):
+def mutate_bitflip(value, bounds, rate, strength):
     """Mutates a gene, according with a probability mut_rate, to a random value inside the given limits"""
     new_param = int(not (value)) if random.random() < rate else value
     return new_param
