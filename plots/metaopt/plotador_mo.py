@@ -9,8 +9,24 @@ from datetime import datetime
 plt.rcParams['font.family'] = 'Times New Roman'
 plt.rcParams['font.size'] = 12
 
+axes_labels = {
+        "iteration": ["Iteration", "Iteração"],
+        "default": ["Default value", "Valor padrão"],
+        "path": ["Optimal path", "Trajetória ótima"],
+        "points": ["Sampled points", "Pontos avaliados"],
+        "refinement": ["Hyperparameter Refinement", "Refinamento de hiperparâmetro"],
+        "surface": ["Hyperparameter Surface", "Superfície de Hiperparâmetros"],
+        "J": ["Performance Score $J$ (Lower is Better)", 'Pontuação $J$ (Menor é Melhor)'],
+        "config": ["Best-found configuration", "Configuração otimizada"],
+        "crossover": ["Crossover Rate", "Taxa de Cruzamento"],
+        "mutation": ["Mutation Strength", "Força de Mutação"],
+        "c1": ["Cognitive Coefficient ($c_1$)", "Coeficiente Cognitivo ($c_1$)"],
+        "c2": ["Social Coefficient ($c_2$)", "Coeficiente Social "],
+        "w": ["Inertia Weight ($w$)", "Inércia ($w$)"],
+        "attraction": ["Total Acceleration Coefficient ($c_1 + c_2$)", "Força de Atração Total ($c_1 + c_2$)"]
+    }
 
-def plotar_convergencia_bo(df_bo, ylim:dict={}, log:bool=False, salvar_em=None):
+def plotar_convergencia_bo(df_bo, ylim:dict={}, log:bool=False, portuguese=False, salvar_em=None):
     """
     Gera o Gráfico 1: O 'Zoom' Logarítmico do BO (Refinamento de Xi e Kappa)
     """
@@ -33,18 +49,18 @@ def plotar_convergencia_bo(df_bo, ylim:dict={}, log:bool=False, salvar_em=None):
 
         # Traça a linha tracejada fina no valor padrão
         axes[i].axhline(y=valor_padrao, color='grey', linestyle='--', linewidth=1.2, alpha=0.7,
-                        label='Valor padrão')
+                        label=axes_labels['default'][portuguese])
         # ------------------------------------------------------
 
         # Plota a trajetória do Hiperparâmetro Ótimo
         axes[i].plot(best_path['Iteration'], best_path[val_col], marker='o',
-                     linestyle='-', linewidth=2, color=cor, label=f'Trajetória ótima')
+                     linestyle='-', linewidth=2, color=cor, label=axes_labels['path'][portuguese])
 
         # Plota todos os pontos testados no fundo para mostrar o "Grid Search" encolhendo
-        axes[i].scatter(df_fam['Iteration'], df_fam[val_col], color='gray', alpha=0.3, s=20, label='Pontos avaliados')
+        axes[i].scatter(df_fam['Iteration'], df_fam[val_col], color='gray', alpha=0.3, s=20, label=axes_labels['points'][portuguese])
 
-        axes[i].set_title(f"Função {fam}", fontweight='bold', pad=10)
-        axes[i].set_ylabel(f"Valor de $\\{val_col.lower()}$")
+        axes[i].set_title(f"Função {fam}" if portuguese else f"{fam} Function", fontweight='bold', pad=10)
+        axes[i].set_ylabel(f"Valor de $\\{val_col.lower()}$" if portuguese else f"$\\{val_col.lower()}$ value")
         if log: axes[i].set_yscale('log')
         if fam in list(ylim.keys()):
             axes[i].set_ylim(0, ylim[fam])
@@ -52,9 +68,9 @@ def plotar_convergencia_bo(df_bo, ylim:dict={}, log:bool=False, salvar_em=None):
         axes[i].grid(True, which="both", ls="--", alpha=0.5)
         axes[i].legend(loc='best', fontsize=10)
 
-    axes[-1].set_xlabel("Ciclo de amostragem (Iteração)", labelpad=10)
+    axes[-1].set_xlabel(axes_labels["iteration"][portuguese], labelpad=10)
 
-    fig.suptitle("Refinamento do hiperparâmetro", fontsize=18, fontweight='bold',
+    fig.suptitle(axes_labels['refinement'][portuguese], fontsize=18, fontweight='bold',
                  y=0.99)
 
     fig.tight_layout()
@@ -66,7 +82,7 @@ def plotar_convergencia_bo(df_bo, ylim:dict={}, log:bool=False, salvar_em=None):
     plt.close()
 
 
-def plotar_sensibilidade_bo(df_bo, legenda=False, salvar_em=None):
+def plotar_sensibilidade_bo(df_bo, legenda=False, portuguese=False, salvar_em=None):
     """
     Gera o Gráfico de Sensibilidade: Fitness vs Hiperparâmetro (O Efeito Funil)
     """
@@ -88,11 +104,11 @@ def plotar_sensibilidade_bo(df_bo, legenda=False, salvar_em=None):
         # Destaca o melhor ponto de todos com uma estrela vermelha
         vencedor = df_fam.loc[df_fam['Avg_Fit'].idxmin()]
         axes[i].scatter(vencedor['Avg_Fit'], vencedor[val_col],
-                        color='red', marker='*', s=200, edgecolors='black', label='Melhor Global', zorder=5)
+                        color='red', marker='*', s=200, edgecolors='black', label='Global best', zorder=5)
 
         axes[i].set_title(f"{fam}", fontweight='bold', fontsize=18)
         if i == 1: axes[i].set_xlabel("Fitness", fontsize=18, labelpad=10)
-        axes[i].set_ylabel(f"Valor de $\\{val_col.lower()}$", fontsize=16)
+        axes[i].set_ylabel(f"Valor de $\\{val_col.lower()}$" if portuguese else f"$\\{val_col.lower()}$ value", fontsize=16)
 
         # Aplica escala logarítmica apenas para o Xi (que varia em casas decimais)
         if val_col == 'Xi':
@@ -115,7 +131,7 @@ def plotar_sensibilidade_bo(df_bo, legenda=False, salvar_em=None):
     # cbar = fig.colorbar(scatter, ax=axes.ravel().tolist(), pad=0.02)
     # cbar.set_label('Ciclo de Refinamento (Iteração)')
 
-    fig.suptitle("Efeito do Hiperparâmetro na Convergência", fontsize=18, fontweight='bold',
+    fig.suptitle("Hyperparameter value × Fitness", fontsize=18, fontweight='bold',
                  y=0.99)
 
     # Ajusta o layout para não encavalar
@@ -128,7 +144,7 @@ def plotar_sensibilidade_bo(df_bo, legenda=False, salvar_em=None):
     plt.close()
 
 
-def plotar_sensibilidade_bo_unificado(df_bo, salvar_em=None):
+def plotar_sensibilidade_bo_unificado(df_bo, portuguese=False, salvar_em=None):
     """
     Gera o Gráfico de Sensibilidade Unificado para todas as funções de aquisição.
     Eixo Y Esq: Kappa (Linear) | Eixo Y Dir: Xi (Logarítmico)
@@ -145,7 +161,7 @@ def plotar_sensibilidade_bo_unificado(df_bo, salvar_em=None):
 
     # 1. Plota LCB no eixo esquerdo (ax1) - Kappa (Vermelho)
     ax1.scatter(df_lcb['Avg_Fit'], df_lcb['Kappa'], color='red', alpha=0.6, edgecolors='black', s=60,
-                label='LCB ($\kappa$)')
+                label='LCB ($\\kappa$)')
     best_lcb = df_lcb.loc[df_lcb['Avg_Fit'].idxmin()]
     ax1.scatter(best_lcb['Avg_Fit'], best_lcb['Kappa'], color='darkred', marker='*', s=400, edgecolors='black',
                 zorder=5)
@@ -169,11 +185,11 @@ def plotar_sensibilidade_bo_unificado(df_bo, salvar_em=None):
     ax1.tick_params(axis='x', which='major', labelsize=16)
 
     # Eixo Y Esquerdo (Kappa)
-    ax1.set_ylabel("Valor de $\kappa$ (LCB)", fontweight='bold', fontsize=16)
+    ax1.set_ylabel("Valor de $\\kappa$ (LCB)" if portuguese else "$\\kappa$ value (LCB)", fontweight='bold', fontsize=16)
     ax1.tick_params(axis='y', labelcolor='black', labelsize=16)
 
     # Eixo Y Direito (Xi)
-    ax2.set_ylabel("Valor de $\\xi$ (EI e PI)", fontweight='bold', fontsize=16)
+    ax2.set_ylabel("Valor de $\\xi$ (EI e PI)" if portuguese else "$\\xi$ value (EI or PI)", fontweight='bold', fontsize=16)
     ax2.tick_params(axis='y', labelcolor='black', labelsize=16)
     ax2.set_yscale('log')  # Escala Logarítmica para o Xi
 
@@ -191,7 +207,7 @@ def plotar_sensibilidade_bo_unificado(df_bo, salvar_em=None):
     # A legenda fica na esquerda (onde o erro é alto) para não cobrir as estrelas (onde o erro é baixo)
     ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=11, framealpha=0.9)
 
-    plt.title("Desempenho das Funções de Aquisição", fontweight='bold', fontsize=18, pad=10)
+    plt.title("Acquisition function performance", fontweight='bold', fontsize=18, pad=10)
 
     # Ajusta as margens para que os dois eixos Y apareçam perfeitamente
     plt.tight_layout()
@@ -295,7 +311,7 @@ def plotar_correlacao_pop(df_pop, algo="GA", salvar_em=None):
     plt.close()
 
 
-def plotar_mapa_calor_ga(df_ga, salvar_em=None):
+def plotar_mapa_calor_ga(df_ga, portuguese=False, salvar_em=None):
     """
     Gera o Gráfico 3: Mapa de Dispersão Crossover vs Mutação (Onde o GA é melhor?)
     """
@@ -311,16 +327,16 @@ def plotar_mapa_calor_ga(df_ga, salvar_em=None):
 
     # Adiciona a barra de cores
     cbar = fig.colorbar(scatter, ax=ax)
-    cbar.set_label('Pontuação $J$ (Menor é Melhor)')
+    cbar.set_label(axes_labels['J'][portuguese])
 
     # Destaca o vencedor global com uma estrela vermelha
     vencedor = df_ga.loc[df_ga['Score'].idxmin()]
     ax.scatter(vencedor['crossover_rate'], vencedor['mutation_strength'],
-               color='red', marker='*', s=300, label='Configuração ótima', edgecolors='black')
+               color='red', marker='*', s=300, label=axes_labels['config'][portuguese], edgecolors='black')
 
-    ax.set_title("Espaço de Hiperparâmetros do GA", fontweight='bold', pad=10)
-    ax.set_xlabel("Taxa de Crossover")
-    ax.set_ylabel("Força de Mutação")
+    ax.set_title(axes_labels['surface'][portuguese], fontweight='bold', pad=10)
+    ax.set_xlabel(axes_labels['crossover'][portuguese])
+    ax.set_ylabel(axes_labels['mutation'][portuguese])
     ax.grid(True, ls="--", alpha=0.5)
     ax.legend(loc='lower left')
 
@@ -332,7 +348,7 @@ def plotar_mapa_calor_ga(df_ga, salvar_em=None):
     plt.close()
 
 
-def plotar_mapa_calor_pso_cognitivo_social(df_pso, salvar_em=None):
+def plotar_mapa_calor_pso_cognitivo_social(df_pso, portuguese=False, salvar_em=None):
     """
     Gera o Mapa de Dispersão Cognitivo (c1) vs Social (c2).
     Mostra se o enxame foi mais explorador (c2 > c1) ou intensificador (c1 > c2).
@@ -351,16 +367,16 @@ def plotar_mapa_calor_pso_cognitivo_social(df_pso, salvar_em=None):
 
     # Adiciona a barra de cores
     cbar = fig.colorbar(scatter, ax=ax)
-    cbar.set_label('Pontuação $J$ (Menor é Melhor)')
+    cbar.set_label(axes_labels['J'][portuguese])
 
     # Destaca o vencedor global com uma estrela vermelha
     vencedor = df_valido.loc[df_valido['Score'].idxmin()]
     ax.scatter(vencedor['c1'], vencedor['c2'],
-               color='red', marker='*', s=300, label='Configuração ótima', edgecolors='black', zorder=5)
+               color='red', marker='*', s=300, label=axes_labels['config'][portuguese], edgecolors='black', zorder=5)
 
-    ax.set_title("Espaço de Hiperparâmetros do PSO: Cognitivo x Social", fontweight='bold', pad=10)
-    ax.set_xlabel("Coeficiente Cognitivo ($c_1$)")
-    ax.set_ylabel("Coeficiente Social ($c_2$)")
+    ax.set_title(axes_labels['surface'][portuguese] + " ($c_1$ × $c_2$)", fontweight='bold', pad=10)
+    ax.set_xlabel(axes_labels['c1'][portuguese])
+    ax.set_ylabel(axes_labels['c2'][portuguese])
     ax.grid(True, ls="--", alpha=0.5)
     ax.legend(loc='lower left')
 
@@ -376,7 +392,7 @@ def plotar_mapa_calor_pso_cognitivo_social(df_pso, salvar_em=None):
     plt.close()
 
 
-def plotar_mapa_calor_pso_inercia_atracao(df_pso, salvar_em=None):
+def plotar_mapa_calor_pso_inercia_atracao(df_pso, portuguese=False, salvar_em=None):
     """
     Gera o Mapa de Estabilidade Inércia (w) vs Força de Atração (c1 + c2).
     """
@@ -395,15 +411,15 @@ def plotar_mapa_calor_pso_inercia_atracao(df_pso, salvar_em=None):
                          c=df_valido['Score'], cmap='viridis_r', s=tamanho, alpha=0.8, edgecolors='black')
 
     cbar = fig.colorbar(scatter, ax=ax)
-    cbar.set_label('Pontuação $J$ (Menor é Melhor)')
+    cbar.set_label(axes_labels['J'][portuguese])
 
     vencedor = df_valido.loc[df_valido['Score'].idxmin()]
     ax.scatter(vencedor['w'], vencedor['forca_atracao'],
-               color='red', marker='*', s=300, label='Configuração ótima', edgecolors='black', zorder=5)
+               color='red', marker='*', s=300, label=axes_labels['config'][portuguese], edgecolors='black', zorder=5)
 
-    ax.set_title("Estabilidade do PSO: Inércia x Força de Atração", fontweight='bold', pad=10)
-    ax.set_xlabel("Inércia ($w$)")
-    ax.set_ylabel("Força de Atração Total ($c_1 + c_2$)")
+    ax.set_title(axes_labels['surface'][portuguese] + " ($c_1+c_2$ × $w$", fontweight='bold', pad=10)
+    ax.set_xlabel(axes_labels['w'][portuguese])
+    ax.set_ylabel(axes_labels['attraction'][portuguese])
     ax.grid(True, ls="--", alpha=0.5)
     ax.legend(loc='lower left')
 
