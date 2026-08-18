@@ -10,17 +10,9 @@ import os
         # para esse caso, valores contínuos com limites de busca e identificador
 
 parameters = [
-    Continuous(20e9, 35e9, 'modulo_viga_1'),
-    Continuous(20e9, 35e9, 'modulo_viga_2'),
-    Continuous(20e9, 35e9, 'modulo_centro'),
+    Continuous(60e9, 80e9, 'modulo_alum'),
 
     Continuous(0.1, 0.40, 'poisson'),
-    # Continuous(2400, 2600, 'dens'),
-
-    Continuous(50e6, 50e8, 'rigidez1'),
-    # Continuous(50e6, 50e8, 'rigidez2'),
-    # Continuous(50e6, 50e8, 'rigidez3'),
-    Continuous(50e6, 50e8, 'rigidez4')
 ]
 
 # lista apenas com identificadores dos parâmetros (equivalente ao %key% no script.mac)
