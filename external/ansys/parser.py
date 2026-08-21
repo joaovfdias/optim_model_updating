@@ -8,6 +8,7 @@ from typing import Union, List
 
 from .kill_process import kill_ansys_process
 
+from ansys.mapdl import reader as pymapdl_reader
 
 class Ansys:
     """
@@ -21,7 +22,7 @@ class Ansys:
 
     num_nodes define a quantidade de pontos usados para descrever os deslocamentos em cada modo de vibração (será retirado, pode ser ignorado)
     """
-    def __init__(self, ansys_exe_path, ansys_working_dir=None, input_dir=None, base_script_filename=None, base_freq_filename=None, base_modes_filename=None, output_dir=None, legacy=False):
+    def __init__(self, ansys_exe_path, ansys_working_dir=None, input_dir=None, base_script_filename=None, base_freq_filename=None, base_modes_filename=None, output_dir=None, nos_filename=None, legacy=False):
         """
         :param ansys_exe_path: executável do ANSYS
         :param ansys_working_dir: pasta que o ANSYS roda e gera arquivos de saída. se vazio, será em \\ANSYS dentro do caminho atual
@@ -47,25 +48,25 @@ class Ansys:
         self.base_script_path = os.path.join(self.input_dir, base_script_filename or 'script.txt')
         self.index = 0 # usado para numerar os script executáveis
 
-        self.base_freq = self.read_frequencies(os.path.join(self.input_dir, base_freq_filename or 'out_base_freq.txt')) # melhorar, dar opção de pegar o caminho
+        self.legacy = legacy
+        self.base_freq = self.read_frequencies(os.path.join(self.input_dir, base_freq_filename or 'out_base_freq.txt'), force_read=True) # melhorar, dar opção de pegar o caminho
         self.num_base_modes = len(self.base_freq) # define o número de modos com base no número de frequências para ajusta a matriz de dados
         if base_modes_filename is None:
             # default: um arquivo só
             path = os.path.join(self.input_dir, 'out_base_modes.txt')
-            self.base_modes = self.read_modes(path)
+            self.base_modes = self.read_modes(path,force_read=True)
         elif isinstance(base_modes_filename, (list, tuple)):
             # lista de arquivos (x,y,z)
             paths = [os.path.join(self.input_dir, f) for f in base_modes_filename]
-            self.base_modes = self.read_modes(paths)
+            self.base_modes = self.read_modes(paths,force_read=True)
         else:
             # string única
             path = os.path.join(self.input_dir, base_modes_filename)
-            self.base_modes = self.read_modes(path)
+            self.base_modes = self.read_modes(path,force_read=True)
 
         self.out_freq_filename = "out_freq.txt" # alteráveis na chamada das funções read
         self.out_modes_filename = "out_modes.txt"
 
-        self.legacy = legacy
         if not self.legacy:
             self.kill_ansys_process()
             from ansys.mapdl.core import launch_mapdl
@@ -136,47 +137,73 @@ class Ansys:
             print(f"Erro: ANSYS retornou código de saída {result.returncode}.")
             print(f"STDERR: {result.stderr}")
 
-    def read_frequencies(self, path=None):
+    def read_frequencies(self, path=None, force_read = False):
         """
         Por padrão, lerá as frequências armazenadas no arquivo 'out_freq.txt' dentro de 'working_dir'
         ou entrar caminho completo/relativo para o arquivo
         """
-        file = path or os.path.join(self.ansys_working_dir, self.out_freq_filename)
-        frequencies = np.loadtxt(file)
+        if self.legacy or force_read:
+            file = path or os.path.join(self.ansys_working_dir, self.out_freq_filename)
+            frequencies = np.loadtxt(file)
+
+
+        else:
+            rst = os.path.join(self.ansys_working_dir, "file.rst")
+            result = pymapdl_reader.read_binary(rst)
+            frequencies = np.asarray(result.time_values)
 
         self.num_modes = frequencies.shape[0]
 
         return frequencies
 
-    def read_modes(self, path: Union[str, List[str]] = None):
-        """
-        Lê modos a partir de um ou mais arquivos (x,y,z).
-        Cada arquivo contém deslocamentos [nós × modos].
-        Se lista de arquivos for passada, concatena os deslocamentos.
-        Retorna array de shape [num_modes, num_dofs].
-        """
-        if path is None:
-            if isinstance(self.out_modes_filename, (list, tuple)):
-                path = [os.path.join(self.ansys_working_dir, op) for op in self.out_modes_filename]
-            else:
-                path = os.path.join(self.ansys_working_dir, self.out_modes_filename)
+    def read_modes(self, path: Union[str, List[str]] = None, force_read = False):
 
-        # Se paths for lista de arquivos (x, y, z)
-        if isinstance(path, (list, tuple)):
-            modes_concat = []
-            for p in path:
-                data = np.loadtxt(p)
-                num_nodes = int(len(data) / self.num_modes)
-                modes_dir = np.reshape(data, (self.num_modes, num_nodes))
-                modes_concat.append(modes_dir)
-            # concatena nas colunas → resultado [num_modes, num_nodes*ndirs]
-            return np.hstack(modes_concat)
+        if self.legacy or force_read:
+            """
+            Lê modos a partir de um ou mais arquivos (x,y,z).
+            Cada arquivo contém deslocamentos [nós × modos].
+            Se lista de arquivos for passada, concatena os deslocamentos.
+            Retorna array de shape [num_modes, num_dofs].
+            """
+            if path is None:
+                if isinstance(self.out_modes_filename, (list, tuple)):
+                    path = [os.path.join(self.ansys_working_dir, op) for op in self.out_modes_filename]
+                else:
+                    path = os.path.join(self.ansys_working_dir, self.out_modes_filename)
+
+            # Se paths for lista de arquivos (x, y, z)
+            if isinstance(path, (list, tuple)):
+                modes_concat = []
+                for p in path:
+                    data = np.loadtxt(p)
+                    self.num_nodes = int(len(data) / self.num_modes)
+                    modes_dir = np.reshape(data, (self.num_modes, self.num_nodes))
+                    modes_concat.append(modes_dir)
+                # concatena nas colunas → resultado [num_modes, num_nodes*ndirs]
+                return np.hstack(modes_concat)
+            else:
+                # caso paths seja string única
+                data = np.loadtxt(path)
+                self.num_nodes = int(len(data) / self.num_modes)
+                modes = np.reshape(data, (self.num_modes, self.num_nodes))
+                return modes
         else:
-            # caso paths seja string única
-            data = np.loadtxt(path)
-            num_nodes = int(len(data) / self.num_modes)
-            modes = np.reshape(data, (self.num_modes, num_nodes))
-            return modes
+
+            nodes_ref = [100, 102, 102, 207, 303, 303, 4, 35, 35]
+            rst = os.path.join(self.ansys_working_dir,"file.rst")
+            result = pymapdl_reader.read_binary(rst)
+            modes = []
+
+            for i in range(self.num_modes):
+
+                nodes_id,disp = result.nodal_solution(i)
+                ref = [np.where(nodes_id == node)[0][0] for node in nodes_ref]
+
+                modes.append(disp[ref,1])
+
+            return np.array(modes)
+
+
 
     @staticmethod
     def kill_ansys_process():
