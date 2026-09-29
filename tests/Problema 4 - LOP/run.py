@@ -10,9 +10,10 @@ def run_TuRBO(irun, parameters, base_dir, local_dir=None, log_dir=None, base_scr
 
 if __name__ == '__main__':
 
-    Compiuter = "DESKTOP"
-    runs = 5
-    Problemas = [1]
+    Compiuter = "LEST 1"
+    runs = 10
+    Problemas = [4, 2, 3]
+    diretorio = r"C:\Users\Thiago\OneDrive\Documentos\2026.2\Artigo (mestrado)\Novas rodadas"
 
     for Problema in Problemas:
         pb = indexar_problema(Problema)
@@ -20,6 +21,7 @@ if __name__ == '__main__':
 
         base_dir = os.path.join(pc.base_path, f"Problema {Problema}")
         local_dir = os.path.join(pc.local_path, f"Problema {Problema}")
+        log_dir = os.path.join(diretorio, f"Problema {Problema}")
 
         script_name = pb.script_filename
         noise = pb.noise
@@ -28,6 +30,6 @@ if __name__ == '__main__':
         for irun in range(1, runs+1):
             print(f"\nRunning TuRBO ({irun}/{runs}). . .")
 
-            p = Process(target=run_TuRBO, args=(irun, parameters, base_dir, local_dir, None, script_name, noise))
+            p = Process(target=run_TuRBO, args=(irun, parameters, base_dir, local_dir, log_dir, script_name, noise))
             p.start()
             p.join()
