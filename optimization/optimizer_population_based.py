@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import time
 
-from parameter import Parameter
-from optimization import Optimizer, Individual
+from optimization import Optimizer, Individual, Parameter
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Any
 
 
