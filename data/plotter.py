@@ -753,10 +753,10 @@ class Plotter:
 
         ax.yaxis.set_minor_locator(ticker.NullLocator())
 
-        ax.set_xlabel("Número de avaliações", labelpad=self.labelpad)
+        ax.set_xlabel(f"{'Number of Evaluations' if not self.portuguese else 'Número de avaliações'}", labelpad=self.labelpad)
         ax.set_ylabel("Fitness", labelpad=self.labelpad)
 
-        ax.set_title("Convergência: Fitness × Avaliações", pad=self.titlepad)
+        ax.set_title(f"{'Convergence' if not self.portuguese else 'Convergência'}: Fitness × {'Evaluations' if not self.portuguese else 'Avaliações'}", pad=self.titlepad)
 
         if legenda:
             ax.legend()
@@ -989,10 +989,10 @@ class Plotter:
 
         ax.yaxis.set_minor_locator(ticker.NullLocator())
 
-        ax.set_xlabel("Tempo de processamento (s)", labelpad=self.labelpad)
+        ax.set_xlabel(f"{'Elapsed Time (s)' if not self.portuguese else 'Tempo de processamento (s)'}", labelpad=self.labelpad)
         ax.set_ylabel("Fitness", labelpad=self.labelpad)
 
-        ax.set_title("Convergência: Fitness × Tempo", pad=self.titlepad)
+        ax.set_title(f"{'Convergence' if not self.portuguese else 'Convergência'}: Fitness × {'Time' if not self.portuguese else 'Tempo'}", pad=self.titlepad)
 
         if legenda:
             ax.legend()

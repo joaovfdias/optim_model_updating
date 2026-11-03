@@ -7,8 +7,8 @@ from tests.indexador_2026 import indexar_problema
 
 
 ALGOS = ["GA", "PSO", "BO"]
-CONJUNTOS = 3
-problemas = [3]
+CONJUNTOS = [1,2,3]
+problemas = [4]
 
 for problema in problemas:
 
@@ -30,8 +30,8 @@ for problema in problemas:
     for algo in ALGOS:
         algo_dir = os.path.join(global_log_dir, algo)
 
-        for i in range(CONJUNTOS):
-            conjunto_nome = f"Conjunto {i + 1}"
-            conjunto_log_dir = os.path.join(algo_dir, f"Set {i + 1}")
+        for i in CONJUNTOS:
+            conjunto_nome = f"Conjunto {i}_novo"
+            conjunto_log_dir = os.path.join(algo_dir, f"Set {i}")
 
             compile_convergence_history(algo, expected_values, conjunto_log_dir, conjunto_nome)
